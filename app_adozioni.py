@@ -26,13 +26,18 @@ st.markdown("""
 
 # --- FUNZIONI DATI ---
 def get_db_data():
-    """Legge il database dal Cloud"""
+    """Legge il database dal Cloud in modo sicuro"""
     try:
-        # worksheet=SHEET_NAME assicura di leggere il tab corretto
+        # Tentativo 1: Cerca il foglio specifico configurato
         return conn.read(worksheet=SHEET_NAME, ttl="0s").fillna("")
-    except Exception as e:
-        st.error(f"Errore connessione Cloud: {e}")
-        return pd.DataFrame()
+    except Exception:
+        try:
+            # Tentativo 2: Se il nome fallisce, legge il primo foglio a sinistra
+            # Questo evita il 404 se il nome del tab è leggermente diverso
+            return conn.read(ttl="0s").fillna("")
+        except Exception as e:
+            st.error(f"Errore connessione Cloud: {e}")
+            return pd.DataFrame()
 
 def salva_su_gsheets(df):
     """Salva il dataframe su Google Sheets"""
@@ -255,3 +260,4 @@ elif st.session_state.pagina == "Ricerca":
             st.dataframe(df, use_container_width=True)
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f'<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>', unsafe_allow_html=True)
+
