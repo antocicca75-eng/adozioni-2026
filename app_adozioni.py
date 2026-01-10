@@ -196,7 +196,12 @@ elif st.session_state.pagina == "Modifica":
                         nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, key=f"p_{i}")
                         nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, key=f"t_{i}")
                     with col2:
-                        nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=int(df_mod.at[i, 'N° sezioni']) if str(df_mod.at[i, 'N° sezioni']).isdigit() else 1, key=f"n_{i}")
+                        # Gestione sicura del numero sezioni per evitare errori di conversione
+                        try:
+                            valore_sez = int(float(df_mod.at[i, 'N° sezioni']))
+                        except:
+                            valore_sez = 1
+                        nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=valore_sez, key=f"n_{i}")
                         nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"s_{i}")
                     with col3:
                         nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
@@ -210,14 +215,30 @@ elif st.session_state.pagina == "Modifica":
                             
                             df_mod.at[i, 'Plesso'] = nuovo_plesso
                             df_mod.at[i, 'Titolo'] = nuovo_titolo
-                            df_mod.at[i, 'Materia'] = info_new.iloc[0,1] if not info_new.empty else df_mod.at[i, 'Materia']
-                            df_mod.at[i, 'Editore'] = info_new.iloc[0,2] if not info_new.empty else df_mod.at[i, 'Editore']
-                            df_mod.at[i, 'Agenzia'] = info_new.iloc[0,3] if not info_new.empty else df_mod.at[i, 'Agenzia']
+                            # Aggiorna automaticamente i dati collegati al libro
+                            if not info_new.empty:
+                                df_mod.at[i, 'Materia'] = info_new.iloc[0,1]
+                                df_mod.at[i, 'Editore'] = info_new.iloc[0,2]
+                                df_mod.at[i, 'Agenzia'] = info_new.iloc[0,3]
+                            
                             df_mod.at[i, 'N° sezioni'] = nuovo_n_sez
                             df_mod.at[i, 'Sezione'] = nuova_sez_lett.upper()
                             df_mod.at[i, 'Note'] = nuove_note
                             
                             df_mod.to_csv(DB_FILE, index=False)
+                            st.success("Modifica salvata!")
+                            st.rerun()
+                            
+                    with btn_del:
+                        if st.button("🗑️ ELIMINA RIGA", key=f"del_{i}", use_container_width=True):
+                            df_mod = df_mod.drop(i)
+                            df_mod.to_csv(DB_FILE, index=False)
+                            st.warning("Adozione eliminata!")
+                            st.rerun()
+        else:
+            st.info("Nessuna adozione corrispondente ai filtri.")
+    else:
+        st.info("Database vuoto (file CSV non trovato).")
 # --- 4. REGISTRO COMPLETO ---
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
@@ -263,4 +284,5 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else: st.warning("Nessun dato trovato.")
+
 
