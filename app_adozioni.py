@@ -78,6 +78,9 @@ with st.sidebar:
     if st.button("➕ NUOVA ADOZIONE", use_container_width=True, type="primary" if st.session_state.pagina == "Inserimento" else "secondary"):
         st.session_state.pagina = "Inserimento"
         st.rerun()
+    if st.button("✏️ MODIFICA ADOZIONE", use_container_width=True, type="primary" if st.session_state.pagina == "Modifica" else "secondary"):
+        st.session_state.pagina = "Modifica"
+        st.rerun()
     if st.button("🆕 AGGIUNGI A CATALOGO", use_container_width=True, type="primary" if st.session_state.pagina == "NuovoLibro" else "secondary"):
         st.session_state.pagina = "NuovoLibro"
         st.rerun()
@@ -88,7 +91,6 @@ with st.sidebar:
         st.session_state.pagina = "Ricerca"
         st.rerun()
 
-    # --- SOLO AGGIUNTA BACKUP EXCEL ---
     st.markdown("---")
     st.subheader("📥 Backup Excel")
     if os.path.exists(DB_FILE):
@@ -97,7 +99,6 @@ with st.sidebar:
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 df_db.to_excel(writer, index=False, sheet_name='Adozioni')
-            
             st.download_button(
                 label="💾 SCARICA BACKUP .XLSX",
                 data=buffer.getvalue(),
@@ -105,8 +106,7 @@ with st.sidebar:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
-        except:
-            st.caption("Errore generazione backup.")
+        except: st.caption("Errore generazione backup.")
 
 st.title("📚 Gestione Adozioni 2026")
 
@@ -132,8 +132,7 @@ if st.session_state.pagina == "NuovoLibro":
                     st.success(f"Libro '{nt}' aggiunto!")
                     st.cache_data.clear()
                     st.rerun()
-                else:
-                    st.error("Errore: chiudi il file Excel!")
+                else: st.error("Errore: chiudi il file Excel!")
 
 # --- 2. NUOVA ADOZIONE ---
 elif st.session_state.pagina == "Inserimento":
@@ -166,15 +165,46 @@ elif st.session_state.pagina == "Inserimento":
                 pd.concat([df_attuale, nuova_riga], ignore_index=True).to_csv(DB_FILE, index=False)
                 st.success("Adozione registrata!")
 
-# --- 3. REGISTRO COMPLETO ---
+# --- 3. MODIFICA / CANCELLA ADOZIONE ---
+elif st.session_state.pagina == "Modifica":
+    st.subheader("✏️ Modifica o Cancella Adozioni")
+    if os.path.exists(DB_FILE):
+        df_mod = pd.read_csv(DB_FILE)
+        plesso_sel = st.selectbox("🔍 Cerca per Plesso", [""] + sorted(df_mod["Plesso"].unique().tolist()))
+        
+        if plesso_sel:
+            filtro_indici = df_mod[df_mod["Plesso"] == plesso_sel].index
+            for i in filtro_indici:
+                with st.expander(f"📖 {df_mod.at[i, 'Titolo']} - Sez. {df_mod.at[i, 'Sezione']}"):
+                    c1, c2, c3 = st.columns([3, 1, 1])
+                    with c1:
+                        nuovo_titolo = st.selectbox(f"Cambia Titolo", elenco_titoli, index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, key=f"tit_{i}")
+                    with c2:
+                        if st.button("💾 AGGIORNA", key=f"upd_{i}", use_container_width=True):
+                            info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
+                            df_mod.at[i, 'Titolo'] = nuovo_titolo
+                            df_mod.at[i, 'Materia'] = info_new.iloc[0,1]
+                            df_mod.at[i, 'Editore'] = info_new.iloc[0,2]
+                            df_mod.at[i, 'Agenzia'] = info_new.iloc[0,3]
+                            df_mod.to_csv(DB_FILE, index=False)
+                            st.success("Aggiornato!")
+                            st.rerun()
+                    with c3:
+                        if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
+                            df_mod = df_mod.drop(i)
+                            df_mod.to_csv(DB_FILE, index=False)
+                            st.warning("Eliminato!")
+                            st.rerun()
+    else: st.info("Database vuoto.")
+
+# --- 4. REGISTRO COMPLETO ---
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
     if os.path.exists(DB_FILE):
         st.dataframe(pd.read_csv(DB_FILE).sort_index(ascending=False), use_container_width=True)
-    else:
-        st.info("Nessuna registrazione presente.")
+    else: st.info("Nessuna registrazione presente.")
 
-# --- 4. RICERCA ---
+# --- 5. RICERCA ---
 elif st.session_state.pagina == "Ricerca":
     st.subheader("🔍 Motore di Ricerca Adozioni")
     if "r_attiva" not in st.session_state: st.session_state.r_attiva = False
@@ -182,44 +212,33 @@ elif st.session_state.pagina == "Ricerca":
     with st.container(border=True):
         st.markdown("##### 🛠️ Imposta i Filtri")
         r1c1, r1c2 = st.columns(2)
-        with r1c1:
-            f_tit = st.multiselect("📕 Titolo Libro", elenco_titoli, key="ft")
-        with r1c2:
-            f_age = st.multiselect("🤝 Agenzia", elenco_agenzie, key="fa")
+        with r1c1: f_tit = st.multiselect("📕 Titolo Libro", elenco_titoli, key="ft")
+        with r1c2: f_age = st.multiselect("🤝 Agenzia", elenco_agenzie, key="fa")
         
         r2c1, r2c2, r2c3 = st.columns(3)
-        with r2c1:
-            f_ple = st.multiselect("🏫 Plesso", ["NESSUNO"] + elenco_plessi, key="fp")
-        with r2c2:
-            f_mat = st.multiselect("📖 Materia", elenco_materie, key="fm")
-        with r2c3:
-            f_edi = st.multiselect("🏢 Editore", elenco_editori, key="fe")
+        with r2c1: f_ple = st.multiselect("🏫 Plesso", ["NESSUNO"] + elenco_plessi, key="fp")
+        with r2c2: f_mat = st.multiselect("📖 Materia", elenco_materie, key="fm")
+        with r2c3: f_edi = st.multiselect("🏢 Editore", elenco_editori, key="fe")
         
         st.markdown("<br>", unsafe_allow_html=True)
         btn1, btn2, _ = st.columns([1, 1, 2])
         with btn1:
-            if st.button("🔍 AVVIA RICERCA", use_container_width=True, type="primary"):
-                st.session_state.r_attiva = True
+            if st.button("🔍 AVVIA RICERCA", use_container_width=True, type="primary"): st.session_state.r_attiva = True
         with btn2:
-            if st.button("🧹 PULISCI", use_container_width=True, on_click=reset_ricerca):
-                st.rerun()
+            if st.button("🧹 PULISCI", use_container_width=True, on_click=reset_ricerca): st.rerun()
 
-    if st.session_state.r_attiva:
-        if os.path.exists(DB_FILE):
-            df = pd.read_csv(DB_FILE).fillna("").astype(str)
-            if f_ple:
-                if "NESSUNO" in f_ple:
-                    df = df[df["Plesso"] == "___ZERO_RESULTS___"]
-                else:
-                    df = df[df["Plesso"].isin(f_ple)]
-            if f_tit: df = df[df["Titolo"].isin(f_tit)]
-            if f_age: df = df[df["Agenzia"].isin(f_age)]
-            if f_mat: df = df[df["Materia"].isin(f_mat)]
-            if f_edi: df = df[df["Editore"].isin(f_edi)]
+    if st.session_state.r_attiva and os.path.exists(DB_FILE):
+        df = pd.read_csv(DB_FILE).fillna("").astype(str)
+        if f_ple:
+            if "NESSUNO" in f_ple: df = df[df["Plesso"] == "___ZERO_RESULTS___"]
+            else: df = df[df["Plesso"].isin(f_ple)]
+        if f_tit: df = df[df["Titolo"].isin(f_tit)]
+        if f_age: df = df[df["Agenzia"].isin(f_age)]
+        if f_mat: df = df[df["Materia"].isin(f_mat)]
+        if f_edi: df = df[df["Editore"].isin(f_edi)]
 
-            if not df.empty:
-                st.dataframe(df.sort_index(ascending=False), use_container_width=True)
-                somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
-                st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
-            else:
-                st.warning("Nessun dato trovato.")
+        if not df.empty:
+            st.dataframe(df.sort_index(ascending=False), use_container_width=True)
+            somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
+            st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
+        else: st.warning("Nessun dato trovato.")
