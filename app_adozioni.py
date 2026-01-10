@@ -91,7 +91,7 @@ with st.sidebar:
     df_da_esportare = get_adozioni_esistenti()
     if not df_da_esportare.empty:
         buffer = io.BytesIO()
-        # Richiede openpyxl nel file requirements.txt
+        # Nota: assicurati che 'openpyxl' sia presente nel file requirements.txt
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df_da_esportare.to_excel(writer, index=False, sheet_name='Adozioni')
         
@@ -113,7 +113,7 @@ if st.session_state.pagina == "NuovoLibro":
     st.warning("Nota: In questa modalità CSV, le modifiche non verranno salvate permanentemente su GitHub.")
     with st.container(border=True):
         nt = st.text_input("Inserisci Titolo Libro")
-        # Layout mantenuto come da richiesta precedente
+        # Layout mantenuto come da richiesta
 
 # --- 2. NUOVA ADOZIONE ---
 elif st.session_state.pagina == "Inserimento":
