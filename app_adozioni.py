@@ -137,8 +137,19 @@ if st.session_state.pagina == "NuovoLibro":
 # --- 2. NUOVA ADOZIONE ---
 elif st.session_state.pagina == "Inserimento":
     st.subheader("Nuova Registrazione Adozione")
+    
+    # Funzione interna per resettare i campi
+    def reset_campi_inserimento():
+        st.session_state.tit_ins = ""
+        st.session_state.ple_ins = ""
+        st.session_state.n_ins = 1
+        st.session_state.sez_ins = ""
+        st.session_state.note_ins = ""
+
     with st.container(border=True):
+        # Usiamo le key per collegare i widget allo session_state
         titolo_scelto = st.selectbox("📕 SELEZIONA TITOLO", [""] + elenco_titoli, key="tit_ins")
+        
         if titolo_scelto:
             info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
             if not info.empty:
@@ -146,24 +157,39 @@ elif st.session_state.pagina == "Inserimento":
         
         c1, c2 = st.columns(2)
         with c1:
-            plesso = st.selectbox("🏫 Plesso", [""] + elenco_plessi)
-            n_sez = st.number_input("🔢 N° sezioni", min_value=1, value=1)
+            plesso = st.selectbox("🏫 Plesso", [""] + elenco_plessi, key="ple_ins")
+            n_sez = st.number_input("🔢 N° sezioni", min_value=1, value=1, key="n_ins")
         with c2:
-            sez_lett = st.text_input("🔡 Lettera Sezione")
-            note = st.text_area("📝 Note")
+            sez_lett = st.text_input("🔡 Lettera Sezione", key="sez_ins")
+            note = st.text_area("📝 Note", key="note_ins")
 
         if st.button("💾 SALVA ADOZIONE", use_container_width=True, type="primary"):
             if titolo_scelto and plesso:
                 info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
                 nuova_riga = pd.DataFrame([{
                     "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "Plesso": plesso, "Materia": info.iloc[0,1], "Titolo": titolo_scelto,
-                    "Editore": info.iloc[0,2], "Agenzia": info.iloc[0,3], 
-                    "N° sezioni": n_sez, "Sezione": sez_lett.upper(), "Note": note
+                    "Plesso": plesso, 
+                    "Materia": info.iloc[0,1], 
+                    "Titolo": titolo_scelto,
+                    "Editore": info.iloc[0,2], 
+                    "Agenzia": info.iloc[0,3], 
+                    "N° sezioni": n_sez, 
+                    "Sezione": sez_lett.upper(), 
+                    "Note": note
                 }])
+                
+                # Salvataggio su file
                 df_attuale = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame()
                 pd.concat([df_attuale, nuova_riga], ignore_index=True).to_csv(DB_FILE, index=False)
-                st.success("Adozione registrata!")
+                
+                # Messaggio di successo
+                st.success("Adozione registrata con successo!")
+                
+                # Reset dei campi e rinfresco pagina
+                reset_campi_inserimento()
+                st.rerun()
+            else:
+                st.error("Per favore, seleziona almeno Titolo e Plesso.")
 
 # --- 3. MODIFICA / CANCELLA ADOZIONE ---
 elif st.session_state.pagina == "Modifica":
@@ -284,5 +310,6 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else: st.warning("Nessun dato trovato.")
+
 
 
