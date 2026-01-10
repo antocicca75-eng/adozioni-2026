@@ -18,14 +18,23 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 def connetti_google_sheets():
     try:
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        # Carica le credenziali dai Secrets
-        info_json = json.loads(st.secrets["gspread"]["json_data"])
-        if "private_key" in info_json:
-            info_json["private_key"] = info_json["private_key"].replace("\\n", "\n")
+        
+        # Carica il JSON dai secrets
+        json_info = json.loads(st.secrets["gspread"]["json_data"], strict=False)
+        
+        # Sostituisci i backslash per la chiave privata
+        if "private_key" in json_info:
+            json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
             
-        creds = Credentials.from_service_account_info(info_json, scopes=scope)
+        creds = Credentials.from_service_account_info(json_info, scopes=scope)
         client_gs = gspread.authorize(creds)
         
+        ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
+        sh = client_gs.open_by_key(ID_FOGLIO)
+        return sh.get_worksheet(0)
+    except Exception as e:
+        st.error(f"Errore connessione: {e}")
+        return None
         # URL del foglio che mi hai fornito
         ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
         sh = client_gs.open_by_key(ID_FOGLIO)
@@ -302,3 +311,4 @@ elif st.session_state.pagina == "Ricerca":
 
 # Riga finale corretta
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.8</p>", unsafe_allow_html=True)
+
