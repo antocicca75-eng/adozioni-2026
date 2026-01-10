@@ -169,34 +169,55 @@ elif st.session_state.pagina == "Inserimento":
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
     if os.path.exists(DB_FILE):
-        df_mod = pd.read_csv(DB_FILE)
-        plesso_sel = st.selectbox("🔍 Cerca per Plesso", [""] + sorted(df_mod["Plesso"].unique().tolist()))
+        df_mod = pd.read_csv(DB_FILE).fillna("")
         
-        if plesso_sel:
-            filtro_indici = df_mod[df_mod["Plesso"] == plesso_sel].index
-            for i in filtro_indici:
-                with st.expander(f"📖 {df_mod.at[i, 'Titolo']} - Sez. {df_mod.at[i, 'Sezione']}"):
-                    c1, c2, c3 = st.columns([3, 1, 1])
-                    with c1:
-                        nuovo_titolo = st.selectbox(f"Cambia Titolo", elenco_titoli, index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, key=f"tit_{i}")
-                    with c2:
-                        if st.button("💾 AGGIORNA", key=f"upd_{i}", use_container_width=True):
-                            info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
-                            df_mod.at[i, 'Titolo'] = nuovo_titolo
-                            df_mod.at[i, 'Materia'] = info_new.iloc[0,1]
-                            df_mod.at[i, 'Editore'] = info_new.iloc[0,2]
-                            df_mod.at[i, 'Agenzia'] = info_new.iloc[0,3]
-                            df_mod.to_csv(DB_FILE, index=False)
-                            st.success("Aggiornato!")
-                            st.rerun()
-                    with c3:
-                        if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
-                            df_mod = df_mod.drop(i)
-                            df_mod.to_csv(DB_FILE, index=False)
-                            st.warning("Eliminato!")
-                            st.rerun()
-    else: st.info("Database vuoto.")
+        # Filtri di ricerca
+        c_ric1, c_ric2 = st.columns(2)
+        with c_ric1:
+            p_cerca = st.selectbox("🔍 Cerca per Plesso", [""] + sorted(df_mod["Plesso"].unique().tolist()))
+        with c_ric2:
+            t_cerca = st.selectbox("🔍 Cerca per Titolo", [""] + sorted(df_mod["Titolo"].unique().tolist()))
+        
+        # Logica di filtraggio
+        df_filtrato = df_mod.copy()
+        if p_cerca:
+            df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
+        if t_cerca:
+            df_filtrato = df_filtrato[df_filtrato["Titolo"] == t_cerca]
 
+        if not df_filtrato.empty:
+            for i in df_filtrato.index:
+                with st.container(border=True):
+                    # Intestazione della riga con info attuali
+                    st.markdown(f"**Registrazione del {df_mod.at[i, 'Data']}**")
+                    
+                    col1, col2, col3 = st.columns([2, 2, 1])
+                    with col1:
+                        nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, key=f"p_{i}")
+                        nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, key=f"t_{i}")
+                    with col2:
+                        nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=int(df_mod.at[i, 'N° sezioni']) if str(df_mod.at[i, 'N° sezioni']).isdigit() else 1, key=f"n_{i}")
+                        nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"s_{i}")
+                    with col3:
+                        nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
+
+                    # Pulsanti Azione
+                    btn_up, btn_del = st.columns(2)
+                    with btn_up:
+                        if st.button("💾 AGGIORNA TUTTO", key=f"sav_{i}", use_container_width=True, type="primary"):
+                            # Recupero info da catalogo per il nuovo titolo scelto
+                            info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
+                            
+                            df_mod.at[i, 'Plesso'] = nuovo_plesso
+                            df_mod.at[i, 'Titolo'] = nuovo_titolo
+                            df_mod.at[i, 'Materia'] = info_new.iloc[0,1] if not info_new.empty else df_mod.at[i, 'Materia']
+                            df_mod.at[i, 'Editore'] = info_new.iloc[0,2] if not info_new.empty else df_mod.at[i, 'Editore']
+                            df_mod.at[i, 'Agenzia'] = info_new.iloc[0,3] if not info_new.empty else df_mod.at[i, 'Agenzia']
+                            df_mod.at[i, 'N° sezioni'] = nuovo_n_sez
+                            df_mod.at[i, 'Sezione'] = nuova_sez_lett.upper()
+                            df_mod.at[i, 'Note'] = nuove_note
+                            
+                            df_mod.to_csv(DB_FILE, index=False)
 # --- 4. REGISTRO COMPLETO ---
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
@@ -242,3 +263,4 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else: st.warning("Nessun dato trovato.")
+
