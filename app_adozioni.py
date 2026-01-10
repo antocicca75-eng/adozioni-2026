@@ -198,9 +198,12 @@ elif st.session_state.pagina == "Inserimento":
 
 # --- 3. MODIFICA / CANCELLA ADOZIONE ---
 elif st.session_state.pagina == "Modifica":
-    st.subheader("✏️ Modifica o Cancella Adozioni (Cloud)")
-    df_mod = get_db_data()
-    if not df_mod.empty:
+    st.subheader("✏️ Modifica o Cancella Adozioni")
+    if os.path.exists(DB_FILE):
+        # Carichiamo il DB e forziamo le colonne a stringa per evitare problemi con i filtri
+        df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
+        
+        # Filtri di ricerca: prendiamo i valori UNICI direttamente dal database CSV
         c_ric1, c_ric2 = st.columns(2)
         with c_ric1:
             lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
@@ -209,46 +212,73 @@ elif st.session_state.pagina == "Modifica":
             lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
             t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db)
         
+        # MOSTRA I DATI SOLO SE UN FILTRO È ATTIVO
         if p_cerca or t_cerca:
+            # Logica di filtraggio
             df_filtrato = df_mod.copy()
-            if p_cerca: df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
-            if t_cerca: df_filtrato = df_filtrato[df_filtrato["Titolo"] == t_cerca]
+            if p_cerca:
+                df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
+            if t_cerca:
+                df_filtrato = df_filtrato[df_filtrato["Titolo"] == t_cerca]
 
             if not df_filtrato.empty:
                 for i in df_filtrato.index:
                     with st.container(border=True):
                         st.markdown(f"**Registrazione del {df_mod.at[i, 'Data']}**")
+                        
                         col1, col2, col3 = st.columns([2, 2, 1])
                         with col1:
-                            nP = st.selectbox(f"Plesso", elenco_plessi, index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, key=f"p_{i}")
-                            nT = st.selectbox(f"Titolo Libro", elenco_titoli, index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, key=f"t_{i}")
+                            # Qui usiamo elenco_plessi e elenco_titoli dalle anagrafiche generali per la modifica
+                            nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, 
+                                                       index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, 
+                                                       key=f"p_{i}")
+                            nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, 
+                                                       index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, 
+                                                       key=f"t_{i}")
                         with col2:
-                            try: valore_sez = int(float(df_mod.at[i, 'N° sezioni']))
-                            except: valore_sez = 1
-                            nS = st.number_input("N° sezioni", min_value=1, value=valore_sez, key=f"n_{i}")
-                            nL = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"s_{i}")
+                            try:
+                                valore_sez = int(float(df_mod.at[i, 'N° sezioni']))
+                            except:
+                                valore_sez = 1
+                            nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=valore_sez, key=f"n_{i}")
+                            nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"s_{i}")
                         with col3:
-                            nN = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
+                            nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
 
+                        # Pulsanti Azione
                         btn_up, btn_del = st.columns(2)
                         with btn_up:
                             if st.button("💾 AGGIORNA TUTTO", key=f"sav_{i}", use_container_width=True, type="primary"):
-                                info_new = catalogo[catalogo.iloc[:, 0] == nT]
-                                df_mod.at[i, 'Plesso'], df_mod.at[i, 'Titolo'] = nP, nT
+                                info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
+                                
+                                df_mod.at[i, 'Plesso'] = nuovo_plesso
+                                df_mod.at[i, 'Titolo'] = nuovo_titolo
                                 if not info_new.empty:
-                                    df_mod.at[i, 'Materia'], df_mod.at[i, 'Editore'], df_mod.at[i, 'Agenzia'] = info_new.iloc[0,1], info_new.iloc[0,2], info_new.iloc[0,3]
-                                df_mod.at[i, 'N° sezioni'], df_mod.at[i, 'Sezione'], df_mod.at[i, 'Note'] = str(nS), nL.upper(), nN
-                                salva_su_gsheets(df_mod)
+                                    df_mod.at[i, 'Materia'] = info_new.iloc[0,1]
+                                    df_mod.at[i, 'Editore'] = info_new.iloc[0,2]
+                                    df_mod.at[i, 'Agenzia'] = info_new.iloc[0,3]
+                                
+                                df_mod.at[i, 'N° sezioni'] = nuovo_n_sez
+                                df_mod.at[i, 'Sezione'] = nuova_sez_lett.upper()
+                                df_mod.at[i, 'Note'] = nuove_note
+                                
+                                df_mod.to_csv(DB_FILE, index=False)
                                 st.success("Modifica salvata!")
                                 st.rerun()
+                                
                         with btn_del:
                             if st.button("🗑️ ELIMINA RIGA", key=f"del_{i}", use_container_width=True):
-                                salva_su_gsheets(df_mod.drop(i))
+                                df_mod = df_mod.drop(i)
+                                df_mod.to_csv(DB_FILE, index=False)
                                 st.warning("Adozione eliminata!")
                                 st.rerun()
-            else: st.info("Nessuna adozione corrispondente ai filtri.")
-        else: st.info("☝️ Seleziona un Plesso o un Titolo per visualizzare i dati.")
-    else: st.info("Database Google Sheets vuoto.")
+            else:
+                st.info("Nessuna adozione corrispondente ai filtri.")
+        else:
+            # Messaggio mostrato all'apertura quando non c'è ricerca attiva
+            st.info("☝️ Seleziona un Plesso o un Titolo per visualizzare e modificare le adozioni.")
+    else:
+        st.info("Database vuoto (file CSV non trovato).")
 
 # --- 4. REGISTRO COMPLETO ---
 elif st.session_state.pagina == "Registro":
@@ -291,3 +321,4 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else: st.warning("Nessun dato trovato.")
+
