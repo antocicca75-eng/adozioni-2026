@@ -17,32 +17,32 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 # --- FUNZIONE CONNESSIONE GOOGLE SHEETS ---
 def connetti_google_sheets():
     try:
+        # 1. Definiamo i permessi necessari
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         
-        # Carica il JSON dai secrets
+        # 2. Carichiamo i dati dal blocco [gspread] dei Secrets
+        # Usiamo strict=False per gestire meglio eventuali caratteri speciali nel JSON
         json_info = json.loads(st.secrets["gspread"]["json_data"], strict=False)
         
-        # Sostituisci i backslash per la chiave privata
+        # 3. Puliamo la chiave privata (fondamentale per evitare errori di escape)
         if "private_key" in json_info:
             json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
             
+        # 4. Autorizzazione con le credenziali del Service Account
         creds = Credentials.from_service_account_info(json_info, scopes=scope)
         client_gs = gspread.authorize(creds)
         
+        # 5. Apertura del foglio tramite l'ID che mi hai dato
         ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
         sh = client_gs.open_by_key(ID_FOGLIO)
+        
+        # 6. Restituiamo il primo foglio (tab) del documento
         return sh.get_worksheet(0)
+        
     except Exception as e:
-        st.error(f"Errore connessione: {e}")
+        # Se qualcosa va storto, mostra l'errore specifico nella sidebar o nell'app
+        st.error(f"⚠️ Errore connessione Cloud: {e}")
         return None
-        # URL del foglio che mi hai fornito
-        ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
-        sh = client_gs.open_by_key(ID_FOGLIO)
-        return sh.get_worksheet(0)
-    except Exception as e:
-        st.error(f"Errore backup Cloud: {e}")
-        return None
-
 def backup_su_google_sheets(df_da_salvare):
     foglio = connetti_google_sheets()
     if foglio:
@@ -311,4 +311,5 @@ elif st.session_state.pagina == "Ricerca":
 
 # Riga finale corretta
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.8</p>", unsafe_allow_html=True)
+
 
