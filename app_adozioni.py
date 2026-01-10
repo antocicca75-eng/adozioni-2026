@@ -198,24 +198,29 @@ elif st.session_state.pagina == "Inserimento":
 
 # --- 3. MODIFICA / CANCELLA ADOZIONE ---
 elif st.session_state.pagina == "Modifica":
-    st.subheader("✏️ Modifica o Cancella Adozioni (Cloud)")
+    st.subheader("✏️ Modifica o Cancella Adozioni")
     
-    # Invece di leggere il CSV locale, leggiamo da Google Sheets
-    df_mod = get_db_data() 
+    # Leggiamo i dati direttamente da Google Sheets
+    df_mod = get_db_data()
     
+    # Controllo sicurezza: se il foglio Google è vuoto, inizializziamo le colonne per evitare KeyError
+    colonne_necessarie = ["Data", "Plesso", "Materia", "Titolo", "Editore", "Agenzia", "N° sezioni", "Sezione", "Note"]
+    for col in colonne_necessarie:
+        if col not in df_mod.columns:
+            df_mod[col] = ""
+
     if not df_mod.empty:
-        # Filtri di ricerca: prendiamo i valori UNICI direttamente dal database Cloud
+        # Filtri di ricerca: prendiamo i valori UNICI dal database Cloud
         c_ric1, c_ric2 = st.columns(2)
         with c_ric1:
-            lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
+            lista_plessi_db = sorted([str(x) for x in df_mod["Plesso"].unique() if str(x).strip() != ""])
             p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db)
         with c_ric2:
-            lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
+            lista_titoli_db = sorted([str(x) for x in df_mod["Titolo"].unique() if str(x).strip() != ""])
             t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db)
         
         # MOSTRA I DATI SOLO SE UN FILTRO È ATTIVO
         if p_cerca or t_cerca:
-            # Logica di filtraggio
             df_filtrato = df_mod.copy()
             if p_cerca:
                 df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
@@ -246,8 +251,7 @@ elif st.session_state.pagina == "Modifica":
                             nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
 
                         # Pulsanti Azione
-                        btn_up, btn_del, btn_back = st.columns([1, 1, 1])
-                        
+                        btn_up, btn_del, btn_cloud = st.columns([1, 1, 1])
                         with btn_up:
                             if st.button("💾 AGGIORNA", key=f"sav_{i}", use_container_width=True, type="primary"):
                                 info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
@@ -263,21 +267,19 @@ elif st.session_state.pagina == "Modifica":
                                 df_mod.at[i, 'Sezione'] = nuova_sez_lett.upper()
                                 df_mod.at[i, 'Note'] = nuove_note
                                 
-                                # Salvataggio su Google Sheets
                                 salva_su_gsheets(df_mod)
                                 st.success("Modifica salvata su Cloud!")
                                 st.rerun()
                                 
                         with btn_del:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
-                                df_aggiornato = df_mod.drop(i)
-                                salva_su_gsheets(df_aggiornato)
+                                df_mod = df_mod.drop(i)
+                                salva_su_gsheets(df_mod)
                                 st.warning("Adozione eliminata dal Cloud!")
                                 st.rerun()
-                        
-                        with btn_back:
-                            # Tasto Backup specifico per la riga o generale
-                            if st.button("☁️ BACKUP", key=f"back_{i}", use_container_width=True):
+
+                        with btn_cloud:
+                            if st.button("☁️ BACKUP GOOGLE", key=f"cloud_{i}", use_container_width=True):
                                 salva_su_gsheets(df_mod)
                                 st.toast("Sincronizzazione Cloud completata!")
             else:
@@ -285,7 +287,7 @@ elif st.session_state.pagina == "Modifica":
         else:
             st.info("☝️ Seleziona un Plesso o un Titolo per visualizzare e modificare le adozioni.")
     else:
-        st.info("Database Cloud vuoto o non raggiungibile.")\
+        st.info("Il database Cloud è attualmente vuoto.")
 
 # --- 4. REGISTRO COMPLETO ---
 elif st.session_state.pagina == "Registro":
@@ -328,5 +330,6 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else: st.warning("Nessun dato trovato.")
+
 
 
