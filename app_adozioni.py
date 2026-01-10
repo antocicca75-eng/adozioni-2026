@@ -199,22 +199,26 @@ elif st.session_state.pagina == "Inserimento":
 # --- 3. MODIFICA / CANCELLA ADOZIONE ---
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
-    if os.path.exists(DB_FILE):
-        # Carichiamo il DB e forziamo le colonne a stringa per evitare problemi con i filtri
-        df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
+    
+    # Recuperiamo i dati dal Cloud invece di cercare il file locale
+    df_mod = get_db_data()
+    
+    # Se il dataframe non è nullo (ovvero la connessione funziona)
+    if df_mod is not None:
+        # Carichiamo il DB e forziamo le colonne a stringa
+        df_mod = df_mod.fillna("").astype(str)
         
-        # Filtri di ricerca: prendiamo i valori UNICI direttamente dal database CSV
+        # Filtri di ricerca: prendiamo i valori UNICI dal database Cloud
         c_ric1, c_ric2 = st.columns(2)
         with c_ric1:
-            lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
+            lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if str(x).strip() != ""])
             p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db)
         with c_ric2:
-            lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
+            lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if str(x).strip() != ""])
             t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db)
         
         # MOSTRA I DATI SOLO SE UN FILTRO È ATTIVO
         if p_cerca or t_cerca:
-            # Logica di filtraggio
             df_filtrato = df_mod.copy()
             if p_cerca:
                 df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
@@ -228,7 +232,6 @@ elif st.session_state.pagina == "Modifica":
                         
                         col1, col2, col3 = st.columns([2, 2, 1])
                         with col1:
-                            # Qui usiamo elenco_plessi e elenco_titoli dalle anagrafiche generali per la modifica
                             nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, 
                                                        index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, 
                                                        key=f"p_{i}")
@@ -258,27 +261,27 @@ elif st.session_state.pagina == "Modifica":
                                     df_mod.at[i, 'Editore'] = info_new.iloc[0,2]
                                     df_mod.at[i, 'Agenzia'] = info_new.iloc[0,3]
                                 
-                                df_mod.at[i, 'N° sezioni'] = nuovo_n_sez
+                                df_mod.at[i, 'N° sezioni'] = str(nuovo_n_sez)
                                 df_mod.at[i, 'Sezione'] = nuova_sez_lett.upper()
                                 df_mod.at[i, 'Note'] = nuove_note
                                 
-                                df_mod.to_csv(DB_FILE, index=False)
-                                st.success("Modifica salvata!")
+                                # Salvataggio su Google Sheets
+                                salva_su_gsheets(df_mod)
+                                st.success("Modifica salvata su Cloud!")
                                 st.rerun()
                                 
                         with btn_del:
                             if st.button("🗑️ ELIMINA RIGA", key=f"del_{i}", use_container_width=True):
                                 df_mod = df_mod.drop(i)
-                                df_mod.to_csv(DB_FILE, index=False)
-                                st.warning("Adozione eliminata!")
+                                salva_su_gsheets(df_mod)
+                                st.warning("Adozione eliminata dal Cloud!")
                                 st.rerun()
             else:
                 st.info("Nessuna adozione corrispondente ai filtri.")
         else:
-            # Messaggio mostrato all'apertura quando non c'è ricerca attiva
             st.info("☝️ Seleziona un Plesso o un Titolo per visualizzare e modificare le adozioni.")
     else:
-        st.info("Database vuoto (file CSV non trovato).")
+        st.error("Impossibile connettersi a Google Sheets o database vuoto.")
 
 # --- 4. REGISTRO COMPLETO ---
 elif st.session_state.pagina == "Registro":
@@ -321,6 +324,7 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else: st.warning("Nessun dato trovato.")
+
 
 
 
