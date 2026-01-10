@@ -18,28 +18,14 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 # --- FUNZIONE CONNESSIONE GOOGLE SHEETS ---
 def connetti_google_sheets():
     try:
-        # 1. Definiamo i permessi necessari
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        
-        # 2. Carichiamo i dati dal blocco [gspread] dei Secrets
-        # Usiamo strict=False per gestire meglio eventuali caratteri speciali nel JSON
         json_info = json.loads(st.secrets["gspread"]["json_data"], strict=False)
-        
-        # 3. Puliamo la chiave privata (fondamentale per evitare errori di escape)
         if "private_key" in json_info:
             json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
-            
-        # 4. Autorizzazione con le credenziali del Service Account
         creds = Credentials.from_service_account_info(json_info, scopes=scope)
         client_gs = gspread.authorize(creds)
-        
-        # 5. Apertura del foglio tramite l'ID fornito
         sh = client_gs.open_by_key(ID_FOGLIO)
-        
-        # 6. Restituiamo il foglio specifico per il database (Adozioni_DB)
-        # Se preferisci il primo foglio in assoluto, usa: return sh.get_worksheet(0)
         return sh.worksheet("Adozioni_DB")
-        
     except Exception as e:
         st.error(f"⚠️ Errore connessione Cloud: {e}")
         return None
@@ -48,9 +34,7 @@ def backup_su_google_sheets(df_da_salvare):
     foglio = connetti_google_sheets()
     if foglio:
         try:
-            # Pulisce il foglio e scrive i nuovi dati (inclusa intestazione)
             foglio.clear()
-            # Prepariamo i dati convertendo tutto in stringa per evitare errori JSON
             dati = [df_da_salvare.columns.values.tolist()] + df_da_salvare.fillna("").values.tolist()
             foglio.update(dati)
             return True
@@ -96,8 +80,10 @@ def get_lista_plessi():
         except: return []
     return []
 
-# --- PREPARAZIONE DATI ---
+# --- PREPARAZIONE DATI (Sempre eseguiti per popolare i filtri) ---
 catalogo = get_catalogo_libri()
+elenco_plessi = get_lista_plessi()
+
 if not catalogo.empty:
     elenco_titoli = sorted([str(x) for x in catalogo.iloc[:, 0].unique() if str(x).strip() != ""])
     elenco_materie = sorted([str(x) for x in catalogo.iloc[:, 1].unique() if str(x).strip() != ""])
@@ -105,8 +91,6 @@ if not catalogo.empty:
     elenco_agenzie = sorted([str(x) for x in catalogo.iloc[:, 3].unique() if str(x).strip() != ""])
 else:
     elenco_titoli = elenco_materie = elenco_editori = elenco_agenzie = []
-
-elenco_plessi = get_lista_plessi()
 
 # --- GESTIONE NAVIGAZIONE ---
 if "pagina" not in st.session_state:
@@ -212,7 +196,6 @@ elif st.session_state.pagina == "Inserimento":
                 df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
                 df_finale.to_csv(DB_FILE, index=False)
                 
-                # BACKUP AUTOMATICO SU CLOUD
                 backup_su_google_sheets(df_finale)
                 
                 st.success("Adozione registrata e sincronizzata su Cloud!")
@@ -243,6 +226,7 @@ elif st.session_state.pagina == "Modifica":
                         st.markdown(f"**Registrazione del {df_mod.at[i, 'Data']}**")
                         col1, col2, col3 = st.columns([2, 2, 1])
                         with col1:
+                            # Qui usiamo le liste popolate all'inizio del file
                             nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, key=f"p_{i}")
                             nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, key=f"t_{i}")
                         with col2:
@@ -266,13 +250,13 @@ elif st.session_state.pagina == "Modifica":
                                 df_mod.at[i, 'Sezione'] = nuova_sez_lett.upper()
                                 df_mod.at[i, 'Note'] = nuove_note
                                 df_mod.to_csv(DB_FILE, index=False)
-                                backup_su_google_sheets(df_mod) # SINC CLOUD
+                                backup_su_google_sheets(df_mod)
                                 st.rerun()
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
                                 df_mod = df_mod.drop(i)
                                 df_mod.to_csv(DB_FILE, index=False)
-                                backup_su_google_sheets(df_mod) # SINC CLOUD
+                                backup_su_google_sheets(df_mod)
                                 st.rerun()
 
 elif st.session_state.pagina == "Registro":
