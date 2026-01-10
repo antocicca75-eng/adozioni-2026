@@ -198,12 +198,13 @@ elif st.session_state.pagina == "Inserimento":
 
 # --- 3. MODIFICA / CANCELLA ADOZIONE ---
 elif st.session_state.pagina == "Modifica":
-    st.subheader("✏️ Modifica o Cancella Adozioni")
-    if os.path.exists(DB_FILE):
-        # Carichiamo il DB e forziamo le colonne a stringa per evitare problemi con i filtri
-        df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
-        
-        # Filtri di ricerca: prendiamo i valori UNICI direttamente dal database CSV
+    st.subheader("✏️ Modifica o Cancella Adozioni (Cloud)")
+    
+    # Invece di leggere il CSV locale, leggiamo da Google Sheets
+    df_mod = get_db_data() 
+    
+    if not df_mod.empty:
+        # Filtri di ricerca: prendiamo i valori UNICI direttamente dal database Cloud
         c_ric1, c_ric2 = st.columns(2)
         with c_ric1:
             lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
@@ -228,7 +229,6 @@ elif st.session_state.pagina == "Modifica":
                         
                         col1, col2, col3 = st.columns([2, 2, 1])
                         with col1:
-                            # Qui usiamo elenco_plessi e elenco_titoli dalle anagrafiche generali per la modifica
                             nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, 
                                                        index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, 
                                                        key=f"p_{i}")
@@ -246,9 +246,10 @@ elif st.session_state.pagina == "Modifica":
                             nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
 
                         # Pulsanti Azione
-                        btn_up, btn_del = st.columns(2)
+                        btn_up, btn_del, btn_back = st.columns([1, 1, 1])
+                        
                         with btn_up:
-                            if st.button("💾 AGGIORNA TUTTO", key=f"sav_{i}", use_container_width=True, type="primary"):
+                            if st.button("💾 AGGIORNA", key=f"sav_{i}", use_container_width=True, type="primary"):
                                 info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
                                 
                                 df_mod.at[i, 'Plesso'] = nuovo_plesso
@@ -258,27 +259,33 @@ elif st.session_state.pagina == "Modifica":
                                     df_mod.at[i, 'Editore'] = info_new.iloc[0,2]
                                     df_mod.at[i, 'Agenzia'] = info_new.iloc[0,3]
                                 
-                                df_mod.at[i, 'N° sezioni'] = nuovo_n_sez
+                                df_mod.at[i, 'N° sezioni'] = str(nuovo_n_sez)
                                 df_mod.at[i, 'Sezione'] = nuova_sez_lett.upper()
                                 df_mod.at[i, 'Note'] = nuove_note
                                 
-                                df_mod.to_csv(DB_FILE, index=False)
-                                st.success("Modifica salvata!")
+                                # Salvataggio su Google Sheets
+                                salva_su_gsheets(df_mod)
+                                st.success("Modifica salvata su Cloud!")
                                 st.rerun()
                                 
                         with btn_del:
-                            if st.button("🗑️ ELIMINA RIGA", key=f"del_{i}", use_container_width=True):
-                                df_mod = df_mod.drop(i)
-                                df_mod.to_csv(DB_FILE, index=False)
-                                st.warning("Adozione eliminata!")
+                            if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
+                                df_aggiornato = df_mod.drop(i)
+                                salva_su_gsheets(df_aggiornato)
+                                st.warning("Adozione eliminata dal Cloud!")
                                 st.rerun()
+                        
+                        with btn_back:
+                            # Tasto Backup specifico per la riga o generale
+                            if st.button("☁️ BACKUP", key=f"back_{i}", use_container_width=True):
+                                salva_su_gsheets(df_mod)
+                                st.toast("Sincronizzazione Cloud completata!")
             else:
                 st.info("Nessuna adozione corrispondente ai filtri.")
         else:
-            # Messaggio mostrato all'apertura quando non c'è ricerca attiva
             st.info("☝️ Seleziona un Plesso o un Titolo per visualizzare e modificare le adozioni.")
     else:
-        st.info("Database vuoto (file CSV non trovato).")
+        st.info("Database Cloud vuoto o non raggiungibile.")\
 
 # --- 4. REGISTRO COMPLETO ---
 elif st.session_state.pagina == "Registro":
@@ -321,4 +328,5 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else: st.warning("Nessun dato trovato.")
+
 
