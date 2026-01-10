@@ -7,7 +7,6 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
 # --- CONNESSIONE GOOGLE SHEETS ---
-# Questa connessione cercherà l'URL del foglio nei "Secrets" di Streamlit Cloud
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- STILE CSS ---
@@ -22,7 +21,6 @@ st.markdown("""
 # --- FUNZIONI CARICAMENTO E SCRITTURA (GOOGLE SHEETS) ---
 def get_catalogo_libri():
     try:
-        # Legge il foglio 'ListaLibri' dal Foglio Google
         df = conn.read(worksheet="ListaLibri", ttl="1m")
         df.columns = [c.strip() for c in df.columns]
         return df.fillna("")
@@ -30,22 +28,26 @@ def get_catalogo_libri():
         return pd.DataFrame()
 
 def get_lista_plessi():
-    # Per semplicità, i plessi li teniamo fissi o li leggiamo da un foglio chiamato 'Plesso'
     try:
-        df = conn.read(worksheet="Plesso", ttl="10m")
+        # Legge dal foglio dedicato 'Plesso'
+        df = conn.read(worksheet="Plesso", ttl="5m")
         return sorted(df.iloc[:, 0].dropna().unique().tolist())
     except:
-        return ["Plesso A", "Plesso B", "Plesso C"] # Default se manca il foglio
+        return []
+
+def get_lista_agenzie():
+    try:
+        # Legge dal foglio dedicato 'Agenzie'
+        df = conn.read(worksheet="Agenzie", ttl="5m")
+        return sorted(df.iloc[:, 0].dropna().unique().tolist())
+    except:
+        return []
 
 def salva_adozione_google(nuova_riga_dict):
     try:
-        # 1. Legge i dati esistenti dal foglio 'Adozioni'
         df_esistente = conn.read(worksheet="Adozioni", ttl=0)
-        # 2. Crea il DataFrame della nuova riga
         nuova_riga_df = pd.DataFrame([nuova_riga_dict])
-        # 3. Concatena
         df_finale = pd.concat([df_esistente, nuova_riga_df], ignore_index=True)
-        # 4. Sovrascrive il foglio Google
         conn.update(worksheet="Adozioni", data=df_finale)
         return True
     except Exception as e:
@@ -68,11 +70,12 @@ if not catalogo.empty:
     elenco_titoli = sorted([str(x) for x in catalogo.iloc[:, 0].unique() if str(x).strip() != ""])
     elenco_materie = sorted([str(x) for x in catalogo.iloc[:, 1].unique() if str(x).strip() != ""])
     elenco_editori = sorted([str(x) for x in catalogo.iloc[:, 2].unique() if str(x).strip() != ""])
-    elenco_agenzie = sorted([str(x) for x in catalogo.iloc[:, 3].unique() if str(x).strip() != ""])
 else:
-    elenco_titoli = elenco_materie = elenco_editori = elenco_agenzie = []
+    elenco_titoli = elenco_materie = elenco_editori = []
 
+# Liste dinamiche dai fogli dedicati
 elenco_plessi = get_lista_plessi()
+elenco_agenzie = get_lista_agenzie()
 
 # --- GESTIONE NAVIGAZIONE ---
 if "pagina" not in st.session_state:
@@ -101,19 +104,13 @@ with st.sidebar:
     if st.button("🔍 FILTRA E RICERCA", use_container_width=True, type="primary" if st.session_state.pagina == "Ricerca" else "secondary"):
         st.session_state.pagina = "Ricerca"
         st.rerun()
-# --- AGGIUNTA NELLA SIDEBAR PER IL BACKUP ---
-with st.sidebar:
-    st.markdown("---") # Una linea di separazione
+
+    st.markdown("---")
     st.subheader("💾 Sicurezza")
-    
-    # Recupera i dati attuali per il backup
     try:
-        df_backup = conn.read(worksheet="Adozioni", ttl="0")
-        
-        if not df_backup.empty:
-            # Converti il DataFrame in CSV per il download
+        df_backup = conn.read(worksheet="Adozioni", ttl=0)
+        if df_backup is not None and not df_backup.empty:
             csv = df_backup.to_csv(index=False).encode('utf-8')
-            
             st.download_button(
                 label="📥 SCARICA BACKUP (CSV)",
                 data=csv,
@@ -122,9 +119,10 @@ with st.sidebar:
                 use_container_width=True
             )
         else:
-            st.write("Nessun dato da scaricare.")
+            st.info("Database ancora vuoto.")
     except:
-        st.write("Errore caricamento backup.")
+        st.warning("In attesa di connessione...")
+
 st.title("📚 Gestione Adozioni 2026 (Cloud)")
 
 # --- 1. SCHERMATA AGGIUNGI NUOVO LIBRO ---
@@ -186,8 +184,8 @@ elif st.session_state.pagina == "Inserimento":
 # --- 3. REGISTRO COMPLETO ---
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo (Google Sheets)")
-    df_reg = conn.read(worksheet="Adozioni", ttl="0")
-    if not df_reg.empty:
+    df_reg = conn.read(worksheet="Adozioni", ttl=0)
+    if df_reg is not None and not df_reg.empty:
         st.dataframe(df_reg.sort_index(ascending=False), use_container_width=True)
     else:
         st.info("Nessuna registrazione presente.")
@@ -223,9 +221,9 @@ elif st.session_state.pagina == "Ricerca":
                 st.rerun()
 
     if st.session_state.r_attiva:
-        df = conn.read(worksheet="Adozioni", ttl="0").fillna("").astype(str)
+        df = conn.read(worksheet="Adozioni", ttl=0).fillna("").astype(str)
         
-        if not df.empty:
+        if df is not None and not df.empty:
             if f_ple:
                 if "NESSUNO" in f_ple:
                     df = df[df["Plesso"] == "___ZERO___"]
@@ -243,4 +241,5 @@ elif st.session_state.pagina == "Ricerca":
                 st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
             else:
                 st.warning("Nessun risultato.")
-
+        else:
+            st.warning("Il database delle adozioni è vuoto.")
