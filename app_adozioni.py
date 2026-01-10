@@ -101,7 +101,30 @@ with st.sidebar:
     if st.button("🔍 FILTRA E RICERCA", use_container_width=True, type="primary" if st.session_state.pagina == "Ricerca" else "secondary"):
         st.session_state.pagina = "Ricerca"
         st.rerun()
-
+# --- AGGIUNTA NELLA SIDEBAR PER IL BACKUP ---
+with st.sidebar:
+    st.markdown("---") # Una linea di separazione
+    st.subheader("💾 Sicurezza")
+    
+    # Recupera i dati attuali per il backup
+    try:
+        df_backup = conn.read(worksheet="Adozioni", ttl="0")
+        
+        if not df_backup.empty:
+            # Converti il DataFrame in CSV per il download
+            csv = df_backup.to_csv(index=False).encode('utf-8')
+            
+            st.download_button(
+                label="📥 SCARICA BACKUP (CSV)",
+                data=csv,
+                file_name=f"backup_adozioni_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                mime='text/csv',
+                use_container_width=True
+            )
+        else:
+            st.write("Nessun dato da scaricare.")
+    except:
+        st.write("Errore caricamento backup.")
 st.title("📚 Gestione Adozioni 2026 (Cloud)")
 
 # --- 1. SCHERMATA AGGIUNGI NUOVO LIBRO ---
@@ -220,3 +243,4 @@ elif st.session_state.pagina == "Ricerca":
                 st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
             else:
                 st.warning("Nessun risultato.")
+
