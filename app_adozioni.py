@@ -4,12 +4,29 @@ import os
 from datetime import datetime
 from openpyxl import load_workbook
 import io
+from streamlit_gsheets import GSheetsConnection  # <--- Nuova libreria per Google Sheets
 
 # --- CONFIGURAZIONE FILE ---
-DB_FILE = "dati_adozioni.csv"
 CONFIG_FILE = "anagrafiche.xlsx"
 
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
+
+# --- CONNESSIONE GOOGLE SHEETS ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+def get_db_data():
+    """Legge i dati dal database su Google Sheets"""
+    try:
+        # TTL=0 permette di leggere i dati sempre aggiornati
+        return conn.read(ttl=0).dropna(how="all").astype(str)
+    except:
+        # Se il foglio è vuoto o errore, restituisce un DF con le colonne corrette
+        return pd.DataFrame(columns=["Data", "Plesso", "Materia", "Titolo", "Editore", "Agenzia", "N° sezioni", "Sezione", "Note"])
+
+def salva_su_gsheets(df):
+    """Aggiorna il database su Google Sheets"""
+    conn.update(data=df)
+    st.cache_data.clear()
 
 # --- STILE CSS ---
 st.markdown("""
@@ -20,7 +37,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNZIONI CARICAMENTO E SCRITTURA ---
+# --- FUNZIONI CARICAMENTO E SCRITTURA CATALOGO (EXCEL) ---
 @st.cache_data
 def get_catalogo_libri():
     if os.path.exists(CONFIG_FILE):
@@ -63,6 +80,8 @@ elenco_plessi = get_lista_plessi()
 # --- GESTIONE NAVIGAZIONE E RESET ---
 if "pagina" not in st.session_state:
     st.session_state.pagina = "Inserimento"
+if "form_id" not in st.session_state:
+    st.session_state.form_id = 0
 
 def reset_ricerca():
     st.session_state.r_attiva = False
@@ -92,21 +111,25 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.subheader("📥 Backup Excel")
-    if os.path.exists(DB_FILE):
+    st.subheader("☁️ Backup Cloud")
+    df_db = get_db_data() # Legge i dati da Cloud
+    if not df_db.empty:
         try:
-            df_db = pd.read_csv(DB_FILE)
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 df_db.to_excel(writer, index=False, sheet_name='Adozioni')
             st.download_button(
                 label="💾 SCARICA BACKUP .XLSX",
                 data=buffer.getvalue(),
-                file_name=f"backup_adozioni_{datetime.now().strftime('%d_%m_%Y')}.xlsx",
+                file_name=f"backup_cloud_{datetime.now().strftime('%d_%m_%Y')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
         except: st.caption("Errore generazione backup.")
+    
+    if st.button("🔄 BACKUP MANUALE GOOGLE", use_container_width=True):
+        salva_su_gsheets(df_db)
+        st.toast("Backup su Google sincronizzato!")
 
 st.title("📚 Gestione Adozioni 2026")
 
@@ -136,17 +159,9 @@ if st.session_state.pagina == "NuovoLibro":
 
 # --- 2. NUOVA ADOZIONE ---
 elif st.session_state.pagina == "Inserimento":
-    st.subheader("Nuova Registrazione Adozione")
-    
-    # Inizializziamo una chiave di reset se non esiste
-    if "form_id" not in st.session_state:
-        st.session_state.form_id = 0
-
-    # Usiamo un container con una chiave dinamica. 
-    # Cambiando form_id, Streamlit distrugge e ricrea i widget, pulendoli.
+    st.subheader("Nuova Registrazione Adozione (Cloud)")
     with st.container(border=True):
         titolo_scelto = st.selectbox("📕 SELEZIONA TITOLO", [""] + elenco_titoli, key=f"tit_{st.session_state.form_id}")
-        
         if titolo_scelto:
             info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
             if not info.empty:
@@ -162,6 +177,7 @@ elif st.session_state.pagina == "Inserimento":
 
         if st.button("💾 SALVA ADOZIONE", use_container_width=True, type="primary"):
             if titolo_scelto and plesso:
+                df_attuale = get_db_data()
                 info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
                 nuova_riga = pd.DataFrame([{
                     "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -170,29 +186,21 @@ elif st.session_state.pagina == "Inserimento":
                     "Titolo": titolo_scelto,
                     "Editore": info.iloc[0,2], 
                     "Agenzia": info.iloc[0,3], 
-                    "N° sezioni": n_sez, 
+                    "N° sezioni": str(n_sez), 
                     "Sezione": sez_lett.upper(), 
                     "Note": note
                 }])
-                
-                df_attuale = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame()
-                pd.concat([df_attuale, nuova_riga], ignore_index=True).to_csv(DB_FILE, index=False)
-                
-                st.success("Adozione registrata!")
-                
-                # TRUCCO PER RESETTARE: incrementiamo l'ID del form
+                salva_su_gsheets(pd.concat([df_attuale, nuova_riga], ignore_index=True))
+                st.success("Adozione registrata su Google Sheets!")
                 st.session_state.form_id += 1
                 st.rerun()
-            else:
-                st.error("Seleziona Titolo e Plesso!")
+            else: st.error("Seleziona Titolo e Plesso!")
+
 # --- 3. MODIFICA / CANCELLA ADOZIONE ---
 elif st.session_state.pagina == "Modifica":
-    st.subheader("✏️ Modifica o Cancella Adozioni")
-    if os.path.exists(DB_FILE):
-        # Carichiamo il DB e forziamo le colonne a stringa per evitare problemi con i filtri
-        df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
-        
-        # Filtri di ricerca: prendiamo i valori UNICI direttamente dal database CSV
+    st.subheader("✏️ Modifica o Cancella Adozioni (Cloud)")
+    df_mod = get_db_data()
+    if not df_mod.empty:
         c_ric1, c_ric2 = st.columns(2)
         with c_ric1:
             lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
@@ -201,107 +209,77 @@ elif st.session_state.pagina == "Modifica":
             lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
             t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db)
         
-        # MOSTRA I DATI SOLO SE UN FILTRO È ATTIVO
         if p_cerca or t_cerca:
-            # Logica di filtraggio
             df_filtrato = df_mod.copy()
-            if p_cerca:
-                df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
-            if t_cerca:
-                df_filtrato = df_filtrato[df_filtrato["Titolo"] == t_cerca]
+            if p_cerca: df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
+            if t_cerca: df_filtrato = df_filtrato[df_filtrato["Titolo"] == t_cerca]
 
             if not df_filtrato.empty:
                 for i in df_filtrato.index:
                     with st.container(border=True):
                         st.markdown(f"**Registrazione del {df_mod.at[i, 'Data']}**")
-                        
                         col1, col2, col3 = st.columns([2, 2, 1])
                         with col1:
-                            # Qui usiamo elenco_plessi e elenco_titoli dalle anagrafiche generali per la modifica
-                            nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, 
-                                                       index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, 
-                                                       key=f"p_{i}")
-                            nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, 
-                                                       index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, 
-                                                       key=f"t_{i}")
+                            nP = st.selectbox(f"Plesso", elenco_plessi, index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, key=f"p_{i}")
+                            nT = st.selectbox(f"Titolo Libro", elenco_titoli, index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, key=f"t_{i}")
                         with col2:
-                            try:
-                                valore_sez = int(float(df_mod.at[i, 'N° sezioni']))
-                            except:
-                                valore_sez = 1
-                            nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=valore_sez, key=f"n_{i}")
-                            nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"s_{i}")
+                            try: valore_sez = int(float(df_mod.at[i, 'N° sezioni']))
+                            except: valore_sez = 1
+                            nS = st.number_input("N° sezioni", min_value=1, value=valore_sez, key=f"n_{i}")
+                            nL = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"s_{i}")
                         with col3:
-                            nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
+                            nN = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
 
-                        # Pulsanti Azione
                         btn_up, btn_del = st.columns(2)
                         with btn_up:
                             if st.button("💾 AGGIORNA TUTTO", key=f"sav_{i}", use_container_width=True, type="primary"):
-                                info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
-                                
-                                df_mod.at[i, 'Plesso'] = nuovo_plesso
-                                df_mod.at[i, 'Titolo'] = nuovo_titolo
+                                info_new = catalogo[catalogo.iloc[:, 0] == nT]
+                                df_mod.at[i, 'Plesso'], df_mod.at[i, 'Titolo'] = nP, nT
                                 if not info_new.empty:
-                                    df_mod.at[i, 'Materia'] = info_new.iloc[0,1]
-                                    df_mod.at[i, 'Editore'] = info_new.iloc[0,2]
-                                    df_mod.at[i, 'Agenzia'] = info_new.iloc[0,3]
-                                
-                                df_mod.at[i, 'N° sezioni'] = nuovo_n_sez
-                                df_mod.at[i, 'Sezione'] = nuova_sez_lett.upper()
-                                df_mod.at[i, 'Note'] = nuove_note
-                                
-                                df_mod.to_csv(DB_FILE, index=False)
+                                    df_mod.at[i, 'Materia'], df_mod.at[i, 'Editore'], df_mod.at[i, 'Agenzia'] = info_new.iloc[0,1], info_new.iloc[0,2], info_new.iloc[0,3]
+                                df_mod.at[i, 'N° sezioni'], df_mod.at[i, 'Sezione'], df_mod.at[i, 'Note'] = str(nS), nL.upper(), nN
+                                salva_su_gsheets(df_mod)
                                 st.success("Modifica salvata!")
                                 st.rerun()
-                                
                         with btn_del:
                             if st.button("🗑️ ELIMINA RIGA", key=f"del_{i}", use_container_width=True):
-                                df_mod = df_mod.drop(i)
-                                df_mod.to_csv(DB_FILE, index=False)
+                                salva_su_gsheets(df_mod.drop(i))
                                 st.warning("Adozione eliminata!")
                                 st.rerun()
-            else:
-                st.info("Nessuna adozione corrispondente ai filtri.")
-        else:
-            # Messaggio mostrato all'apertura quando non c'è ricerca attiva
-            st.info("☝️ Seleziona un Plesso o un Titolo per visualizzare e modificare le adozioni.")
-    else:
-        st.info("Database vuoto (file CSV non trovato).")
+            else: st.info("Nessuna adozione corrispondente ai filtri.")
+        else: st.info("☝️ Seleziona un Plesso o un Titolo per visualizzare i dati.")
+    else: st.info("Database Google Sheets vuoto.")
+
 # --- 4. REGISTRO COMPLETO ---
 elif st.session_state.pagina == "Registro":
-    st.subheader("📑 Registro Completo")
-    if os.path.exists(DB_FILE):
-        st.dataframe(pd.read_csv(DB_FILE).sort_index(ascending=False), use_container_width=True)
-    else: st.info("Nessuna registrazione presente.")
+    st.subheader("📑 Registro Completo (Cloud)")
+    df = get_db_data()
+    if not df.empty:
+        st.dataframe(df.sort_index(ascending=False), use_container_width=True)
+    else: st.info("Nessuna registrazione presente su Cloud.")
 
 # --- 5. RICERCA ---
 elif st.session_state.pagina == "Ricerca":
-    st.subheader("🔍 Motore di Ricerca Adozioni")
-    if "r_attiva" not in st.session_state: st.session_state.r_attiva = False
-
+    st.subheader("🔍 Motore di Ricerca Cloud")
     with st.container(border=True):
-        st.markdown("##### 🛠️ Imposta i Filtri")
         r1c1, r1c2 = st.columns(2)
         with r1c1: f_tit = st.multiselect("📕 Titolo Libro", elenco_titoli, key="ft")
         with r1c2: f_age = st.multiselect("🤝 Agenzia", elenco_agenzie, key="fa")
-        
         r2c1, r2c2, r2c3 = st.columns(3)
         with r2c1: f_ple = st.multiselect("🏫 Plesso", ["NESSUNO"] + elenco_plessi, key="fp")
         with r2c2: f_mat = st.multiselect("📖 Materia", elenco_materie, key="fm")
         with r2c3: f_edi = st.multiselect("🏢 Editore", elenco_editori, key="fe")
         
-        st.markdown("<br>", unsafe_allow_html=True)
         btn1, btn2, _ = st.columns([1, 1, 2])
         with btn1:
             if st.button("🔍 AVVIA RICERCA", use_container_width=True, type="primary"): st.session_state.r_attiva = True
         with btn2:
             if st.button("🧹 PULISCI", use_container_width=True, on_click=reset_ricerca): st.rerun()
 
-    if st.session_state.r_attiva and os.path.exists(DB_FILE):
-        df = pd.read_csv(DB_FILE).fillna("").astype(str)
+    if st.session_state.get("r_attiva"):
+        df = get_db_data()
         if f_ple:
-            if "NESSUNO" in f_ple: df = df[df["Plesso"] == "___ZERO_RESULTS___"]
+            if "NESSUNO" in f_ple: df = df[df["Plesso"] == "___ZERO___"]
             else: df = df[df["Plesso"].isin(f_ple)]
         if f_tit: df = df[df["Titolo"].isin(f_tit)]
         if f_age: df = df[df["Agenzia"].isin(f_age)]
@@ -313,8 +291,3 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else: st.warning("Nessun dato trovato.")
-
-
-
-
-
