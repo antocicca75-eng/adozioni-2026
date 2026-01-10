@@ -11,6 +11,7 @@ import json
 # --- CONFIGURAZIONE FILE ---
 DB_FILE = "dati_adozioni.csv"
 CONFIG_FILE = "anagrafiche.xlsx"
+ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
 
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
@@ -32,26 +33,29 @@ def connetti_google_sheets():
         creds = Credentials.from_service_account_info(json_info, scopes=scope)
         client_gs = gspread.authorize(creds)
         
-        # 5. Apertura del foglio tramite l'ID che mi hai dato
-        ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
+        # 5. Apertura del foglio tramite l'ID fornito
         sh = client_gs.open_by_key(ID_FOGLIO)
         
-        # 6. Restituiamo il primo foglio (tab) del documento
-        return sh.get_worksheet(0)
+        # 6. Restituiamo il foglio specifico per il database (Adozioni_DB)
+        # Se preferisci il primo foglio in assoluto, usa: return sh.get_worksheet(0)
+        return sh.worksheet("Adozioni_DB")
         
     except Exception as e:
-        # Se qualcosa va storto, mostra l'errore specifico nella sidebar o nell'app
         st.error(f"⚠️ Errore connessione Cloud: {e}")
         return None
+
 def backup_su_google_sheets(df_da_salvare):
     foglio = connetti_google_sheets()
     if foglio:
         try:
             # Pulisce il foglio e scrive i nuovi dati (inclusa intestazione)
             foglio.clear()
-            foglio.update([df_da_salvare.columns.values.tolist()] + df_da_salvare.fillna("").values.tolist())
+            # Prepariamo i dati convertendo tutto in stringa per evitare errori JSON
+            dati = [df_da_salvare.columns.values.tolist()] + df_da_salvare.fillna("").values.tolist()
+            foglio.update(dati)
             return True
-        except:
+        except Exception as e:
+            st.sidebar.error(f"Errore scrittura Cloud: {e}")
             return False
     return False
 
@@ -309,7 +313,4 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else: st.warning("Nessun dato trovato.")
 
-# Riga finale corretta
-st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.8</p>", unsafe_allow_html=True)
-
-
+st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.9</p>", unsafe_allow_html=True)
