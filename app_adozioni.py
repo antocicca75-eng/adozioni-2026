@@ -2,171 +2,122 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
+import io
 
-# --- CONFIGURAZIONE PAGINA ---
+# --- CONFIGURAZIONE ---
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
-# --- CONNESSIONE GOOGLE SHEETS (TEST DI CONNESSIONE) ---
-try:
-    # Connessione principale
-    conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception as e:
-    st.error("Errore fatale di configurazione. Verifica i Secrets.")
-    st.stop()
+# Connessione ultra-rapida
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- STILE CSS ---
-st.markdown("""
-    <style>
-    [data-testid="stDataEditor"] thead tr th { background-color: #004a99 !important; color: white !important; }
-    .stApp { background-color: #ffffff; }
-    .totale-box { padding: 20px; background-color: #e8f0fe; border-radius: 10px; border: 1px solid #004a99; margin-top: 15px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- FUNZIONI CARICAMENTO DATI ---
-
-def get_catalogo_libri():
+# --- FUNZIONI CARICAMENTO ---
+def carica_dati(foglio, tempo=1):
     try:
-        # ttl=1 forza il ricaricamento quasi immediato per il test
-        df = conn.read(worksheet="Catalogo", ttl=1)
+        df = conn.read(worksheet=foglio, ttl=tempo)
         if df is not None:
-            df.columns = [c.strip().capitalize() for c in df.columns]
+            df.columns = [c.strip().upper() for c in df.columns]
             return df.fillna("")
         return pd.DataFrame()
-    except Exception as e:
-        st.sidebar.error(f"Errore Catalogo: {e}")
+    except:
         return pd.DataFrame()
 
-def get_lista_plessi():
-    try:
-        df = conn.read(worksheet="Plesso", ttl=1)
-        return sorted(df.iloc[:, 0].dropna().unique().tolist())
-    except:
-        return []
-
-def get_lista_agenzie():
-    try:
-        df = conn.read(worksheet="Agenzie", ttl=1)
-        return sorted(df.iloc[:, 0].dropna().unique().tolist())
-    except:
-        return []
-
-def salva_adozione_google(nuova_riga_dict):
-    try:
-        df_esistente = conn.read(worksheet="Adozioni", ttl=0)
-        nuova_riga_df = pd.DataFrame([nuova_riga_dict])
-        df_finale = pd.concat([df_esistente, nuova_riga_df], ignore_index=True)
-        conn.update(worksheet="Adozioni", data=df_finale)
-        return True
-    except Exception as e:
-        st.error(f"Errore salvataggio: {e}")
-        return False
-
-def aggiungi_libro_catalogo_google(t, m, e, a):
-    try:
-        df_esistente = conn.read(worksheet="Catalogo", ttl=0)
-        nuova_riga = pd.DataFrame([{"Titolo": t, "Materia": m, "Editore": e, "Agenzia": a}])
-        df_finale = pd.concat([df_esistente, nuova_riga], ignore_index=True)
-        conn.update(worksheet="Catalogo", data=df_finale)
-        return True
-    except:
-        return False
-
 # --- PREPARAZIONE DATI ---
-catalogo = get_catalogo_libri()
-if not catalogo.empty:
-    elenco_titoli = sorted([str(x) for x in catalogo.iloc[:, 0].unique() if str(x).strip() != ""])
-    elenco_materie = sorted([str(x) for x in catalogo.iloc[:, 1].unique() if str(x).strip() != ""])
-    elenco_editori = sorted([str(x) for x in catalogo.iloc[:, 2].unique() if str(x).strip() != ""])
-else:
-    elenco_titoli = elenco_materie = elenco_editori = []
+df_catalogo = carica_dati("Catalogo")
+df_adozioni = carica_dati("Adozioni", tempo=0) # Tempo 0 per vedere subito i nuovi inserimenti
+elenco_plessi = carica_dati("Plesso").iloc[:,0].tolist() if not carica_dati("Plesso").empty else []
+elenco_agenzie = carica_dati("Agenzie").iloc[:,0].tolist() if not carica_dati("Agenzie").empty else []
 
-elenco_plessi = get_lista_plessi()
-elenco_agenzie = get_lista_agenzie()
-
-# --- SIDEBAR E TEST CONNESSIONE ---
+# --- SIDEBAR: NAVIGAZIONE ED EXPORT ---
 with st.sidebar:
-    st.title("🧭 MENU")
+    st.title("📂 GESTIONE")
+    menu = st.radio("Vai a:", ["Nuova Adozione", "Registro e Export", "Aggiungi al Catalogo"])
     
-    # PULSANTE DI RESET CACHE (TEST DI CONNESSIONE)
-    if st.button("🔄 REFRESH DATI (TEST)", use_container_width=True):
+    st.markdown("---")
+    st.subheader("📥 Backup Dati")
+    
+    if not df_adozioni.empty:
+        # Funzione per convertire DataFrame in Excel (in memoria)
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df_adozioni.to_excel(writer, index=False, sheet_name='Adozioni')
+        
+        st.download_button(
+            label="XLSX - ESPORTA IN EXCEL",
+            data=buffer.getvalue(),
+            file_name=f"adozioni_{datetime.now().strftime('%d_%m_%Y')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+    
+    if st.button("🔄 AGGIORNA TUTTO"):
         st.cache_data.clear()
-        st.toast("Cache pulita! Ricaricamento...")
         st.rerun()
-
-    st.markdown("---")
-    if st.button("➕ NUOVA ADOZIONE", use_container_width=True, type="primary" if st.session_state.get("pagina") == "Inserimento" else "secondary"):
-        st.session_state.pagina = "Inserimento"
-        st.rerun()
-    if st.button("🆕 AGGIUNGI A CATALOGO", use_container_width=True):
-        st.session_state.pagina = "NuovoLibro"
-        st.rerun()
-    if st.button("📊 REGISTRO COMPLETO", use_container_width=True):
-        st.session_state.pagina = "Registro"
-        st.rerun()
-    if st.button("🔍 FILTRA E RICERCA", use_container_width=True):
-        st.session_state.pagina = "Ricerca"
-        st.rerun()
-
-    st.markdown("---")
-    st.subheader("💾 Backup")
-    try:
-        df_back = conn.read(worksheet="Adozioni", ttl=0)
-        if df_back is not None and not df_back.empty:
-            st.download_button("📥 SCARICA CSV", df_back.to_csv(index=False).encode('utf-8'), "backup.csv", "text/csv", use_container_width=True)
-        else:
-            st.info("Nessun dato da scaricare.")
-    except:
-        st.warning("Connessione instabile...")
 
 # --- LOGICA PAGINE ---
-if "pagina" not in st.session_state:
-    st.session_state.pagina = "Inserimento"
 
-st.title("📚 Gestione Adozioni 2026")
+# 1. REGISTRO ED EXPORT
+if menu == "Registro e Export":
+    st.subheader("📑 Registro Completo Adozioni")
+    if not df_adozioni.empty:
+        st.dataframe(df_adozioni, use_container_width=True)
+        st.info(f"Totale righe nel database: {len(df_adozioni)}")
+    else:
+        st.warning("Il database delle adozioni è vuoto.")
 
-# --- 1. NUOVA ADOZIONE ---
-if st.session_state.pagina == "Inserimento":
-    st.subheader("Nuova Registrazione")
-    if not elenco_titoli:
-        st.warning("⚠️ ATTENZIONE: Il catalogo libri sembra vuoto. Controlla il foglio Google o premi 'Refresh' nella sidebar.")
+# 2. NUOVA ADOZIONE
+elif menu == "Nuova Adozione":
+    st.subheader("✍️ Inserimento Nuova Adozione")
     
-    with st.container(border=True):
-        titolo_scelto = st.selectbox("📕 SELEZIONA TITOLO", [""] + elenco_titoli)
-        if titolo_scelto:
-            info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
-            if not info.empty:
-                st.info(f"Materia: {info.iloc[0,1]} | Editore: {info.iloc[0,2]} | Agenzia: {info.iloc[0,3]}")
+    with st.form("form_adozione", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            titoli = df_catalogo["TITOLO"].tolist() if not df_catalogo.empty else []
+            scelta_titolo = st.selectbox("Seleziona Libro", [""] + titoli)
+            plesso = st.selectbox("Plesso", [""] + elenco_plessi)
+        with col2:
+            sezioni = st.number_input("Numero Sezioni", min_value=1, step=1)
+            classe = st.text_input("Sezione (es. A, B, C)")
         
-        c1, c2 = st.columns(2)
-        with c1:
-            plesso = st.selectbox("🏫 Plesso", [""] + elenco_plessi)
-            n_sez = st.number_input("🔢 N° sezioni", min_value=1, value=1)
-        with c2:
-            sez_lett = st.text_input("🔡 Lettera Sezione")
-            note = st.text_area("📝 Note")
+        note = st.text_area("Note aggiuntive")
+        submit = st.form_submit_button("SALVA ONLINE")
 
-        if st.button("💾 SALVA ONLINE", use_container_width=True, type="primary"):
-            if titolo_scelto and plesso:
-                info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
-                nuovo_dato = {
+        if submit:
+            if scelta_titolo and plesso:
+                # Recupera info libro
+                info = df_catalogo[df_catalogo["TITOLO"] == scelta_titolo].iloc[0]
+                nuova_riga = {
                     "DATA": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "PLESSO": plesso, "MATERIA": info.iloc[0,1], "TITOLO": titolo_scelto,
-                    "EDITORE": info.iloc[0,2], "AGENZIA": info.iloc[0,3], 
-                    "N° sezioni": n_sez, "Sezione": sez_lett.upper(), "Note": note
+                    "PLESSO": plesso,
+                    "MATERIA": info["MATERIA"],
+                    "TITOLO": scelta_titolo,
+                    "EDITORE": info["EDITORE"],
+                    "AGENZIA": info["AGENZIA"],
+                    "N° SEZIONI": sezioni,
+                    "SEZIONE": classe.upper(),
+                    "NOTE": note
                 }
-                if salva_adozione_google(nuovo_dato):
-                    st.success("Dato inviato con successo!")
-                    st.rerun()
+                
+                # Salvataggio
+                df_updated = pd.concat([df_adozioni, pd.DataFrame([nuova_riga])], ignore_index=True)
+                conn.update(worksheet="Adozioni", data=df_updated)
+                st.success("Adozione registrata con successo!")
+                st.cache_data.clear()
             else:
-                st.error("Campi obbligatori mancanti!")
+                st.error("Errore: Titolo e Plesso sono obbligatori.")
 
-# --- ALTRE PAGINE (Semplificate per test) ---
-elif st.session_state.pagina == "Registro":
-    st.subheader("📑 Registro")
-    df_reg = conn.read(worksheet="Adozioni", ttl=0)
-    st.dataframe(df_reg, use_container_width=True)
-
-elif st.session_state.pagina == "NuovoLibro":
-    st.subheader("🆕 Nuovo Libro")
-    # ... (Codice inserimento catalogo simile a prima)
+# 3. AGGIUNGI AL CATALOGO
+elif menu == "Aggiungi al Catalogo":
+    st.subheader("📖 Aggiungi Titolo alla Lista Libri")
+    with st.form("form_catalogo", clear_on_submit=True):
+        t = st.text_input("Titolo")
+        m = st.text_input("Materia")
+        e = st.text_input("Editore")
+        a = st.selectbox("Agenzia", [""] + elenco_agenzie)
+        
+        if st.form_submit_button("AGGIUNGI AL CATALOGO"):
+            if t and m and e and a:
+                nuovo_libro = {"TITOLO": t, "MATERIA": m, "EDITORE": e, "AGENZIA": a}
+                df_cat_up = pd.concat([df_catalogo, pd.DataFrame([nuovo_libro])], ignore_index=True)
+                conn.update(worksheet="Catalogo", data=df_cat_up)
+                st.success("Libro aggiunto!")
+                st.cache_data.clear()
