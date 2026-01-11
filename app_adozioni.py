@@ -222,8 +222,16 @@ elif st.session_state.pagina == "Inserimento":
 
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
+    
+    # FORZIAMO IL CARICAMENTO DEI DATI PER I MENU A TENDINA
+    elenco_plessi = get_lista_plessi()
+    catalogo = get_catalogo_libri()
+    elenco_titoli = sorted([str(x) for x in catalogo.iloc[:, 0].unique() if str(x).strip() != ""]) if not catalogo.empty else []
+
     if os.path.exists(DB_FILE):
         df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
+        
+        # FILTRI DI RICERCA (In alto)
         c_ric1, c_ric2 = st.columns(2)
         with c_ric1:
             lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
@@ -232,6 +240,7 @@ elif st.session_state.pagina == "Modifica":
             lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
             t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db)
         
+        # LOGICA DI VISUALIZZAZIONE
         if p_cerca or t_cerca:
             df_filtrato = df_mod.copy()
             if p_cerca: df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
@@ -242,13 +251,27 @@ elif st.session_state.pagina == "Modifica":
                     with st.container(border=True):
                         st.markdown(f"**Registrazione del {df_mod.at[i, 'Data']}**")
                         col1, col2, col3 = st.columns([2, 2, 1])
+                        
                         with col1:
-                            nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=elenco_plessi.index(df_mod.at[i, 'Plesso']) if df_mod.at[i, 'Plesso'] in elenco_plessi else 0, key=f"p_{i}")
-                            nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=elenco_titoli.index(df_mod.at[i, 'Titolo']) if df_mod.at[i, 'Titolo'] in elenco_titoli else 0, key=f"t_{i}")
+                            # PLESSO: Cerchiamo l'indice corretto per mostrare il valore attuale
+                            try:
+                                idx_p = elenco_plessi.index(df_mod.at[i, 'Plesso'])
+                            except ValueError:
+                                idx_p = 0
+                            nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=idx_p, key=f"p_{i}")
+
+                            # TITOLO: Cerchiamo l'indice corretto per mostrare il valore attuale
+                            try:
+                                idx_t = elenco_titoli.index(df_mod.at[i, 'Titolo'])
+                            except ValueError:
+                                idx_t = 0
+                            nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=idx_t, key=f"t_{i}")
+
                         with col2:
                             valore_sez = int(float(df_mod.at[i, 'N° sezioni'])) if df_mod.at[i, 'N° sezioni'] else 1
                             nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=valore_sez, key=f"n_{i}")
                             nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"s_{i}")
+                        
                         with col3:
                             nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
 
@@ -266,14 +289,18 @@ elif st.session_state.pagina == "Modifica":
                                 df_mod.at[i, 'Sezione'] = nuova_sez_lett.upper()
                                 df_mod.at[i, 'Note'] = nuove_note
                                 df_mod.to_csv(DB_FILE, index=False)
-                                backup_su_google_sheets(df_mod) # SINC CLOUD
+                                backup_su_google_sheets(df_mod) 
                                 st.rerun()
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
                                 df_mod = df_mod.drop(i)
                                 df_mod.to_csv(DB_FILE, index=False)
-                                backup_su_google_sheets(df_mod) # SINC CLOUD
+                                backup_su_google_sheets(df_mod)
                                 st.rerun()
+            else:
+                st.warning("Nessun record trovato con i filtri selezionati.")
+        else:
+            st.info("🔍 Seleziona un Plesso o un Titolo per visualizzare i dati da modificare.")
 
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
@@ -314,4 +341,5 @@ elif st.session_state.pagina == "Ricerca":
         else: st.warning("Nessun dato trovato.")
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.9</p>", unsafe_allow_html=True)
+
 
