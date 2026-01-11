@@ -215,12 +215,15 @@ elif st.session_state.pagina == "Inserimento":
                 # BACKUP AUTOMATICO SU CLOUD
                 backup_su_google_sheets(df_finale)
                 
-                # Messaggio a scomparsa che sopravvive al rerun
-                st.toast("✅ Registrazione avvenuta con successo!", icon="🎉")
-                
-                # Incrementiamo l'ID per resettare i widget e facciamo il rerun
+                # 1. Incrementiamo l'ID: questo resetta i widget al prossimo ciclo
                 st.session_state.form_id += 1
-                st.rerun()
+                
+                # 2. Mostriamo l'avviso (senza rerun sotto, resterà visibile)
+                st.success("✅ Registrazione avvenuta con successo e sincronizzata su Cloud!")
+                
+                # 3. Opzionale: un piccolo tasto per confermare e nascondere il messaggio verde
+                if st.button("OK, procedi con nuova"):
+                    st.rerun()
             else: 
                 st.error("⚠️ Seleziona Titolo e Plesso!")
 elif st.session_state.pagina == "Modifica":
@@ -344,6 +347,7 @@ elif st.session_state.pagina == "Ricerca":
         else: st.warning("Nessun dato trovato.")
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.9</p>", unsafe_allow_html=True)
+
 
 
 
