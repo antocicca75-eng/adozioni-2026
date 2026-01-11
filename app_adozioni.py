@@ -179,11 +179,12 @@ elif st.session_state.pagina == "Inserimento":
             note = st.text_area("📝 Note", key=f"not_{st.session_state.form_id}", height=70)
         with c2:
             n_sez = st.number_input("🔢 N° sezioni", min_value=1, value=1, key=f"n_{st.session_state.form_id}")
-            saggio = st.selectbox("📚 Saggio consegnato", ["NO", "SI"], key=f"sag_{st.session_state.form_id}")
+            # Modifica: Impostato vuoto ("-") e obbligatorio
+            saggio = st.selectbox("📚 Saggio consegnato", ["-", "NO", "SI"], key=f"sag_{st.session_state.form_id}")
         with c3:
             sez_lett = st.text_input("🔡 Lettera Sezione", key=f"sez_{st.session_state.form_id}")
         if st.button("💾 SALVA ADOZIONE", use_container_width=True, type="primary"):
-            if titolo_scelto and plesso:
+            if titolo_scelto and plesso and saggio != "-":
                 info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
                 nuova_riga = pd.DataFrame([{
                     "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -198,7 +199,10 @@ elif st.session_state.pagina == "Inserimento":
                 st.session_state.form_id += 1
                 st.success("✅ Registrazione avvenuta con successo!")
                 st.rerun()
-            else: st.error("⚠️ Seleziona Titolo e Plesso!")
+            elif saggio == "-":
+                st.error("⚠️ Devi specificare se il Saggio è stato consegnato (SI/NO)!")
+            else: 
+                st.error("⚠️ Seleziona Titolo e Plesso!")
 
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
@@ -233,21 +237,26 @@ elif st.session_state.pagina == "Modifica":
                             nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=val_sez, key=f"mn_{i}")
                             nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"ms_{i}")
                         with col3:
-                            idx_saggio = 1 if df_mod.at[i, 'Saggio Consegna'] == "SI" else 0
-                            nuovo_saggio = st.selectbox("Saggio consegnato", ["NO", "SI"], index=idx_saggio, key=f"msag_{i}")
+                            # Gestione indice per Modifica
+                            attuale_sag = df_mod.at[i, 'Saggio Consegna']
+                            idx_saggio = ["-", "NO", "SI"].index(attuale_sag) if attuale_sag in ["-", "NO", "SI"] else 0
+                            nuovo_saggio = st.selectbox("Saggio consegnato", ["-", "NO", "SI"], index=idx_saggio, key=f"msag_{i}")
                         b1, b2 = st.columns(2)
                         with b1:
                             if st.button("💾 AGGIORNA", key=f"upd_{i}", use_container_width=True, type="primary"):
-                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
-                                info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
-                                df_full.at[i, 'Plesso'] = nuovo_plesso
-                                df_full.at[i, 'Titolo'] = nuovo_titolo
-                                if not info_new.empty:
-                                    df_full.at[i, 'Materia'] = info_new.iloc[0,1]; df_full.at[i, 'Editore'] = info_new.iloc[0,2]; df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
-                                df_full.at[i, 'N° sezioni'] = nuovo_n_sez; df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
-                                df_full.at[i, 'Saggio Consegna'] = nuovo_saggio; df_full.at[i, 'Note'] = nuove_note
-                                df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full)
-                                st.success("Aggiornato!"); st.rerun()
+                                if nuovo_saggio != "-":
+                                    df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
+                                    info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
+                                    df_full.at[i, 'Plesso'] = nuovo_plesso
+                                    df_full.at[i, 'Titolo'] = nuovo_titolo
+                                    if not info_new.empty:
+                                        df_full.at[i, 'Materia'] = info_new.iloc[0,1]; df_full.at[i, 'Editore'] = info_new.iloc[0,2]; df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
+                                    df_full.at[i, 'N° sezioni'] = nuovo_n_sez; df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
+                                    df_full.at[i, 'Saggio Consegna'] = nuovo_saggio; df_full.at[i, 'Note'] = nuove_note
+                                    df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full)
+                                    st.success("Aggiornato!"); st.rerun()
+                                else:
+                                    st.error("⚠️ Seleziona SI o NO per il saggio!")
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
                                 df_full = pd.read_csv(DB_FILE).fillna("").astype(str); df_full = df_full.drop(int(i))
@@ -288,4 +297,4 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
-st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.1</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.2</p>", unsafe_allow_html=True)
