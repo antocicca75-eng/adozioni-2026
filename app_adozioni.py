@@ -225,11 +225,10 @@ elif st.session_state.pagina == "Inserimento":
                 if st.button("OK, procedi con nuova"):
                     st.rerun()
             else: 
-                st.error("⚠️ Seleziona Titolo e Plesso!")
-elif st.session_state.pagina == "Modifica":
+               elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
     
-    # FORZIAMO IL CARICAMENTO DEI DATI PER I MENU A TENDINA
+    # Ricaricamento forzato anagrafiche per i menu a tendina
     elenco_plessi = get_lista_plessi()
     catalogo = get_catalogo_libri()
     elenco_titoli = sorted([str(x) for x in catalogo.iloc[:, 0].unique() if str(x).strip() != ""]) if not catalogo.empty else []
@@ -237,7 +236,6 @@ elif st.session_state.pagina == "Modifica":
     if os.path.exists(DB_FILE):
         df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
         
-        # FILTRI DI RICERCA (In alto)
         c_ric1, c_ric2 = st.columns(2)
         with c_ric1:
             lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
@@ -246,7 +244,6 @@ elif st.session_state.pagina == "Modifica":
             lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
             t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db)
         
-        # LOGICA DI VISUALIZZAZIONE
         if p_cerca or t_cerca:
             df_filtrato = df_mod.copy()
             if p_cerca: df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
@@ -259,14 +256,12 @@ elif st.session_state.pagina == "Modifica":
                         col1, col2, col3 = st.columns([2, 2, 1])
                         
                         with col1:
-                            # PLESSO: Cerchiamo l'indice corretto per mostrare il valore attuale
                             try:
                                 idx_p = elenco_plessi.index(df_mod.at[i, 'Plesso'])
                             except ValueError:
                                 idx_p = 0
                             nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=idx_p, key=f"p_{i}")
 
-                            # TITOLO: Cerchiamo l'indice corretto per mostrare il valore attuale
                             try:
                                 idx_t = elenco_titoli.index(df_mod.at[i, 'Titolo'])
                             except ValueError:
@@ -274,13 +269,42 @@ elif st.session_state.pagina == "Modifica":
                             nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=idx_t, key=f"t_{i}")
 
                         with col2:
-                            valore_sez = int(float(df_mod.at[i, 'N° sezioni'])) if df_mod.at[i, 'N° sezioni'] else 1
-                            nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=valore_sez, key=f"n_{i}")
+                            val_sez = int(float(df_mod.at[i, 'N° sezioni'])) if df_mod.at[i, 'N° sezioni'] else 1
+                            nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=val_sez, key=f"n_{i}")
                             nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"s_{i}")
                         
                         with col3:
                             nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
-b1, b2 = st.columns(2)
+
+                        # TASTI AGGIORNA ED ELIMINA
+                        b1, b2 = st.columns(2)
+                        with b1:
+                            if st.button("💾 AGGIORNA", key=f"sav_{i}", use_container_width=True, type="primary"):
+                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
+                                info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
+                                df_full.at[i, 'Plesso'] = nuovo_plesso
+                                df_full.at[i, 'Titolo'] = nuovo_titolo
+                                if not info_new.empty:
+                                    df_full.at[i, 'Materia'] = info_new.iloc[0,1]
+                                    df_full.at[i, 'Editore'] = info_new.iloc[0,2]
+                                    df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
+                                df_full.at[i, 'N° sezioni'] = nuovo_n_sez
+                                df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
+                                df_full.at[i, 'Note'] = nuove_note
+                                df_full.to_csv(DB_FILE, index=False)
+                                backup_su_google_sheets(df_full)
+                                st.rerun()
+                        with b2:
+                            if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
+                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
+                                df_full = df_full.drop(int(i))
+                                df_full.to_csv(DB_FILE, index=False)
+                                backup_su_google_sheets(df_full)
+                                st.rerun()
+            else:
+                st.warning("Nessun record trovato.")
+        else:
+            st.info("🔍 Seleziona un Plesso o un Titolo per visualizzare i dati.")
                         with b1:
                             if st.button("💾 AGGIORNA", key=f"sav_{i}", use_container_width=True, type="primary"):
                                 # --- TUTTO QUESTO DEVE ESSERE RIENTRATO (INDENTATO) ---
@@ -350,6 +374,7 @@ elif st.session_state.pagina == "Ricerca":
         else: st.warning("Nessun dato trovato.")
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.9</p>", unsafe_allow_html=True)
+
 
 
 
