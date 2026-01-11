@@ -18,28 +18,14 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 # --- FUNZIONE CONNESSIONE GOOGLE SHEETS ---
 def connetti_google_sheets():
     try:
-        # 1. Definiamo i permessi necessari
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        
-        # 2. Carichiamo i dati dal blocco [gspread] dei Secrets
-        # Usiamo strict=False per gestire meglio eventuali caratteri speciali nel JSON
         json_info = json.loads(st.secrets["gspread"]["json_data"], strict=False)
-        
-        # 3. Puliamo la chiave privata (fondamentale per evitare errori di escape)
         if "private_key" in json_info:
             json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
-            
-        # 4. Autorizzazione con le credenziali del Service Account
         creds = Credentials.from_service_account_info(json_info, scopes=scope)
         client_gs = gspread.authorize(creds)
-        
-        # 5. Apertura del foglio tramite l'ID fornito
         sh = client_gs.open_by_key(ID_FOGLIO)
-        
-        # 6. Restituiamo il foglio specifico per il database (Adozioni_DB)
-        # Se preferisci il primo foglio in assoluto, usa: return sh.get_worksheet(0)
         return sh.worksheet("Adozioni_DB")
-        
     except Exception as e:
         st.error(f"⚠️ Errore connessione Cloud: {e}")
         return None
@@ -48,9 +34,7 @@ def backup_su_google_sheets(df_da_salvare):
     foglio = connetti_google_sheets()
     if foglio:
         try:
-            # Pulisce il foglio e scrive i nuovi dati (inclusa intestazione)
             foglio.clear()
-            # Prepariamo i dati convertendo tutto in stringa per evitare errori JSON
             dati = [df_da_salvare.columns.values.tolist()] + df_da_salvare.fillna("").values.tolist()
             foglio.update(dati)
             return True
@@ -212,30 +196,22 @@ elif st.session_state.pagina == "Inserimento":
                 df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
                 df_finale.to_csv(DB_FILE, index=False)
                 
-                # BACKUP AUTOMATICO SU CLOUD
                 backup_su_google_sheets(df_finale)
-                
-                # 1. Incrementiamo l'ID: questo resetta i widget al prossimo ciclo
                 st.session_state.form_id += 1
-                
-                # 2. Mostriamo l'avviso (senza rerun sotto, resterà visibile)
                 st.success("✅ Registrazione avvenuta con successo e sincronizzata su Cloud!")
-                
-                # 3. Opzionale: un piccolo tasto per confermare e nascondere il messaggio verde
                 if st.button("OK, procedi con nuova"):
                     st.rerun()
-            else: 
-               elif st.session_state.pagina == "Modifica":
+            else:
+                st.error("⚠️ Seleziona Titolo e Plesso!")
+
+elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
-    
-    # Ricaricamento forzato anagrafiche per i menu a tendina
     elenco_plessi = get_lista_plessi()
     catalogo = get_catalogo_libri()
     elenco_titoli = sorted([str(x) for x in catalogo.iloc[:, 0].unique() if str(x).strip() != ""]) if not catalogo.empty else []
 
     if os.path.exists(DB_FILE):
         df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
-        
         c_ric1, c_ric2 = st.columns(2)
         with c_ric1:
             lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
@@ -254,29 +230,20 @@ elif st.session_state.pagina == "Inserimento":
                     with st.container(border=True):
                         st.markdown(f"**Registrazione del {df_mod.at[i, 'Data']}**")
                         col1, col2, col3 = st.columns([2, 2, 1])
-                        
                         with col1:
-                            try:
-                                idx_p = elenco_plessi.index(df_mod.at[i, 'Plesso'])
-                            except ValueError:
-                                idx_p = 0
+                            try: idx_p = elenco_plessi.index(df_mod.at[i, 'Plesso'])
+                            except: idx_p = 0
                             nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=idx_p, key=f"p_{i}")
-
-                            try:
-                                idx_t = elenco_titoli.index(df_mod.at[i, 'Titolo'])
-                            except ValueError:
-                                idx_t = 0
+                            try: idx_t = elenco_titoli.index(df_mod.at[i, 'Titolo'])
+                            except: idx_t = 0
                             nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=idx_t, key=f"t_{i}")
-
                         with col2:
                             val_sez = int(float(df_mod.at[i, 'N° sezioni'])) if df_mod.at[i, 'N° sezioni'] else 1
                             nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=val_sez, key=f"n_{i}")
                             nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"s_{i}")
-                        
                         with col3:
                             nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
 
-                        # TASTI AGGIORNA ED ELIMINA
                         b1, b2 = st.columns(2)
                         with b1:
                             if st.button("💾 AGGIORNA", key=f"sav_{i}", use_container_width=True, type="primary"):
@@ -293,6 +260,7 @@ elif st.session_state.pagina == "Inserimento":
                                 df_full.at[i, 'Note'] = nuove_note
                                 df_full.to_csv(DB_FILE, index=False)
                                 backup_su_google_sheets(df_full)
+                                st.success("Aggiornato!")
                                 st.rerun()
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
@@ -301,39 +269,8 @@ elif st.session_state.pagina == "Inserimento":
                                 df_full.to_csv(DB_FILE, index=False)
                                 backup_su_google_sheets(df_full)
                                 st.rerun()
-            else:
-                st.warning("Nessun record trovato.")
-        else:
-            st.info("🔍 Seleziona un Plesso o un Titolo per visualizzare i dati.")
-                        with b1:
-                            if st.button("💾 AGGIORNA", key=f"sav_{i}", use_container_width=True, type="primary"):
-                                # --- TUTTO QUESTO DEVE ESSERE RIENTRATO (INDENTATO) ---
-                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
-                                info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
-                                
-                                df_full.at[i, 'Plesso'] = nuovo_plesso
-                                df_full.at[i, 'Titolo'] = nuovo_titolo
-                                if not info_new.empty:
-                                    df_full.at[i, 'Materia'] = info_new.iloc[0,1]
-                                    df_full.at[i, 'Editore'] = info_new.iloc[0,2]
-                                    df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
-                                
-                                df_full.at[i, 'N° sezioni'] = nuovo_n_sez
-                                df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
-                                df_full.at[i, 'Note'] = nuove_note
-                                
-                                df_full.to_csv(DB_FILE, index=False)
-                                backup_su_google_sheets(df_full)
-                                st.rerun()
-
-                        with b2:
-                            if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
-                                # --- ANCHE QUESTO DEVE ESSERE RIENTRATO ---
-                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
-                                df_full = df_full.drop(int(i)) # Rimuove la riga corretta dal database intero
-                                df_full.to_csv(DB_FILE, index=False)
-                                backup_su_google_sheets(df_full)
-                                st.rerun()
+            else: st.warning("Nessun record trovato.")
+        else: st.info("🔍 Seleziona un Plesso o un Titolo per visualizzare i dati.")
 
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
@@ -374,12 +311,3 @@ elif st.session_state.pagina == "Ricerca":
         else: st.warning("Nessun dato trovato.")
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.9</p>", unsafe_allow_html=True)
-
-
-
-
-
-
-
-
-
