@@ -215,19 +215,14 @@ elif st.session_state.pagina == "Inserimento":
                 # BACKUP AUTOMATICO SU CLOUD
                 backup_su_google_sheets(df_finale)
                 
-                # Visualizziamo l'avviso
-                st.success("✅ Adozione registrata e sincronizzata su Cloud!")
+                # Messaggio a scomparsa che sopravvive al rerun
+                st.toast("✅ Registrazione avvenuta con successo!", icon="🎉")
                 
-                # Usiamo un piccolo trucco: incrementiamo l'ID del form per pulire i campi 
-                # senza forzare un rerun immediato che cancellerebbe il messaggio
+                # Incrementiamo l'ID per resettare i widget e facciamo il rerun
                 st.session_state.form_id += 1
-                
-                # Opzionale: pulsante per pulire lo schermo e inserire un altro record
-                if st.button("Inserisci un'altra adozione"):
-                    st.rerun()
+                st.rerun()
             else: 
-                st.error("Seleziona Titolo e Plesso!")
-
+                st.error("⚠️ Seleziona Titolo e Plesso!")
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
     
@@ -349,6 +344,7 @@ elif st.session_state.pagina == "Ricerca":
         else: st.warning("Nessun dato trovato.")
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.9</p>", unsafe_allow_html=True)
+
 
 
 
