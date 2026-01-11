@@ -280,36 +280,36 @@ elif st.session_state.pagina == "Modifica":
                         
                         with col3:
                             nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"not_{i}")
-
-                        b1, b2 = st.columns(2)
+b1, b2 = st.columns(2)
                         with b1:
-                          if st.button("💾 AGGIORNA", key=f"sav_{i}", use_container_width=True, type="primary"):
-    # 1. Rileggiamo il database aggiornato per sicurezza prima di scrivere
-    df_database_completo = pd.read_csv(DB_FILE).fillna("").astype(str)
-    
-    # 2. Applichiamo le modifiche solo alla riga specifica 'i'
-    info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
-    df_database_completo.at[i, 'Plesso'] = nuovo_plesso
-    df_database_completo.at[i, 'Titolo'] = nuovo_titolo
-    
-    if not info_new.empty:
-        df_database_completo.at[i, 'Materia'] = info_new.iloc[0,1]
-        df_database_completo.at[i, 'Editore'] = info_new.iloc[0,2]
-        df_database_completo.at[i, 'Agenzia'] = info_new.iloc[0,3]
-        
-    df_database_completo.at[i, 'N° sezioni'] = nuovo_n_sez
-    df_database_completo.at[i, 'Sezione'] = nuova_sez_lett.upper()
-    df_database_completo.at[i, 'Note'] = nuove_note
-    
-    # 3. Salviamo il file INTERO (così non perdi gli altri record)
-    df_database_completo.to_csv(DB_FILE, index=False)
-    
-    # 4. Sincronizziamo il Cloud
-    backup_su_google_sheets(df_database_completo)
-    
-    st.success("Modifica salvata con successo!")
-    st.rerun()
+                            if st.button("💾 AGGIORNA", key=f"sav_{i}", use_container_width=True, type="primary"):
+                                # --- TUTTO QUESTO DEVE ESSERE RIENTRATO (INDENTATO) ---
+                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
+                                info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
+                                
+                                df_full.at[i, 'Plesso'] = nuovo_plesso
+                                df_full.at[i, 'Titolo'] = nuovo_titolo
+                                if not info_new.empty:
+                                    df_full.at[i, 'Materia'] = info_new.iloc[0,1]
+                                    df_full.at[i, 'Editore'] = info_new.iloc[0,2]
+                                    df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
+                                
+                                df_full.at[i, 'N° sezioni'] = nuovo_n_sez
+                                df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
+                                df_full.at[i, 'Note'] = nuove_note
+                                
+                                df_full.to_csv(DB_FILE, index=False)
+                                backup_su_google_sheets(df_full)
+                                st.rerun()
+
                         with b2:
+                            if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
+                                # --- ANCHE QUESTO DEVE ESSERE RIENTRATO ---
+                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
+                                df_full = df_full.drop(int(i)) # Rimuove la riga corretta dal database intero
+                                df_full.to_csv(DB_FILE, index=False)
+                                backup_su_google_sheets(df_full)
+                                st.rerun()
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
                                 df_mod = df_mod.drop(i)
                                 df_mod.to_csv(DB_FILE, index=False)
@@ -359,6 +359,7 @@ elif st.session_state.pagina == "Ricerca":
         else: st.warning("Nessun dato trovato.")
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.9</p>", unsafe_allow_html=True)
+
 
 
 
