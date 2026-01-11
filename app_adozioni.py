@@ -310,15 +310,6 @@ b1, b2 = st.columns(2)
                                 df_full.to_csv(DB_FILE, index=False)
                                 backup_su_google_sheets(df_full)
                                 st.rerun()
-                            if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
-                                df_mod = df_mod.drop(i)
-                                df_mod.to_csv(DB_FILE, index=False)
-                                backup_su_google_sheets(df_mod)
-                                st.rerun()
-            else:
-                st.warning("Nessun record trovato con i filtri selezionati.")
-        else:
-            st.info("🔍 Seleziona un Plesso o un Titolo per visualizzare i dati da modificare.")
 
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
@@ -359,6 +350,7 @@ elif st.session_state.pagina == "Ricerca":
         else: st.warning("Nessun dato trovato.")
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v12.9</p>", unsafe_allow_html=True)
+
 
 
 
