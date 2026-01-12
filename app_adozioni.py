@@ -219,7 +219,7 @@ with st.sidebar:
 # --- LOGICA DELLE PAGINE ---
 # =========================================================
 
-# --- MODULO CONSEGNE (IL TUO CODICE FUNZIONANTE) ---
+# --- MODULO CONSEGNE (CON CARICAMENTO AUTOMATICO DEFAULT) ---
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
@@ -236,14 +236,15 @@ if st.session_state.pagina == "Consegne":
         st.rerun()
 
     ctr = st.session_state.get("reset_ctr", 0)
-    if "add_ctr" not in st.session_state: st.session_state.add_ctr = 0
-    actr = st.session_state.add_ctr
+    actr = st.session_state.get("add_ctr", 0)
 
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
     
-    lista_tipologie = ["- SELEZIONA -", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"] + [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
-    cat_scelta = col_c.selectbox("Tipologia Libri:", lista_tipologie, key=f"c_sel_{ctr}")
+    # Gestione Tipologie
+    basi = ["- SELEZIONA -", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
+    altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
+    cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
 
     if cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
         st.session_state.lista_consegne_attuale = list(st.session_state.db_consegne.get(cat_scelta, []))
@@ -255,8 +256,7 @@ if st.session_state.pagina == "Consegne":
             ci, cd = st.columns([0.9, 0.1])
             classi_visualizzate = f"{lib['c1']} {lib['c2']} {lib['c3']}".strip()
             ci.info(f"{lib['t']} | {lib['e']} | Classi: {classi_visualizzate}")
-            # Chiave differenziata per evitare conflitti nella lista temporanea
-            if cd.button("❌", key=f"del_con_{cat_scelta}_{i}"):
+            if cd.button("❌", key=f"del_list_{cat_scelta}_{i}"):
                 st.session_state.lista_consegne_attuale.pop(i); st.rerun()
 
         col_btns = st.columns(2)
@@ -267,76 +267,75 @@ if st.session_state.pagina == "Consegne":
         if col_btns[1].button("🗑️ SVUOTA TUTTO", use_container_width=True):
             reset_consegne_totale()
 
+        # --- SEZIONE INSERIMENTO CON DEFAULT AUTOMATICO ---
         with st.expander("➕ Cerca e Aggiungi Libro dal Catalogo", expanded=True):
             df_cat = get_catalogo_libri()
+            
+            # 1. Recupero dati dal catalogo
+            t_def, e_def = "", ""
             if not df_cat.empty:
-                elenco_titoli_cat = ["- CERCA TITOLO -"] + sorted(df_cat.iloc[:, 0].astype(str).unique().tolist())
-                scelta_libro = st.selectbox("Seleziona libro dal catalogo:", elenco_titoli_cat, key=f"search_{actr}")
+                elenco_titoli = ["- CERCA TITOLO -"] + sorted(df_cat.iloc[:, 0].astype(str).unique().tolist())
+                scelta_libro = st.selectbox("Seleziona libro dal catalogo:", elenco_titoli, key=f"search_{actr}")
                 
-                t_init = ""
-                e_init = ""
                 if scelta_libro != "- CERCA TITOLO -":
-                    dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
-                    t_init = str(dati_libro.iloc[0])
-                    e_init = str(dati_libro.iloc[2])
+                    riga = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
+                    t_def = str(riga.iloc[0])
+                    e_def = str(riga.iloc[2])
 
-                t_input = st.text_input("Titolo Libro:", value=t_init, key=f"t_in_{actr}")
-                e_input = st.text_input("Editore:", value=e_init, key=f"e_in_{actr}")
-                
-                st.write("Inserisci Classi (solo numero):")
-                cc1, cc2, cc3, _ = st.columns([1, 1, 1, 5])
-                c1in = cc1.text_input("N°", key=f"c1_{actr}", max_chars=2)
-                c2in = cc2.text_input("N° ", key=f"c2_{actr}", max_chars=2)
-                c3in = cc3.text_input("N°  ", key=f"c3_{actr}", max_chars=2)
-                
-                if st.button("Conferma Aggiunta"):
-                    if t_input and e_input:
-                        st.session_state.lista_consegne_attuale.append({
-                            "t": t_input.upper(), 
-                            "e": e_input.upper(), 
-                            "c1": c1in, "c2": c2in, "c3": c3in
-                        })
-                        st.session_state.add_ctr += 1
-                        st.rerun()
-                    else:
-                        st.warning("Inserisci Titolo ed Editore!")
+            # 2. Campi testo con valore di default agganciato alla scelta
+            t_input = st.text_input("Titolo Libro:", value=t_def, key=f"t_in_{actr}")
+            e_input = st.text_input("Editore:", value=e_def, key=f"e_in_{actr}")
+            
+            st.write("Inserisci Classi (solo numero):")
+            cc1, cc2, cc3, _ = st.columns([1, 1, 1, 5])
+            c1in = cc1.text_input("N°", key=f"c1_{actr}", max_chars=2)
+            c2in = cc2.text_input("N° ", key=f"c2_{actr}", max_chars=2)
+            c3in = cc3.text_input("N°  ", key=f"c3_{actr}", max_chars=2)
+            
+            if st.button("Conferma Aggiunta", use_container_width=True):
+                if t_input and e_input:
+                    st.session_state.lista_consegne_attuale.append({
+                        "t": t_input.upper(), "e": e_input.upper(), 
+                        "c1": c1in, "c2": c2in, "c3": c3in
+                    })
+                    st.session_state.add_ctr += 1
+                    st.rerun()
+                else:
+                    st.warning("Inserisci Titolo ed Editore!")
 
+    # --- DATI DESTINATARIO E STAMPA ---
     st.markdown("---")
-    st.subheader("📍 Dati Destinatario")
     d1, d2 = st.columns(2)
     docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
     data_con = d2.text_input("Data di consegna", key=f"dat_{ctr}")
-    classe_man = d1.text_input("Classe specifica (opzionale)", key=f"cla_{ctr}")
+    classe_man = d1.text_input("Classe specifica", key=f"cla_{ctr}")
 
     col_print, col_conf = st.columns(2)
-    if col_print.button("🖨️ GENERA E SCARICA PDF", use_container_width=True):
+    if col_print.button("🖨️ GENERA PDF", use_container_width=True):
         if st.session_state.lista_consegne_attuale:
-            p_da_stampare = p_scelto if p_scelto != "- SELEZIONA PLESSO -" else ""
+            p_val = p_scelto if p_scelto != "- SELEZIONA PLESSO -" else ""
             pdf = PDF_CONSEGNA(logo_data=uploaded_logo if 'uploaded_logo' in locals() else None)
             pdf.add_page()
-            pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_da_stampare, docente, classe_man, data_con)
+            pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_val, docente, classe_man, data_con)
             pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
-            pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_da_stampare, docente, classe_man, data_con)
-            st.download_button("📥 CLICCA PER IL PDF", bytes(pdf.output()), f"consegna_{p_da_stampare}.pdf", "application/pdf")
+            pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_val, docente, classe_man, data_con)
+            st.download_button("📥 SCARICA PDF", bytes(pdf.output()), f"consegna_{p_val}.pdf", "application/pdf")
 
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -" and cat_scelta != "- SELEZIONA -":
             if p_scelto not in st.session_state.storico_consegne:
                 st.session_state.storico_consegne[p_scelto] = {}
-            # Salviamo una copia pulita dei dati
             st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
-            st.success(f"Consegna registrata per {p_scelto}!")
+            st.success("Registrato nello Storico!")
         else:
             st.error("Seleziona Plesso e Tipologia!")
 
-# --- PAGINA STORICO (CON FIX CHIAVI DUPLICATE) ---
+# --- PAGINA STORICO (FIX CHIAVI DUPLICATE) ---
 if st.session_state.pagina == "Storico":
     st.header("📚 Registro Collane Consegnate")
-    
     if not st.session_state.get("storico_consegne"):
         st.info("Nessuna consegna registrata.")
     else:
-        # Usiamo list() per evitare errori di mutazione durante il loop
         for plesso in list(st.session_state.storico_consegne.keys()):
             with st.expander(f"🏫 {plesso}", expanded=False):
                 tipologie = st.session_state.storico_consegne[plesso]
@@ -344,25 +343,21 @@ if st.session_state.pagina == "Storico":
                     with st.expander(f"📖 {tipologia}", expanded=False):
                         libri = tipologie[tipologia]
                         for i, lib in enumerate(libri):
-                            col_info, col_del = st.columns([0.85, 0.15])
+                            c_info, c_del = st.columns([0.85, 0.15])
                             cl_v = f"{lib['c1']} {lib['c2']} {lib['c3']}".strip()
-                            col_info.write(f"**{lib['t']}** — {lib['e']} ({cl_v})")
+                            c_info.write(f"**{lib['t']}** — {lib['e']} ({cl_v})")
                             
-                            # SOLUZIONE ERRORE: Chiave complessa che include Plesso, Tipologia e Indice
-                            # Questo rende impossibile avere due chiavi uguali
-                            k_ritiro = f"rit_{plesso.replace(' ', '')}_{tipologia.replace(' ', '')}_{i}"
-                            
-                            if col_del.button("❌", key=k_ritiro):
+                            # CHIAVE UNICA COMPLESSA PER EVITARE ERRORE
+                            unique_k = f"rit_{plesso.replace(' ', '')}_{tipologia.replace(' ', '')}_{i}"
+                            if c_del.button("❌", key=unique_k):
                                 st.session_state.storico_consegne[plesso][tipologia].pop(i)
                                 if not st.session_state.storico_consegne[plesso][tipologia]:
                                     del st.session_state.storico_consegne[plesso][tipologia]
                                 if not st.session_state.storico_consegne[plesso]:
                                     del st.session_state.storico_consegne[plesso]
                                 st.rerun()
-
     if st.button("⬅️ Torna a Modulo Consegne"):
         st.session_state.pagina = "Consegne"; st.rerun()
-
 # --- PAGINA STORICO (VERSIONE PULITA E MATRIOSKA) ---
 if st.session_state.pagina == "Storico":
     st.header("📚 Registro Collane Consegnate")
@@ -590,6 +585,7 @@ if st.session_state.pagina == "Storico":
         st.session_state.pagina = "Consegne"
         st.rerun()
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
