@@ -223,7 +223,6 @@ with st.sidebar:
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
-    # Inizializza lo storico se non esiste
     if "storico_consegne" not in st.session_state:
         st.session_state.storico_consegne = {}
 
@@ -241,14 +240,11 @@ if st.session_state.pagina == "Consegne":
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
     
-    # --- MODIFICA RICHIESTA: Gestione Tipologie ---
-    # Definiamo le basi fisse (Inglese 1^ e 4^) e recuperiamo le altre dal DB
+    # Gestione Tipologie (Inglese 1^ e 4^)
     basi = ["- SELEZIONA -", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
-    # Escludiamo eventuali vecchie chiavi "INGLESE" generiche per evitare doppioni
     altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
     cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
 
-    # Controllo di sicurezza per evitare KeyError
     if cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
         dati_esistenti = st.session_state.db_consegne.get(cat_scelta, [])
         st.session_state.lista_consegne_attuale = list(dati_esistenti)
@@ -260,7 +256,6 @@ if st.session_state.pagina == "Consegne":
             ci, cd = st.columns([0.9, 0.1])
             classi_visualizzate = f"{lib['c1']} {lib['c2']} {lib['c3']}".strip()
             ci.info(f"{lib['t']} | {lib['e']} | Classi: {classi_visualizzate}")
-            # Chiave differenziata per categoria per evitare errori streamlit
             if cd.button("❌", key=f"del_con_{cat_scelta}_{i}"):
                 st.session_state.lista_consegne_attuale.pop(i); st.rerun()
 
@@ -314,7 +309,7 @@ if st.session_state.pagina == "Consegne":
         else:
             st.error("Seleziona Plesso e Tipologia prima di confermare!")
 
-# --- PAGINA STORICO (VERSIONE PULITA) ---
+# --- PAGINA STORICO (FIX DUPLICATE ID) ---
 if st.session_state.pagina == "Storico":
     st.header("📚 Registro Collane Consegnate")
     if not st.session_state.get("storico_consegne"):
@@ -339,9 +334,9 @@ if st.session_state.pagina == "Storico":
                                     del st.session_state.storico_consegne[plesso]
                                 st.rerun()
 
-    if st.button("⬅️ Torna a Modulo Consegne"):
+    # AGGIUNTA KEY UNICA AL PULSANTE DI RITORNO
+    if st.button("⬅️ Torna a Modulo Consegne", key="back_to_consegne_button"):
         st.session_state.pagina = "Consegne"; st.rerun()
-
 # --- AGGIUNTA: PAGINA STORICO (VERSIONE PULITA) ---
 if st.session_state.pagina == "Storico":
     st.header("📚 Registro Collane Consegnate")
@@ -597,6 +592,7 @@ if st.session_state.pagina == "Storico":
         st.session_state.pagina = "Consegne"
         st.rerun()
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
