@@ -219,7 +219,7 @@ with st.sidebar:
 # --- LOGICA DELLE PAGINE ---
 # =========================================================
 
-# --- MODULO CONSEGNE (INDIPENDENTE) ---
+# --- MODULO CONSEGNE (IL TUO ORIGINALE) ---
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
@@ -240,7 +240,11 @@ if st.session_state.pagina == "Consegne":
 
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
-    cat_scelta = col_c.selectbox("Tipologia Libri:", ["- SELEZIONA -"] + list(st.session_state.db_consegne.keys()), key=f"c_sel_{ctr}")
+    
+    # Lista tipologie con le nuove voci richieste
+    basi = ["- SELEZIONA -", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
+    altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
+    cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
 
     if cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
         st.session_state.lista_consegne_attuale = list(st.session_state.db_consegne[cat_scelta])
@@ -252,7 +256,7 @@ if st.session_state.pagina == "Consegne":
             ci, cd = st.columns([0.9, 0.1])
             classi_visualizzate = f"{lib['c1']} {lib['c2']} {lib['c3']}".strip()
             ci.info(f"{lib['t']} | {lib['e']} | Classi: {classi_visualizzate}")
-            if cd.button("❌", key=f"del_con_{i}"):
+            if cd.button("❌", key=f"del_con_{cat_scelta}_{i}"):
                 st.session_state.lista_consegne_attuale.pop(i); st.rerun()
 
         col_btns = st.columns(2)
@@ -296,7 +300,6 @@ if st.session_state.pagina == "Consegne":
             pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_da_stampare, docente, classe_man, data_con)
             st.download_button("📥 SCARICA PDF", bytes(pdf.output()), f"consegna_{p_da_stampare}.pdf", "application/pdf")
 
-    # --- NUOVO: PULSANTE CONFERMA CONSEGNA ---
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -" and cat_scelta != "- SELEZIONA -":
             if p_scelto not in st.session_state.storico_consegne:
@@ -306,8 +309,7 @@ if st.session_state.pagina == "Consegne":
         else:
             st.error("Seleziona Plesso e Tipologia prima di confermare!")
 
-
-# --- PAGINA STORICO (FIX CHIAVI DUPLICATE) ---
+# --- AGGIUNTA: PAGINA STORICO (VERSIONE PULITA) ---
 if st.session_state.pagina == "Storico":
     st.header("📚 Registro Collane Consegnate")
     if not st.session_state.get("storico_consegne"):
@@ -315,24 +317,24 @@ if st.session_state.pagina == "Storico":
     else:
         for plesso in list(st.session_state.storico_consegne.keys()):
             with st.expander(f"🏫 {plesso}", expanded=False):
-                tipologie = st.session_state.storico_consegne[plesso]
-                for tipologia in list(tipologie.keys()):
-                    with st.expander(f"📖 {tipologia}", expanded=False):
-                        libri = tipologie[tipologia]
-                        for i, lib in enumerate(libri):
-                            c_info, c_del = st.columns([0.85, 0.15])
+                per_tipo = st.session_state.storico_consegne[plesso]
+                for tipo in list(per_tipo.keys()):
+                    with st.expander(f"📖 {tipo}", expanded=False):
+                        for i, lib in enumerate(per_tipo[tipo]):
+                            c_inf, c_del = st.columns([0.85, 0.15])
                             cl_v = f"{lib['c1']} {lib['c2']} {lib['c3']}".strip()
-                            c_info.write(f"**{lib['t']}** — {lib['e']} ({cl_v})")
+                            c_inf.write(f"**{lib['t']}** — {lib['e']} ({cl_v})")
                             
-                            # CHIAVE UNICA COMPLESSA PER EVITARE ERRORE
-                            unique_k = f"rit_{plesso.replace(' ', '')}_{tipologia.replace(' ', '')}_{i}"
-                            if c_del.button("❌", key=unique_k):
-                                st.session_state.storico_consegne[plesso][tipologia].pop(i)
-                                if not st.session_state.storico_consegne[plesso][tipologia]:
-                                    del st.session_state.storico_consegne[plesso][tipologia]
+                            # CHIAVE UNICA PER IL PULSANTE RITIRO
+                            k_rit = f"rit_{plesso.replace(' ','')}_{tipo.replace(' ','')}_{i}"
+                            if c_del.button("❌", key=k_rit):
+                                st.session_state.storico_consegne[plesso][tipo].pop(i)
+                                if not st.session_state.storico_consegne[plesso][tipo]:
+                                    del st.session_state.storico_consegne[plesso][tipo]
                                 if not st.session_state.storico_consegne[plesso]:
                                     del st.session_state.storico_consegne[plesso]
                                 st.rerun()
+
     if st.button("⬅️ Torna a Modulo Consegne"):
         st.session_state.pagina = "Consegne"; st.rerun()
 # --- PAGINA STORICO (VERSIONE PULITA E MATRIOSKA) ---
@@ -562,6 +564,7 @@ if st.session_state.pagina == "Storico":
         st.session_state.pagina = "Consegne"
         st.rerun()
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
