@@ -219,21 +219,25 @@ with st.sidebar:
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
-    # Funzione per resettare tutto (svuota anche la memoria visiva dei widget)
+    # Prepariamo l'elenco plessi con un'opzione neutra in cima
+    elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
+
+    # Funzione per resettare tutto
     def reset_consegne_totale():
         st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = None
-        # Cambiando il contatore della chiave, Streamlit resetta i selectbox
+        # Incrementiamo il contatore per resettare i widget (selectbox)
         if "reset_ctr" not in st.session_state:
             st.session_state.reset_ctr = 0
         st.session_state.reset_ctr += 1
         st.rerun()
 
-    # Usiamo un suffisso dinamico per forzare il reset dei menu
+    # Identificatore dinamico per i widget
     ctr = st.session_state.get("reset_ctr", 0)
 
     col_p, col_c = st.columns(2)
-    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi, key=f"p_sel_{ctr}")
+    # Ora il plesso ha una chiave dinamica e una voce iniziale neutra
+    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
     cat_scelta = col_c.selectbox("Tipologia Libri:", ["- SELEZIONA -"] + list(st.session_state.db_consegne.keys()), key=f"c_sel_{ctr}")
 
     if cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
@@ -282,25 +286,22 @@ if st.session_state.pagina == "Consegne":
                             "c1": c1in, "c2": c2in, "c3": c3in
                         })
                         st.rerun()
-            else:
-                st.error("Catalogo non disponibile.")
 
     st.markdown("---")
     st.subheader("📍 Dati Destinatario")
     d1, d2 = st.columns(2)
-    docente = d1.text_input("Insegnante ricevente")
-    data_con = d2.text_input("Data di consegna")
-    classe_man = d1.text_input("Classe/Sezione specifica")
+    docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
+    data_con = d2.text_input("Data di consegna", key=f"dat_{ctr}")
+    classe_man = d1.text_input("Classe/Sezione specifica", key=f"cla_{ctr}")
 
     if st.button("🖨️ GENERA PDF E SCARICA", use_container_width=True):
-        if st.session_state.lista_consegne_attuale:
+        if st.session_state.lista_consegne_attuale and p_scelto != "- SELEZIONA PLESSO -":
             pdf = PDF_CONSEGNA(logo_data=uploaded_logo if 'uploaded_logo' in locals() else None)
             pdf.add_page()
             pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
             pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
             pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
             
-            # TRASFORMAZIONE IN BYTES PER STREAMLIT
             pdf_output = bytes(pdf.output()) 
             st.download_button(
                 label="📥 CLICCA QUI PER SCARICARE",
@@ -308,6 +309,8 @@ if st.session_state.pagina == "Consegne":
                 file_name=f"consegna_{p_scelto}.pdf",
                 mime="application/pdf"
             )
+        else:
+            st.error("Assicurati di aver selezionato un Plesso e aggiunto dei libri.")
 # --- (RESTO DELLE TUE PAGINE ORIGINALI) ---
 elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo al catalogo Excel")
@@ -460,6 +463,7 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
