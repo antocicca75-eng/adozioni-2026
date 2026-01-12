@@ -314,6 +314,9 @@ if st.session_state.pagina == "Consegne":
                 mime="application/pdf"
             )
         else:
+            st.error("Seleziona un Plesso e aggiungi i libri prima di generare.")
+            )
+        else:
             st.error("Seleziona un Plesso e aggiungi i libri prima di generare.")ver selezionato un Plesso e aggiunto dei libri.")
 # --- (RESTO DELLE TUE PAGINE ORIGINALI) ---
 elif st.session_state.pagina == "NuovoLibro":
@@ -467,6 +470,7 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
