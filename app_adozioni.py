@@ -255,15 +255,15 @@ if st.session_state.pagina == "Consegne":
         with st.expander("➕ Cerca e Aggiungi Libro dal Catalogo"):
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
-                # Creiamo una lista di titoli per la ricerca
-                lista_titoli = ["- CERCA TITOLO -"] + df_cat['TITOLO'].tolist()
-                scelta_libro = st.selectbox("Seleziona libro dal catalogo:", lista_titoli)
+                # Usiamo le posizioni delle colonne (0=Titolo, 2=Editore) per sicurezza
+                elenco_titoli_cat = sorted(df_cat.iloc[:, 0].unique().tolist())
+                scelta_libro = st.selectbox("Seleziona libro dal catalogo:", ["- CERCA TITOLO -"] + elenco_titoli_cat)
                 
                 if scelta_libro != "- CERCA TITOLO -":
-                    # Recupera l'editore in automatico
-                    dati_libro = df_cat[df_cat['TITOLO'] == scelta_libro].iloc[0]
-                    t_auto = dati_libro['TITOLO']
-                    e_auto = dati_libro['EDITORE']
+                    # Recupera l'editore in automatico (colonna indice 2)
+                    dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
+                    t_auto = str(dati_libro.iloc[0])
+                    e_auto = str(dati_libro.iloc[2])
                     
                     st.write(f"**Selezionato:** {t_auto} ({e_auto})")
                     
@@ -293,10 +293,16 @@ if st.session_state.pagina == "Consegne":
         if st.session_state.lista_consegne_attuale:
             pdf = PDF_CONSEGNA(logo_data=uploaded_logo if 'uploaded_logo' in locals() else None)
             pdf.add_page()
+            # Disegna parte sinistra
             pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-            pdf.dashed_line(148.5, 0, 148.5, 210, 2)
+            # Linea tratteggiata centrale
+            pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
+            # Disegna parte destra
             pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-            st.download_button("📥 SCARICA PDF", pdf.output(dest='S').encode('latin-1', 'replace'), "consegna.pdf")
+            
+            # CORREZIONE ATTRIBUTEERROR: fpdf2 output('S') restituisce già bytes
+            pdf_bytes = pdf.output() 
+            st.download_button("📥 SCARICA PDF", pdf_bytes, "consegna.pdf", "application/pdf")
 # --- (RESTO DELLE TUE PAGINE ORIGINALI) ---
 elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo al catalogo Excel")
@@ -449,6 +455,7 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
