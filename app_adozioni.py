@@ -219,10 +219,8 @@ with st.sidebar:
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
-    # Prepariamo l'elenco plessi con un'opzione neutra in cima
     elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
 
-    # Funzione per resettare tutto
     def reset_consegne_totale():
         st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = None
@@ -231,7 +229,6 @@ if st.session_state.pagina == "Consegne":
         st.session_state.reset_ctr += 1
         st.rerun()
 
-    # Identificatore dinamico per i widget
     ctr = st.session_state.get("reset_ctr", 0)
 
     col_p, col_c = st.columns(2)
@@ -246,11 +243,11 @@ if st.session_state.pagina == "Consegne":
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
             ci, cd = st.columns([0.9, 0.1])
-            # Visualizzazione pulita: Titolo | Editore | Classi selezionate
             classi_visualizzate = f"{lib['c1']} {lib['c2']} {lib['c3']}".strip()
             ci.info(f"{lib['t']} | {lib['e']} | Classi: {classi_visualizzate}")
             if cd.button("❌", key=f"del_con_{i}"):
-                st.session_state.lista_consegne_attuale.pop(i); st.rerun()
+                st.session_state.lista_consegne_attuale.pop(i)
+                st.rerun()
 
         col_btns = st.columns(2)
         if col_btns[0].button("💾 REGISTRA LISTA", use_container_width=True):
@@ -260,7 +257,6 @@ if st.session_state.pagina == "Consegne":
         if col_btns[1].button("🗑️ SVUOTA TUTTO", use_container_width=True):
             reset_consegne_totale()
 
-        # --- SEZIONE AGGIUNTA CON RICERCA ---
         with st.expander("➕ Cerca e Aggiungi Libro dal Catalogo"):
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
@@ -273,9 +269,7 @@ if st.session_state.pagina == "Consegne":
                     e_auto = str(dati_libro.iloc[2])
                     
                     st.write(f"**Selezionato:** {t_auto} ({e_auto})")
-                    
-                    # Tre campi piccoli per le classi (solo numeri)
-                    st.write("Inserisci Classi (es: 1, 2, 3):")
+                    st.write("Inserisci Classi (solo numero):")
                     cc1, cc2, cc3, empty_space = st.columns([1, 1, 1, 5])
                     c1in = cc1.text_input("N°", key=f"c1_{ctr}", max_chars=2)
                     c2in = cc2.text_input("N° ", key=f"c2_{ctr}", max_chars=2)
@@ -314,10 +308,7 @@ if st.session_state.pagina == "Consegne":
                 mime="application/pdf"
             )
         else:
-            st.error("Seleziona un Plesso e aggiungi i libri prima di generare.")
-            )
-        else:
-            st.error("Seleziona un Plesso e aggiungi i libri prima di generare.")ver selezionato un Plesso e aggiunto dei libri.")
+            st.error("Seleziona un Plesso e aggiungi i libri prima di scaricare.")
 # --- (RESTO DELLE TUE PAGINE ORIGINALI) ---
 elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo al catalogo Excel")
@@ -470,6 +461,7 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
