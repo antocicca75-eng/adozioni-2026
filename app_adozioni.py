@@ -230,6 +230,10 @@ if st.session_state.pagina == "Consegne":
         st.rerun()
 
     ctr = st.session_state.get("reset_ctr", 0)
+    # Contatore specifico per pulire il form di aggiunta libro
+    if "add_ctr" not in st.session_state:
+        st.session_state.add_ctr = 0
+    actr = st.session_state.add_ctr
 
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
@@ -261,7 +265,8 @@ if st.session_state.pagina == "Consegne":
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
                 elenco_titoli_cat = sorted(df_cat.iloc[:, 0].astype(str).unique().tolist())
-                scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + elenco_titoli_cat, key=f"search_{ctr}")
+                # Chiave dinamica basata su actr per resettare il form
+                scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + elenco_titoli_cat, key=f"search_{actr}")
                 
                 if scelta_libro != "- CERCA TITOLO -":
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
@@ -271,9 +276,9 @@ if st.session_state.pagina == "Consegne":
                     st.write(f"**Selezionato:** {t_auto} ({e_auto})")
                     st.write("Inserisci Classi (solo numero):")
                     cc1, cc2, cc3, empty_space = st.columns([1, 1, 1, 5])
-                    c1in = cc1.text_input("N°", key=f"c1_{ctr}", max_chars=2)
-                    c2in = cc2.text_input("N° ", key=f"c2_{ctr}", max_chars=2)
-                    c3in = cc3.text_input("N°  ", key=f"c3_{ctr}", max_chars=2)
+                    c1in = cc1.text_input("N°", key=f"c1_{actr}", max_chars=2)
+                    c2in = cc2.text_input("N° ", key=f"c2_{actr}", max_chars=2)
+                    c3in = cc3.text_input("N°  ", key=f"c3_{actr}", max_chars=2)
                     
                     if st.button("Conferma Aggiunta"):
                         st.session_state.lista_consegne_attuale.append({
@@ -281,6 +286,8 @@ if st.session_state.pagina == "Consegne":
                             "e": e_auto.upper(), 
                             "c1": c1in, "c2": c2in, "c3": c3in
                         })
+                        # Incrementiamo actr per svuotare i campi al prossimo libro
+                        st.session_state.add_ctr += 1
                         st.rerun()
             else:
                 st.error("Catalogo non disponibile.")
@@ -461,6 +468,7 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
