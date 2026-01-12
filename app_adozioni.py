@@ -7,6 +7,7 @@ import io
 import gspread
 from google.oauth2.service_account import Credentials
 import json
+from fpdf import FPDF # Assicurati di avere fpdf installato
 
 # --- CONFIGURAZIONE FILE ---
 DB_FILE = "dati_adozioni.csv"
@@ -14,6 +15,47 @@ CONFIG_FILE = "anagrafiche.xlsx"
 ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
 
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
+
+# =========================================================
+# --- CLASSE PDF PER MODULO CONSEGNE (Layout Originale) ---
+# =========================================================
+class PDF_CONSEGNA(FPDF):
+    def __init__(self, logo_data=None):
+        super().__init__(orientation='L', unit='mm', format='A4')
+        self.logo_data = logo_data
+
+    def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
+        if self.logo_data:
+            with open("temp_logo.png", "wb") as f: f.write(self.logo_data.getbuffer())
+            self.image("temp_logo.png", x=x_offset + 34, y=8, w=80)
+        
+        self.set_y(38); self.set_x(x_offset + 10)
+        self.set_fill_color(230, 230, 230); self.set_font('Arial', 'B', 9)
+        self.cell(129, 8, str(categoria).upper(), border=1, ln=1, align='C', fill=True)
+        
+        self.set_x(x_offset + 10); self.set_fill_color(245, 245, 245)
+        self.cell(75, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
+        self.cell(24, 7, 'CLASSE', border=1, align='C', fill=True) 
+        self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
+        
+        for i, lib in enumerate(libri):
+            fill = i % 2 == 1
+            self.set_x(x_offset + 10); self.set_fill_color(250, 250, 250) if fill else self.set_fill_color(255, 255, 255)
+            self.set_font('Arial', 'B', 7.5)
+            self.cell(75, 6, f" {str(lib['t'])[:45]}", border=1, align='L', fill=fill)
+            self.set_font('Arial', '', 8)
+            self.cell(8, 6, str(lib.get('c1','')), border=1, align='C', fill=fill)
+            self.cell(8, 6, str(lib.get('c2','')), border=1, align='C', fill=fill)
+            self.cell(8, 6, str(lib.get('c3','')), border=1, align='C', fill=fill)
+            self.cell(30, 6, str(lib.get('e',''))[:20], border=1, ln=1, align='C', fill=fill)
+
+        self.set_y(145); self.set_x(x_offset + 10); self.set_fill_color(240, 240, 240); self.set_font('Arial', 'B', 8)
+        self.cell(129, 7, ' DETTAGLI DI CONSEGNA', border=1, ln=1, fill=True)
+        for label, val in [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]:
+            self.set_x(x_offset + 10); self.set_font('Arial', 'B', 7.5)
+            self.cell(35, 6.2, label, border=1, align='L')
+            self.set_font('Arial', '', 7.5)
+            self.cell(94, 6.2, str(val).upper(), border=1, ln=1, align='L')
 
 # --- FUNZIONE CONNESSIONE GOOGLE SHEETS ---
 def connetti_google_sheets():
@@ -108,6 +150,15 @@ elenco_plessi = get_lista_plessi()
 if "pagina" not in st.session_state:
     st.session_state.pagina = "Inserimento"
 
+# --- INIZIALIZZAZIONE DB MODULO CONSEGNE ---
+if 'db_consegne' not in st.session_state:
+    st.session_state.db_consegne = {
+        "LETTURE CLASSE PRIMA": [], "LETTURE CLASSE QUARTA": [],
+        "SUSSIDIARI DISCIPLINE": [], "INGLESE": [], "RELIGIONE": []
+    }
+if 'lista_consegne_attuale' not in st.session_state:
+    st.session_state.lista_consegne_attuale = []
+
 def reset_ricerca():
     st.session_state.r_attiva = False
     st.session_state.ft = []
@@ -117,6 +168,7 @@ def reset_ricerca():
     st.session_state.fe = []
     st.session_state.fsag = "TUTTI"
 
+# --- SIDEBAR NAVIGAZIONE ---
 with st.sidebar:
     st.title("🧭 MENU")
     if st.button("➕ NUOVA ADOZIONE", use_container_width=True, type="primary" if st.session_state.pagina == "Inserimento" else "secondary"):
@@ -129,8 +181,20 @@ with st.sidebar:
         st.session_state.pagina = "Registro"; st.rerun()
     if st.button("🔍 FILTRA E RICERCA", use_container_width=True, type="primary" if st.session_state.pagina == "Ricerca" else "secondary"):
         st.session_state.pagina = "Ricerca"; st.rerun()
+    
+    # --- IL TUO NUOVO PULSANTE ---
+    if st.button("📄 MODULO CONSEGNE", use_container_width=True, type="primary" if st.session_state.pagina == "Consegne" else "secondary"):
+        st.session_state.pagina = "Consegne"; st.rerun()
 
     st.markdown("---")
+    # FISARMONICA PER MODULO CONSEGNE
+    if st.session_state.pagina == "Consegne":
+        with st.expander("⚙️ OPZIONI CONSEGNA", expanded=True):
+            uploaded_logo = st.file_uploader("Logo Scuola", type=["png", "jpg", "jpeg"])
+            if st.button("🗑️ SVUOTA LISTA"):
+                st.session_state.lista_consegne_attuale = []
+                st.rerun()
+
     st.subheader("📥 Backup Google Sheets")
     if st.button("☁️ SINCRONIZZA ORA", use_container_width=True):
         if os.path.exists(DB_FILE):
@@ -139,9 +203,64 @@ with st.sidebar:
                 st.sidebar.success("Sincronizzato!")
             else: st.sidebar.error("Errore sincronizzazione.")
 
-st.title("📚 Gestione Adozioni 2026")
+# =========================================================
+# --- LOGICA DELLE PAGINE ---
+# =========================================================
 
-if st.session_state.pagina == "NuovoLibro":
+# --- MODULO CONSEGNE (INDIPENDENTE) ---
+if st.session_state.pagina == "Consegne":
+    st.header("📄 Generazione Moduli Consegna")
+    
+    col_p, col_c = st.columns(2)
+    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi)
+    cat_scelta = col_c.selectbox("Tipologia Libri:", ["- SELEZIONA -"] + list(st.session_state.db_consegne.keys()))
+
+    if cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
+        st.session_state.lista_consegne_attuale = list(st.session_state.db_consegne[cat_scelta])
+        st.session_state.last_cat = cat_scelta
+
+    if cat_scelta != "- SELEZIONA -":
+        st.markdown("---")
+        for i, lib in enumerate(st.session_state.lista_consegne_attuale):
+            ci, cd = st.columns([0.9, 0.1])
+            ci.info(f"{lib['t']} | {lib['e']} | Classe: {lib['c1']}{lib['c2']}{lib['c3']}")
+            if cd.button("❌", key=f"del_con_{i}"):
+                st.session_state.lista_consegne_attuale.pop(i); st.rerun()
+
+        if st.button("💾 REGISTRA LISTA NEL DB", use_container_width=True):
+            st.session_state.db_consegne[cat_scelta] = list(st.session_state.lista_consegne_attuale)
+            st.success("Salvato!")
+
+        with st.expander("➕ Aggiungi un nuovo libro"):
+            ct, ce = st.columns([3, 2])
+            tin = ct.text_input("Titolo Libro")
+            ein = ce.text_input("Editore")
+            cc1, cc2, cc3 = st.columns(3)
+            c1in = cc1.text_input("Classe")
+            c2in = cc2.text_input("Sezione")
+            c3in = cc3.text_input("Extra")
+            if st.button("Aggiungi"):
+                st.session_state.lista_consegne_attuale.append({"t": tin.upper(), "e": ein.upper(), "c1": c1in, "c2": c2in, "c3": c3in})
+                st.rerun()
+
+    st.markdown("---")
+    st.subheader("📍 Dati Destinatario")
+    d1, d2 = st.columns(2)
+    docente = d1.text_input("Insegnante ricevente")
+    data_con = d2.text_input("Data di consegna")
+    classe_man = d1.text_input("Classe/Sezione specifica")
+
+    if st.button("🖨️ GENERA PDF E SCARICA", use_container_width=True):
+        if st.session_state.lista_consegne_attuale:
+            pdf = PDF_CONSEGNA(logo_data=uploaded_logo if 'uploaded_logo' in locals() else None)
+            pdf.add_page()
+            pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+            pdf.dashed_line(148.5, 0, 148.5, 210, 2)
+            pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+            st.download_button("📥 CLICCA QUI PER IL PDF", pdf.output(dest='S').encode('latin-1', 'replace'), "consegna.pdf")
+
+# --- (RESTO DELLE TUE PAGINE ORIGINALI) ---
+elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo al catalogo Excel")
     with st.container(border=True):
         nt = st.text_input("Inserisci Titolo Libro")
@@ -179,7 +298,6 @@ elif st.session_state.pagina == "Inserimento":
             note = st.text_area("📝 Note", key=f"not_{st.session_state.form_id}", height=70)
         with c2:
             n_sez = st.number_input("🔢 N° sezioni", min_value=1, value=1, key=f"n_{st.session_state.form_id}")
-            # Modifica: Impostato vuoto ("-") e obbligatorio
             saggio = st.selectbox("📚 Saggio consegnato", ["-", "NO", "SI"], key=f"sag_{st.session_state.form_id}")
         with c3:
             sez_lett = st.text_input("🔡 Lettera Sezione", key=f"sez_{st.session_state.form_id}")
@@ -199,10 +317,8 @@ elif st.session_state.pagina == "Inserimento":
                 st.session_state.form_id += 1
                 st.success("✅ Registrazione avvenuta con successo!")
                 st.rerun()
-            elif saggio == "-":
-                st.error("⚠️ Devi specificare se il Saggio è stato consegnato (SI/NO)!")
-            else: 
-                st.error("⚠️ Seleziona Titolo e Plesso!")
+            elif saggio == "-": st.error("⚠️ Devi specificare SI/NO!")
+            else: st.error("⚠️ Seleziona Titolo e Plesso!")
 
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
@@ -237,7 +353,6 @@ elif st.session_state.pagina == "Modifica":
                             nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=val_sez, key=f"mn_{i}")
                             nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"ms_{i}")
                         with col3:
-                            # Gestione indice per Modifica
                             attuale_sag = df_mod.at[i, 'Saggio Consegna']
                             idx_saggio = ["-", "NO", "SI"].index(attuale_sag) if attuale_sag in ["-", "NO", "SI"] else 0
                             nuovo_saggio = st.selectbox("Saggio consegnato", ["-", "NO", "SI"], index=idx_saggio, key=f"msag_{i}")
@@ -255,8 +370,6 @@ elif st.session_state.pagina == "Modifica":
                                     df_full.at[i, 'Saggio Consegna'] = nuovo_saggio; df_full.at[i, 'Note'] = nuove_note
                                     df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full)
                                     st.success("Aggiornato!"); st.rerun()
-                                else:
-                                    st.error("⚠️ Seleziona SI o NO per il saggio!")
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
                                 df_full = pd.read_csv(DB_FILE).fillna("").astype(str); df_full = df_full.drop(int(i))
@@ -297,4 +410,4 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
-st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.2</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
