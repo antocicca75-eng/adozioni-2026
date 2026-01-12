@@ -190,11 +190,16 @@ with st.sidebar:
     if st.button("🔍 FILTRA E RICERCA", use_container_width=True, type="primary" if st.session_state.pagina == "Ricerca" else "secondary"):
         st.session_state.pagina = "Ricerca"; st.rerun()
     
-    # --- IL TUO NUOVO PULSANTE ---
+   # --- IL TUO NUOVO PULSANTE ---
     if st.button("📄 MODULO CONSEGNE", use_container_width=True, type="primary" if st.session_state.pagina == "Consegne" else "secondary"):
         st.session_state.pagina = "Consegne"; st.rerun()
 
+    # --- AGGIUNTA: PULSANTE STORICO ---
+    if st.button("📚 COLLANE CONSEGNATE", use_container_width=True, type="primary" if st.session_state.pagina == "Storico" else "secondary"):
+        st.session_state.pagina = "Storico"; st.rerun()
+
     st.markdown("---")
+    
     # FISARMONICA PER MODULO CONSEGNE
     if st.session_state.pagina == "Consegne":
         with st.expander("⚙️ OPZIONI CONSEGNA", expanded=True):
@@ -210,7 +215,6 @@ with st.sidebar:
             if backup_su_google_sheets(df_sync):
                 st.sidebar.success("Sincronizzato!")
             else: st.sidebar.error("Errore sincronizzazione.")
-
 # =========================================================
 # --- LOGICA DELLE PAGINE ---
 # =========================================================
@@ -491,6 +495,7 @@ if st.session_state.pagina == "Storico":
         st.session_state.pagina = "Consegne"
         st.rerun()
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
