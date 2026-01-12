@@ -95,15 +95,19 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNZIONI CARICAMENTO E SCRITTURA ---
-@st.cache_data(ttl=600)
+# --- FUNZIONI CARICAMENTO E SCRITTURA (OTTIMIZZATE) ---
+
+@st.cache_data(ttl=3600) # Memorizza per 1 ora per evitare errori di quota 429
 def get_catalogo_libri():
     sh = connetti_google_sheets()
     if sh:
         try:
+            # Una sola chiamata a Google per ora
             df = pd.DataFrame(sh.worksheet("Catalogo").get_all_records())
             return df.fillna("")
-        except: pass
+        except Exception as e:
+            st.warning("⚠️ Limite Google raggiunto. Caricamento dati locali...")
+    
     if os.path.exists(CONFIG_FILE):
         try:
             df = pd.read_excel(CONFIG_FILE, sheet_name="ListaLibri")
@@ -112,6 +116,7 @@ def get_catalogo_libri():
         except: return pd.DataFrame()
     return pd.DataFrame()
 
+@st.cache_data(ttl=3600) # Cache aggiunta anche qui
 def get_lista_plessi():
     sh = connetti_google_sheets()
     if sh:
@@ -119,6 +124,7 @@ def get_lista_plessi():
             df = pd.DataFrame(sh.worksheet("Plesso").get_all_records())
             return sorted(df.iloc[:, 0].dropna().unique().tolist())
         except: pass
+    
     if os.path.exists(CONFIG_FILE):
         try:
             df = pd.read_excel(CONFIG_FILE, sheet_name="Plesso")
@@ -132,6 +138,8 @@ def aggiungi_libro_a_excel(t, m, e, a):
         ws = wb["ListaLibri"]
         ws.append([t, m, e, a])
         wb.save(CONFIG_FILE)
+        # Svuota la cache così il nuovo libro apparirà subito
+        st.cache_data.clear() 
         return True
     except: return False
 
@@ -411,3 +419,4 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
