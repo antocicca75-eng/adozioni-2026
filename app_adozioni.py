@@ -226,7 +226,6 @@ if st.session_state.pagina == "Consegne":
     def reset_consegne_totale():
         st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = None
-        # Incrementiamo il contatore per resettare i widget (selectbox)
         if "reset_ctr" not in st.session_state:
             st.session_state.reset_ctr = 0
         st.session_state.reset_ctr += 1
@@ -236,7 +235,6 @@ if st.session_state.pagina == "Consegne":
     ctr = st.session_state.get("reset_ctr", 0)
 
     col_p, col_c = st.columns(2)
-    # Ora il plesso ha una chiave dinamica e una voce iniziale neutra
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
     cat_scelta = col_c.selectbox("Tipologia Libri:", ["- SELEZIONA -"] + list(st.session_state.db_consegne.keys()), key=f"c_sel_{ctr}")
 
@@ -248,7 +246,9 @@ if st.session_state.pagina == "Consegne":
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
             ci, cd = st.columns([0.9, 0.1])
-            ci.info(f"{lib['t']} | {lib['e']} | Classe: {lib['c1']}{lib['c2']}{lib['c3']}")
+            # Visualizzazione pulita: Titolo | Editore | Classi selezionate
+            classi_visualizzate = f"{lib['c1']} {lib['c2']} {lib['c3']}".strip()
+            ci.info(f"{lib['t']} | {lib['e']} | Classi: {classi_visualizzate}")
             if cd.button("❌", key=f"del_con_{i}"):
                 st.session_state.lista_consegne_attuale.pop(i); st.rerun()
 
@@ -274,10 +274,12 @@ if st.session_state.pagina == "Consegne":
                     
                     st.write(f"**Selezionato:** {t_auto} ({e_auto})")
                     
-                    cc1, cc2, cc3 = st.columns(3)
-                    c1in = cc1.text_input("Classe", key=f"c1_{ctr}")
-                    c2in = cc2.text_input("Sez.", key=f"c2_{ctr}")
-                    c3in = cc3.text_input("Extra", key=f"c3_{ctr}")
+                    # Tre campi piccoli per le classi (solo numeri)
+                    st.write("Inserisci Classi (es: 1, 2, 3):")
+                    cc1, cc2, cc3, empty_space = st.columns([1, 1, 1, 5])
+                    c1in = cc1.text_input("N°", key=f"c1_{ctr}", max_chars=2)
+                    c2in = cc2.text_input("N° ", key=f"c2_{ctr}", max_chars=2)
+                    c3in = cc3.text_input("N°  ", key=f"c3_{ctr}", max_chars=2)
                     
                     if st.button("Conferma Aggiunta"):
                         st.session_state.lista_consegne_attuale.append({
@@ -286,13 +288,15 @@ if st.session_state.pagina == "Consegne":
                             "c1": c1in, "c2": c2in, "c3": c3in
                         })
                         st.rerun()
+            else:
+                st.error("Catalogo non disponibile.")
 
     st.markdown("---")
     st.subheader("📍 Dati Destinatario")
     d1, d2 = st.columns(2)
     docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
     data_con = d2.text_input("Data di consegna", key=f"dat_{ctr}")
-    classe_man = d1.text_input("Classe/Sezione specifica", key=f"cla_{ctr}")
+    classe_man = d1.text_input("Classe/Sezione specifica (opzionale)", key=f"cla_{ctr}")
 
     if st.button("🖨️ GENERA PDF E SCARICA", use_container_width=True):
         if st.session_state.lista_consegne_attuale and p_scelto != "- SELEZIONA PLESSO -":
@@ -310,7 +314,7 @@ if st.session_state.pagina == "Consegne":
                 mime="application/pdf"
             )
         else:
-            st.error("Assicurati di aver selezionato un Plesso e aggiunto dei libri.")
+            st.error("Seleziona un Plesso e aggiungi i libri prima di generare.")ver selezionato un Plesso e aggiunto dei libri.")
 # --- (RESTO DELLE TUE PAGINE ORIGINALI) ---
 elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo al catalogo Excel")
@@ -463,6 +467,7 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
