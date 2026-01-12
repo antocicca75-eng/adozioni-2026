@@ -451,8 +451,47 @@ elif st.session_state.pagina == "Ricerca":
             st.dataframe(df.sort_index(ascending=False), use_container_width=True)
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
+# ... fine della tua pagina precedente ...
+        st.dataframe(df.sort_index(ascending=False), use_container_width=True)
+        somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
+        st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
+# --- INIZIO NUOVA PAGINA STORICO (Inseriscila qui sotto) ---
+
+if st.session_state.pagina == "Storico":
+    st.header("📚 Registro Collane Consegnate")
+    st.info("In questa sezione puoi monitorare i libri consegnati. Clicca sulla ❌ a destra del titolo per segnare il ritiro.")
+
+    if "storico_consegne" not in st.session_state or not st.session_state.storico_consegne:
+        st.warning("Nessuna consegna registrata al momento.")
+    else:
+        for plesso in list(st.session_state.storico_consegne.keys()):
+            with st.expander(f"🏫 PLESSO: {plesso}", expanded=True):
+                tipologie = st.session_state.storico_consegne[plesso]
+                for tipologia in list(tipologie.keys()):
+                    st.markdown(f"### 📖 {tipologia}")
+                    libri = tipologie[tipologia]
+                    
+                    for i, lib in enumerate(libri):
+                        col_info, col_del = st.columns([0.85, 0.15])
+                        classi = f"{lib['c1']} {lib['c2']} {lib['c3']}".strip()
+                        info_testo = f"**{lib['t']}** — *{lib['e']}* (Classi: {classi})"
+                        col_info.write(info_testo)
+                        
+                        if col_del.button("❌", key=f"rit_{plesso}_{tipologia}_{i}"):
+                            st.session_state.storico_consegne[plesso][tipologia].pop(i)
+                            if not st.session_state.storico_consegne[plesso][tipologia]:
+                                del st.session_state.storico_consegne[plesso][tipologia]
+                            if not st.session_state.storico_consegne[plesso]:
+                                del st.session_state.storico_consegne[plesso]
+                            st.rerun()
+                    st.markdown("---")
+
+    if st.button("⬅️ Torna a Modulo Consegne"):
+        st.session_state.pagina = "Consegne"
+        st.rerun()
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
