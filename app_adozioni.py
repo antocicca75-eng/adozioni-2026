@@ -219,9 +219,17 @@ with st.sidebar:
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
+    # Funzione interna per il reset completo
+    def reset_consegne():
+        st.session_state.lista_consegne_attuale = []
+        st.session_state.last_cat = None
+        # Resettiamo i widget tramite le loro chiavi
+        if 'p_sel' in st.session_state: st.session_state.p_sel = elenco_plessi[0] if elenco_plessi else ""
+        if 'c_sel' in st.session_state: st.session_state.c_sel = "- SELEZIONA -"
+
     col_p, col_c = st.columns(2)
-    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi)
-    cat_scelta = col_c.selectbox("Tipologia Libri:", ["- SELEZIONA -"] + list(st.session_state.db_consegne.keys()))
+    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi, key="p_sel")
+    cat_scelta = col_c.selectbox("Tipologia Libri:", ["- SELEZIONA -"] + list(st.session_state.db_consegne.keys()), key="c_sel")
 
     if cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
         st.session_state.lista_consegne_attuale = list(st.session_state.db_consegne[cat_scelta])
@@ -235,9 +243,15 @@ if st.session_state.pagina == "Consegne":
             if cd.button("❌", key=f"del_con_{i}"):
                 st.session_state.lista_consegne_attuale.pop(i); st.rerun()
 
-        if st.button("💾 REGISTRA LISTA NEL DB", use_container_width=True):
+        col_btns = st.columns(2)
+        if col_btns[0].button("💾 REGISTRA LISTA NEL DB", use_container_width=True):
             st.session_state.db_consegne[cat_scelta] = list(st.session_state.lista_consegne_attuale)
             st.success("Salvato!")
+        
+        # Tasto SVUOTA potenziato
+        if col_btns[1].button("🗑️ SVUOTA TUTTO", use_container_width=True):
+            reset_consegne()
+            st.rerun()
 
         with st.expander("➕ Aggiungi un nuovo libro"):
             ct, ce = st.columns([3, 2])
@@ -248,8 +262,9 @@ if st.session_state.pagina == "Consegne":
             c2in = cc2.text_input("Sezione")
             c3in = cc3.text_input("Extra")
             if st.button("Aggiungi"):
-                st.session_state.lista_consegne_attuale.append({"t": tin.upper(), "e": ein.upper(), "c1": c1in, "c2": c2in, "c3": c3in})
-                st.rerun()
+                if tin and ein:
+                    st.session_state.lista_consegne_attuale.append({"t": tin.upper(), "e": ein.upper(), "c1": c1in, "c2": c2in, "c3": c3in})
+                    st.rerun()
 
     st.markdown("---")
     st.subheader("📍 Dati Destinatario")
@@ -419,4 +434,5 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
