@@ -219,13 +219,12 @@ with st.sidebar:
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
-    # Funzione interna per il reset completo
-    def reset_consegne():
+    # Funzione per resettare tutto
+    def reset_consegne_totale():
         st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = None
-        # Resettiamo i widget tramite le loro chiavi
-        if 'p_sel' in st.session_state: st.session_state.p_sel = elenco_plessi[0] if elenco_plessi else ""
-        if 'c_sel' in st.session_state: st.session_state.c_sel = "- SELEZIONA -"
+        st.session_state.p_sel = elenco_plessi[0] if elenco_plessi else ""
+        st.session_state.c_sel = "- SELEZIONA -"
 
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi, key="p_sel")
@@ -244,27 +243,44 @@ if st.session_state.pagina == "Consegne":
                 st.session_state.lista_consegne_attuale.pop(i); st.rerun()
 
         col_btns = st.columns(2)
-        if col_btns[0].button("💾 REGISTRA LISTA NEL DB", use_container_width=True):
+        if col_btns[0].button("💾 REGISTRA LISTA", use_container_width=True):
             st.session_state.db_consegne[cat_scelta] = list(st.session_state.lista_consegne_attuale)
             st.success("Salvato!")
         
-        # Tasto SVUOTA potenziato
         if col_btns[1].button("🗑️ SVUOTA TUTTO", use_container_width=True):
-            reset_consegne()
+            reset_consegne_totale()
             st.rerun()
 
-        with st.expander("➕ Aggiungi un nuovo libro"):
-            ct, ce = st.columns([3, 2])
-            tin = ct.text_input("Titolo Libro")
-            ein = ce.text_input("Editore")
-            cc1, cc2, cc3 = st.columns(3)
-            c1in = cc1.text_input("Classe")
-            c2in = cc2.text_input("Sezione")
-            c3in = cc3.text_input("Extra")
-            if st.button("Aggiungi"):
-                if tin and ein:
-                    st.session_state.lista_consegne_attuale.append({"t": tin.upper(), "e": ein.upper(), "c1": c1in, "c2": c2in, "c3": c3in})
-                    st.rerun()
+        # --- SEZIONE AGGIUNTA CON RICERCA ---
+        with st.expander("➕ Cerca e Aggiungi Libro dal Catalogo"):
+            df_cat = get_catalogo_libri()
+            if not df_cat.empty:
+                # Creiamo una lista di titoli per la ricerca
+                lista_titoli = ["- CERCA TITOLO -"] + df_cat['TITOLO'].tolist()
+                scelta_libro = st.selectbox("Seleziona libro dal catalogo:", lista_titoli)
+                
+                if scelta_libro != "- CERCA TITOLO -":
+                    # Recupera l'editore in automatico
+                    dati_libro = df_cat[df_cat['TITOLO'] == scelta_libro].iloc[0]
+                    t_auto = dati_libro['TITOLO']
+                    e_auto = dati_libro['EDITORE']
+                    
+                    st.write(f"**Selezionato:** {t_auto} ({e_auto})")
+                    
+                    cc1, cc2, cc3 = st.columns(3)
+                    c1in = cc1.text_input("Classe", key="c1_in")
+                    c2in = cc2.text_input("Sez.", key="c2_in")
+                    c3in = cc3.text_input("Extra", key="c3_in")
+                    
+                    if st.button("Conferma Aggiunta"):
+                        st.session_state.lista_consegne_attuale.append({
+                            "t": t_auto.upper(), 
+                            "e": e_auto.upper(), 
+                            "c1": c1in, "c2": c2in, "c3": c3in
+                        })
+                        st.rerun()
+            else:
+                st.error("Catalogo non disponibile per la ricerca.")
 
     st.markdown("---")
     st.subheader("📍 Dati Destinatario")
@@ -280,8 +296,7 @@ if st.session_state.pagina == "Consegne":
             pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
             pdf.dashed_line(148.5, 0, 148.5, 210, 2)
             pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-            st.download_button("📥 CLICCA QUI PER IL PDF", pdf.output(dest='S').encode('latin-1', 'replace'), "consegna.pdf")
-
+            st.download_button("📥 SCARICA PDF", pdf.output(dest='S').encode('latin-1', 'replace'), "consegna.pdf")
 # --- (RESTO DELLE TUE PAGINE ORIGINALI) ---
 elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo al catalogo Excel")
@@ -434,5 +449,6 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
