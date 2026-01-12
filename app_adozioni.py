@@ -230,7 +230,6 @@ if st.session_state.pagina == "Consegne":
         st.rerun()
 
     ctr = st.session_state.get("reset_ctr", 0)
-    # Contatore specifico per pulire il form di aggiunta libro
     if "add_ctr" not in st.session_state:
         st.session_state.add_ctr = 0
     actr = st.session_state.add_ctr
@@ -265,7 +264,6 @@ if st.session_state.pagina == "Consegne":
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
                 elenco_titoli_cat = sorted(df_cat.iloc[:, 0].astype(str).unique().tolist())
-                # Chiave dinamica basata su actr per resettare il form
                 scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + elenco_titoli_cat, key=f"search_{actr}")
                 
                 if scelta_libro != "- CERCA TITOLO -":
@@ -286,7 +284,6 @@ if st.session_state.pagina == "Consegne":
                             "e": e_auto.upper(), 
                             "c1": c1in, "c2": c2in, "c3": c3in
                         })
-                        # Incrementiamo actr per svuotare i campi al prossimo libro
                         st.session_state.add_ctr += 1
                         st.rerun()
             else:
@@ -300,22 +297,26 @@ if st.session_state.pagina == "Consegne":
     classe_man = d1.text_input("Classe/Sezione specifica (opzionale)", key=f"cla_{ctr}")
 
     if st.button("🖨️ GENERA PDF E SCARICA", use_container_width=True):
-        if st.session_state.lista_consegne_attuale and p_scelto != "- SELEZIONA PLESSO -":
+        # Rimossa la condizione obbligatoria sul plesso
+        if st.session_state.lista_consegne_attuale:
+            # Se il plesso non è selezionato, passiamo una stringa vuota o un trattino
+            p_da_stampare = p_scelto if p_scelto != "- SELEZIONA PLESSO -" else ""
+            
             pdf = PDF_CONSEGNA(logo_data=uploaded_logo if 'uploaded_logo' in locals() else None)
             pdf.add_page()
-            pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+            pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_da_stampare, docente, classe_man, data_con)
             pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
-            pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+            pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_da_stampare, docente, classe_man, data_con)
             
             pdf_output = bytes(pdf.output()) 
             st.download_button(
                 label="📥 CLICCA QUI PER SCARICARE",
                 data=pdf_output,
-                file_name=f"consegna_{p_scelto}.pdf",
+                file_name=f"consegna_{p_da_stampare if p_da_stampare else 'generica'}.pdf",
                 mime="application/pdf"
             )
         else:
-            st.error("Seleziona un Plesso e aggiungi i libri prima di scaricare.")
+            st.error("Aggiungi almeno un libro prima di scaricare il PDF.")
 # --- (RESTO DELLE TUE PAGINE ORIGINALI) ---
 elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo al catalogo Excel")
@@ -468,6 +469,7 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
