@@ -219,16 +219,22 @@ with st.sidebar:
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
-    # Funzione per resettare tutto
+    # Funzione per resettare tutto (svuota anche la memoria visiva dei widget)
     def reset_consegne_totale():
         st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = None
-        st.session_state.p_sel = elenco_plessi[0] if elenco_plessi else ""
-        st.session_state.c_sel = "- SELEZIONA -"
+        # Cambiando il contatore della chiave, Streamlit resetta i selectbox
+        if "reset_ctr" not in st.session_state:
+            st.session_state.reset_ctr = 0
+        st.session_state.reset_ctr += 1
+        st.rerun()
+
+    # Usiamo un suffisso dinamico per forzare il reset dei menu
+    ctr = st.session_state.get("reset_ctr", 0)
 
     col_p, col_c = st.columns(2)
-    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi, key="p_sel")
-    cat_scelta = col_c.selectbox("Tipologia Libri:", ["- SELEZIONA -"] + list(st.session_state.db_consegne.keys()), key="c_sel")
+    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi, key=f"p_sel_{ctr}")
+    cat_scelta = col_c.selectbox("Tipologia Libri:", ["- SELEZIONA -"] + list(st.session_state.db_consegne.keys()), key=f"c_sel_{ctr}")
 
     if cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
         st.session_state.lista_consegne_attuale = list(st.session_state.db_consegne[cat_scelta])
@@ -249,18 +255,15 @@ if st.session_state.pagina == "Consegne":
         
         if col_btns[1].button("🗑️ SVUOTA TUTTO", use_container_width=True):
             reset_consegne_totale()
-            st.rerun()
 
         # --- SEZIONE AGGIUNTA CON RICERCA ---
         with st.expander("➕ Cerca e Aggiungi Libro dal Catalogo"):
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
-                # Usiamo le posizioni delle colonne (0=Titolo, 2=Editore) per sicurezza
-                elenco_titoli_cat = sorted(df_cat.iloc[:, 0].unique().tolist())
-                scelta_libro = st.selectbox("Seleziona libro dal catalogo:", ["- CERCA TITOLO -"] + elenco_titoli_cat)
+                elenco_titoli_cat = sorted(df_cat.iloc[:, 0].astype(str).unique().tolist())
+                scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + elenco_titoli_cat, key=f"search_{ctr}")
                 
                 if scelta_libro != "- CERCA TITOLO -":
-                    # Recupera l'editore in automatico (colonna indice 2)
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
                     t_auto = str(dati_libro.iloc[0])
                     e_auto = str(dati_libro.iloc[2])
@@ -268,9 +271,9 @@ if st.session_state.pagina == "Consegne":
                     st.write(f"**Selezionato:** {t_auto} ({e_auto})")
                     
                     cc1, cc2, cc3 = st.columns(3)
-                    c1in = cc1.text_input("Classe", key="c1_in")
-                    c2in = cc2.text_input("Sez.", key="c2_in")
-                    c3in = cc3.text_input("Extra", key="c3_in")
+                    c1in = cc1.text_input("Classe", key=f"c1_{ctr}")
+                    c2in = cc2.text_input("Sez.", key=f"c2_{ctr}")
+                    c3in = cc3.text_input("Extra", key=f"c3_{ctr}")
                     
                     if st.button("Conferma Aggiunta"):
                         st.session_state.lista_consegne_attuale.append({
@@ -280,7 +283,7 @@ if st.session_state.pagina == "Consegne":
                         })
                         st.rerun()
             else:
-                st.error("Catalogo non disponibile per la ricerca.")
+                st.error("Catalogo non disponibile.")
 
     st.markdown("---")
     st.subheader("📍 Dati Destinatario")
@@ -293,16 +296,18 @@ if st.session_state.pagina == "Consegne":
         if st.session_state.lista_consegne_attuale:
             pdf = PDF_CONSEGNA(logo_data=uploaded_logo if 'uploaded_logo' in locals() else None)
             pdf.add_page()
-            # Disegna parte sinistra
             pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-            # Linea tratteggiata centrale
             pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
-            # Disegna parte destra
             pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
             
-            # CORREZIONE ATTRIBUTEERROR: fpdf2 output('S') restituisce già bytes
-            pdf_bytes = pdf.output() 
-            st.download_button("📥 SCARICA PDF", pdf_bytes, "consegna.pdf", "application/pdf")
+            # TRASFORMAZIONE IN BYTES PER STREAMLIT
+            pdf_output = bytes(pdf.output()) 
+            st.download_button(
+                label="📥 CLICCA QUI PER SCARICARE",
+                data=pdf_output,
+                file_name=f"consegna_{p_scelto}.pdf",
+                mime="application/pdf"
+            )
 # --- (RESTO DELLE TUE PAGINE ORIGINALI) ---
 elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo al catalogo Excel")
@@ -455,6 +460,7 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
