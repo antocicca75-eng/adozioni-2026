@@ -460,24 +460,29 @@ elif st.session_state.pagina == "Ricerca":
         somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
         st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 
-# --- NUOVA PAGINA: STORICO COLLANE CONSEGNATE (Versione Compatta) ---
+# --- NUOVA PAGINA: STORICO COLLANE CONSEGNATE (Versione Pulita) ---
 if st.session_state.pagina == "Storico":
     st.header("📚 Registro Collane Consegnate")
-    st.info("Clicca sui plessi e sulle tipologie per vedere i dettagli dei libri consegnati.")
+    st.info("Clicca sul nome del plesso e sulla collana per gestire i ritiri.")
 
     if "storico_consegne" not in st.session_state or not st.session_state.storico_consegne:
         st.warning("Nessuna consegna registrata al momento.")
     else:
-        # Loop sui Plessi - Partono CHIUSI (expanded=False)
+        # Loop sui Plessi - Rimosso "PLESSO:" davanti al nome
         for plesso in list(st.session_state.storico_consegne.keys()):
-            with st.expander(f"🏫 PLESSO: {plesso}", expanded=False):
+            # L'expander ora mostra solo il nome del plesso (es: "GIOVANNI XXIII")
+            with st.expander(f"🏫 {plesso}", expanded=False):
                 tipologie = st.session_state.storico_consegne[plesso]
                 
-                # Loop sulle Tipologie - Anche queste partono CHIUSE
+                # Loop sulle Tipologie (Collane)
                 for tipologia in list(tipologie.keys()):
-                    with st.expander(f"📖 Tipologia: {tipologia}", expanded=False):
-                        # Font più piccolo per l'intestazione interna
-                        st.markdown(f"#### Elenco {tipologia}")
+                    # Rinominazione dinamica se necessario (se i nomi non sono già aggiornati nel DB)
+                    nome_visualizzato = tipologia
+                    if tipologia == "INGLESE":
+                        nome_visualizzato = "INGLESE CLASSE PRIMA"
+                    
+                    # L'expander ora mostra solo il nome della collana (es: "LETTURE CLASSE PRIMA")
+                    with st.expander(f"📖 {nome_visualizzato}", expanded=False):
                         libri = tipologie[tipologia]
                         
                         for i, lib in enumerate(libri):
@@ -500,6 +505,7 @@ if st.session_state.pagina == "Storico":
         st.session_state.pagina = "Consegne"
         st.rerun()
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.3</p>", unsafe_allow_html=True)
+
 
 
 
