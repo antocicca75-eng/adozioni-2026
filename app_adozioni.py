@@ -775,67 +775,62 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (FIX CONNESSIONE) ---
+# --- BLOCCO 15: TABELLONE GENERALE (MEMORIA DI SISTEMA) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # 1. INIZIALIZZAZIONE CONNESSIONE (Se manca)
-    if "conn" not in st.session_state:
-        try:
-            from streamlit_gsheets import GSheetsConnection
-            st.session_state.conn = st.connection("gsheets", type=GSheetsConnection)
-        except Exception as e:
-            st.error("Configurazione Google Sheets mancante nel file secrets.toml")
+    # 1. RECUPERO LISTA DALLA MEMORIA ESISTENTE
+    # Cerchiamo i nomi dei plessi ovunque l'app li abbia salvati durante l'avvio
+    elenco_totale = []
 
-    # 2. FUNZIONE DI CARICAMENTO
-    def scarica_tutti_i_plessi():
-        if "conn" in st.session_state:
-            try:
-                # Carica il foglio "Plesso" dal tuo database
-                df_nomi = st.session_state.conn.read(worksheet="Plesso")
-                lista_raw = df_nomi.iloc[:, 0].dropna().unique().tolist()
-                return sorted([str(x).strip().upper() for x in lista_raw if x])
-            except Exception as e:
-                # Se il foglio "Plesso" non esiste o non è accessibile
-                return []
-        return []
-
-    elenco_totale = scarica_tutti_i_plessi()
+    # Proviamo a prenderli dal dataframe principale che usi nel modulo consegne
+    if "df_adozioni" in st.session_state and not st.session_state.df_adozioni.empty:
+        # Se nel foglio "Plesso" del tuo Sheets ci sono i nomi, l'app dovrebbe averli caricati qui
+        if 'Plesso' in st.session_state.df_adozioni.columns:
+            elenco_totale = sorted(st.session_state.df_adozioni['Plesso'].unique().tolist())
     
-    # Recupero stati (Consegne e Ritiri)
+    # Se la memoria è vuota, usiamo i nomi che hai già usato per consegne/ritiri
     set_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
     set_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
 
     if not elenco_totale:
-        st.warning("⚠️ Non riesco a leggere il database. Verifica che il foglio si chiami esattamente 'Plesso' e che le chiavi API siano corrette.")
-        if st.button("🔄 Ricarica Pagina"):
+        elenco_totale = sorted(list(set_consegnati | set_ritirati))
+
+    # --- SCHERMATA DI AVVISO SE VUOTO ---
+    if not elenco_totale:
+        st.warning("⚠️ Lista plessi non trovata. Torna alla Home e ricarica il Database.")
+        if st.button("⬅️ Torna alla Home"):
+            st.session_state.pagina = "Consegne"
             st.rerun()
     else:
-        # 3. STATISTICHE
-        tot = len(elenco_totale)
+        # 2. CALCOLO STATISTICHE
+        tot_p = len(elenco_totale)
         rit = len([p for p in elenco_totale if p in set_ritirati])
         cons = len([p for p in elenco_totale if p in set_consegnati and p not in set_ritirati])
-        da_fare = tot - (rit + cons)
+        da_fare = tot_p - (rit + cons)
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("⚪ DA INIZIARE", da_fare)
-        col2.metric("🟡 DA RITIRARE", cons)
-        col3.metric("🟢 COMPLETATI", rit)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("⚪ DA INIZIARE", da_fare)
+        c2.metric("🟡 DA RITIRARE", cons)
+        c3.metric("🟢 COMPLETATI", rit)
         
         st.markdown("---")
 
-        # 4. RICERCA E GRIGLIA
-        cerca = st.text_input("🔍 Cerca scuola...", "").upper()
-        lista_filtrata = [p for p in elenco_totale if cerca in p]
+        # 3. RICERCA RAPIDA
+        cerca = st.text_input("🔍 Cerca scuola nel database...", "").upper()
+        lista_visualizzata = [p for p in elenco_totale if cerca in str(p).upper()]
 
+        # 4. GRIGLIA A 4 COLONNE (STYLE CARDS)
         n_col = 4 
-        for i in range(0, len(lista_filtrata), n_col):
+        for i in range(0, len(lista_visualizzata), n_col):
             cols = st.columns(n_col)
-            for j, plesso in enumerate(lista_filtrata[i:i+n_col]):
+            for j, plesso in enumerate(lista_visualizzata[i:i+n_col]):
                 
+                # Default: BIANCO
                 bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #EEEEEE")
+                
                 if plesso in set_ritirati:
                     bg, txt, lab, brd = ("#28a745", "#FFFFFF", "✅ RITIRATO", "2px solid #1e7e34")
                 elif plesso in set_consegnati:
@@ -845,10 +840,10 @@ elif st.session_state.pagina == "Tabellone Stato":
                     st.markdown(f"""
                         <div style="
                             background-color: {bg}; color: {txt}; border: {brd};
-                            border-radius: 10px; padding: 12px 5px; margin-bottom: 12px;
-                            text-align: center; height: 110px; display: flex;
+                            border-radius: 10px; padding: 15px 5px; margin-bottom: 12px;
+                            text-align: center; height: 115px; display: flex;
                             flex-direction: column; justify-content: center; align-items: center;
-                            box-shadow: 2px 2px 6px rgba(0,0,0,0.06);
+                            box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
                         ">
                             <div style="font-size: 15px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
@@ -864,7 +859,10 @@ elif st.session_state.pagina == "Tabellone Stato":
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
+# FINE BLOCCO 15
+# =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
