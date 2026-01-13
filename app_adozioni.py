@@ -234,11 +234,9 @@ elenco_plessi = get_lista_plessi()
 if "pagina" not in st.session_state:
     st.session_state.pagina = "Inserimento"
 
+# Cerca questa riga e sostituiscila
 if 'db_consegne' not in st.session_state:
-    st.session_state.db_consegne = {
-        "LETTURE CLASSE PRIMA": [], "LETTURE CLASSE QUARTA": [],
-        "SUSSIDIARI DISCIPLINE": [], "INGLESE CLASSE PRIMA": [], "INGLESE CLASSE QUARTA": [], "RELIGIONE": []
-    }
+    st.session_state.db_consegne = carica_config_consegne()
 if 'lista_consegne_attuale' not in st.session_state:
     st.session_state.lista_consegne_attuale = []
 
@@ -572,6 +570,7 @@ elif st.session_state.pagina == "Modifica":
 
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
