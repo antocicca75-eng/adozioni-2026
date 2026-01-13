@@ -775,93 +775,101 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (MEMORIA DI SISTEMA) ---
+# --- BLOCCO 15: TABELLONE GENERALE (SISTEMA SCANNER) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
-    st.header("📊 Tabellone Avanzamento Plessi")
+    st.header("📊 Monitoraggio Completo Plessi")
 
-    # 1. RECUPERO LISTA DALLA MEMORIA ESISTENTE
-    # Cerchiamo i nomi dei plessi ovunque l'app li abbia salvati durante l'avvio
+    # 1. SCANNER TOTALE DELLA MEMORIA PER TROVARE I PLESSI
     elenco_totale = []
 
-    # Proviamo a prenderli dal dataframe principale che usi nel modulo consegne
-    if "df_adozioni" in st.session_state and not st.session_state.df_adozioni.empty:
-        # Se nel foglio "Plesso" del tuo Sheets ci sono i nomi, l'app dovrebbe averli caricati qui
-        if 'Plesso' in st.session_state.df_adozioni.columns:
-            elenco_totale = sorted(st.session_state.df_adozioni['Plesso'].unique().tolist())
+    # Cerchiamo in tutte le variabili possibili usate da Streamlit
+    fonti = [
+        st.session_state.get("df_adozioni"), 
+        st.session_state.get("df_plessi"),
+        st.session_state.get("database")
+    ]
+
+    for f in fonti:
+        if f is not None and hasattr(f, 'columns'):
+            if 'Plesso' in f.columns:
+                elenco_totale = sorted(f['Plesso'].dropna().unique().tolist())
+                break
     
-    # Se la memoria è vuota, usiamo i nomi che hai già usato per consegne/ritiri
+    # Se ancora vuoto, proviamo a vedere se esiste una lista semplice
+    if not elenco_totale:
+        elenco_totale = st.session_state.get("lista_plessi", [])
+
+    # Recupero dati movimento
     set_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
     set_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
 
-    if not elenco_totale:
-        elenco_totale = sorted(list(set_consegnati | set_ritirati))
+    # Integriamo comunque con chi è già stato movimentato
+    elenco_totale = sorted(list(set(elenco_totale) | set_consegnati | set_ritirati))
 
-    # --- SCHERMATA DI AVVISO SE VUOTO ---
     if not elenco_totale:
-        st.warning("⚠️ Lista plessi non trovata. Torna alla Home e ricarica il Database.")
-        if st.button("⬅️ Torna alla Home"):
+        st.error("❌ Errore critico: Il Tabellone non trova la lista dei plessi.")
+        st.info("💡 Suggerimento: Vai nel Modulo Consegne, seleziona una scuola qualsiasi e poi torna qui.")
+        if st.button("⬅️ Torna al Modulo"):
             st.session_state.pagina = "Consegne"
             st.rerun()
     else:
-        # 2. CALCOLO STATISTICHE
+        # 2. CONTATORI
         tot_p = len(elenco_totale)
         rit = len([p for p in elenco_totale if p in set_ritirati])
         cons = len([p for p in elenco_totale if p in set_consegnati and p not in set_ritirati])
-        da_fare = tot_p - (rit + cons)
+        mancano = tot_p - (rit + cons)
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("⚪ DA INIZIARE", da_fare)
+        c1.metric("⚪ DA INIZIARE", mancano)
         c2.metric("🟡 DA RITIRARE", cons)
         c3.metric("🟢 COMPLETATI", rit)
         
         st.markdown("---")
 
-        # 3. RICERCA RAPIDA
-        cerca = st.text_input("🔍 Cerca scuola nel database...", "").upper()
+        # 3. RICERCA E GRIGLIA
+        cerca = st.text_input("🔍 Cerca scuola...", "").upper()
         lista_visualizzata = [p for p in elenco_totale if cerca in str(p).upper()]
 
-        # 4. GRIGLIA A 4 COLONNE (STYLE CARDS)
         n_col = 4 
         for i in range(0, len(lista_visualizzata), n_col):
             cols = st.columns(n_col)
             for j, plesso in enumerate(lista_visualizzata[i:i+n_col]):
                 
-                # Default: BIANCO
-                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #EEEEEE")
-                
+                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #EEE")
                 if plesso in set_ritirati:
-                    bg, txt, lab, brd = ("#28a745", "#FFFFFF", "✅ RITIRATO", "2px solid #1e7e34")
+                    bg, txt, lab, brd = ("#28a745", "#FFF", "✅ RITIRATO", "2px solid #1e7e34")
                 elif plesso in set_consegnati:
-                    bg, txt, lab, brd = ("#FFD700", "#000000", "🚚 CONSEGNATO", "2px solid #d39e00")
+                    bg, txt, lab, brd = ("#FFD700", "#000", "🚚 CONSEGNATO", "2px solid #d39e00")
 
                 with cols[j]:
                     st.markdown(f"""
                         <div style="
                             background-color: {bg}; color: {txt}; border: {brd};
                             border-radius: 10px; padding: 15px 5px; margin-bottom: 12px;
-                            text-align: center; height: 115px; display: flex;
+                            text-align: center; height: 110px; display: flex;
                             flex-direction: column; justify-content: center; align-items: center;
                             box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
                         ">
                             <div style="font-size: 15px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
+                            <div style="font-size: 8px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
                                 {lab}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne"):
+    if st.button("⬅️ Torna al Modulo"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
