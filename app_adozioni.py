@@ -432,35 +432,65 @@ if st.session_state.pagina == "Consegne":
             
             salva_storico_cloud(st.session_state.storico_consegne)
 # =========================================================
-# --- BLOCCO 10: PAGINA STORICO ---
+# --- BLOCCO 10: PAGINA STORICO (VERSIONE AGGIORNATA) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Storico":
     st.header("📚 Registro Collane Consegnate")
+    
     if not st.session_state.get("storico_consegne"):
         st.info("Nessuna consegna registrata.")
     else:
+        # Iterazione sui plessi registrati
         for plesso in list(st.session_state.storico_consegne.keys()):
             with st.expander(f"🏫 {plesso}", expanded=False):
                 per_tipo = st.session_state.storico_consegne[plesso]
+                
+                # Iterazione sulle tipologie per ogni plesso
                 for tipo in list(per_tipo.keys()):
                     with st.expander(f"📖 {tipo}", expanded=False):
+                        
                         for i, lib in enumerate(per_tipo[tipo]):
-                            c_inf, c_del = st.columns([0.85, 0.15])
-                            c_inf.write(f"**{lib['t']}** — {lib['e']} ({lib['c1']} {lib['c2']} {lib['c3']})")
+                            # Assicurati che 'q' esista nello storico
+                            if 'q' not in lib: lib['q'] = 1
+                            
+                            # Layout: Info (0.6), Quantità (0.3), Elimina (0.1)
+                            c_inf, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
+                            
+                            # 1. DESCRIZIONE TITOLO PULITA (senza parentesi extra)
+                            c_inf.markdown(f"**{lib['t']}** \n{lib['e']} — Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
+                            
+                            # 2. CAMPO COPIE A DESTRA PRIMA DELLA X (con tasti +/-)
+                            m1, v1, p1 = c_qta.columns([1,1,1])
+                            if m1.button("➖", key=f"hist_m_{plesso}_{tipo}_{i}"):
+                                if lib['q'] > 1:
+                                    st.session_state.storico_consegne[plesso][tipo][i]['q'] -= 1
+                                    salva_storico_cloud(st.session_state.storico_consegne)
+                                    st.rerun()
+                            
+                            v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px;'>{lib['q']}</p>", unsafe_allow_html=True)
+                            
+                            if p1.button("➕", key=f"hist_p_{plesso}_{tipo}_{i}"):
+                                st.session_state.storico_consegne[plesso][tipo][i]['q'] += 1
+                                salva_storico_cloud(st.session_state.storico_consegne)
+                                st.rerun()
+
+                            # 3. TASTO ELIMINA
                             if c_del.button("❌", key=f"rit_{plesso}_{tipo}_{i}"):
                                 st.session_state.storico_consegne[plesso][tipo].pop(i)
-                                if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
-                                if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
+                                if not st.session_state.storico_consegne[plesso][tipo]: 
+                                    del st.session_state.storico_consegne[plesso][tipo]
+                                if not st.session_state.storico_consegne[plesso]: 
+                                    del st.session_state.storico_consegne[plesso]
                                 salva_storico_cloud(st.session_state.storico_consegne)
                                 st.rerun()
 
     if st.button("⬅️ Torna a Modulo Consegne", key="btn_back_st"):
-        st.session_state.pagina = "Consegne"; st.rerun()
+        st.session_state.pagina = "Consegne"
+        st.rerun()
 # =========================================================
 # FINE BLOCCO 10
 # =========================================================
-
 
 # =========================================================
 # --- BLOCCO 11: PAGINA NUOVO LIBRO ---
@@ -643,6 +673,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
