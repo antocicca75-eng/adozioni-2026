@@ -775,86 +775,77 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (DINAMICO) ---
+# --- BLOCCO 15: TABELLONE GENERALE (COMPATTO E COMPLETO) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
     
-    # 1. RECUPERO AUTOMATICO DEI PLESSI DAI DATI ESISTENTI
-    # Estraiamo i nomi da entrambi i database per non perdere nulla
-    nomi_consegne = set(st.session_state.get("storico_consegne", {}).keys())
-    nomi_ritiri = set(st.session_state.get("storico_ritiri", {}).keys())
+    # 1. ELENCO COMPLETO (Aggiungi qui tutti i nomi dei tuoi plessi)
+    # Questa lista definisce i nomi delle celle che vedrai sempre
+    elenco_totale = [
+        "RODARI", "PASCOLI", "ALIGHIERI", "KING", "MONTESSORI", 
+        "GALILEI", "GRAMSCI", "LEOPARDI", "MANZONI", "CARDUCCI",
+        "DANTE", "FOSCOLO", "MARCONI", "VERGA", "UNGARETTI",
+        "PERTINI", "TOTI", "MAZZINI", "COLLODI", "DE AMICIS"
+    ]
+    elenco_totale.sort()
+
+    # Database attuali per il controllo stati
+    consegnati = st.session_state.get("storico_consegne", {}).keys()
+    ritirati = st.session_state.get("storico_ritiri", {}).keys()
+
+    # 2. STATISTICHE SINTETICHE
+    tot = len(elenco_totale)
+    fatti = len([p for p in elenco_totale if p in ritirati or p in consegnati])
     
-    # Unione dei due set e ordinamento alfabetico
-    elenco_dinamico = sorted(list(nomi_consegne | nomi_ritiri))
+    st.write(f"📈 **Avanzamento:** {fatti} su {tot} plessi gestiti")
+    st.progress(fatti/tot if tot > 0 else 0)
 
-    if not elenco_dinamico:
-        st.info("💡 Il tabellone è vuoto perché non hai ancora registrato consegne. I plessi appariranno qui automaticamente dopo la prima conferma.")
-        if st.button("⬅️ Torna a Modulo Consegne"):
-            st.session_state.pagina = "Consegne"
-            st.rerun()
-    else:
-        # 2. STATISTICHE RAPIDE
-        tot = len(elenco_dinamico)
-        fatti = len(nomi_ritiri) # Un plesso è considerato "completato" se è nei ritiri
-        mancanti = tot - fatti
-        
-        col_s1, col_s2, col_s3 = st.columns(3)
-        col_s1.metric("Plessi in Lista", tot)
-        col_s2.metric("Ritiri Effettuati", fatti, delta=f"{fatti/tot*100:.0f}%" if tot > 0 else "0%")
-        col_s3.metric("Solo Consegnati", mancanti)
-        
-        st.markdown("---")
+    # 3. GRIGLIA COMPATTA (6 Colonne per riga per ridurre lo spazio)
+    n_col = 6
+    for i in range(0, len(elenco_totale), n_col):
+        cols = st.columns(n_col)
+        for j, plesso in enumerate(elenco_totale[i:i+n_col]):
+            
+            # Default: Bianco (Da fare)
+            bg = "#FFFFFF"; txt = "#555"; label = "VUOTO"; border = "1px solid #eee"
 
-        # 3. CREAZIONE GRIGLIA AUTOMATICA (4 Colonne per riga)
-        n_colonne = 4
-        for i in range(0, len(elenco_dinamico), n_colonne):
-            cols = st.columns(n_colonne)
-            for j, plesso in enumerate(elenco_dinamico[i:i+n_colonne]):
-                
-                # Logica Colore basata sullo stato reale
-                if plesso in nomi_ritiri:
-                    bg = "#28a745"  # Verde
-                    txt = "#FFFFFF"
-                    label = "✅ RITIRATO"
-                    border = "1px solid #1e7e34"
-                else:
-                    # Se è nel tabellone ma non nei ritiri, è sicuramente consegnato (giallo)
-                    bg = "#FFD700"  # Giallo
-                    txt = "#000000"
-                    label = "🚚 CONSEGNATO"
-                    border = "1px solid #d39e00"
+            if plesso in ritirati:
+                bg = "#28a745"; txt = "#FFF"; label = "RITIRATO"; border = "1px solid #1e7e34"
+            elif plesso in consegnati:
+                bg = "#FFD700"; txt = "#000"; label = "CONSEGNATO"; border = "1px solid #d39e00"
 
-                with cols[j]:
-                    st.markdown(f"""
-                        <div style="
-                            background-color: {bg};
-                            color: {txt};
-                            border: {border};
-                            border-radius: 8px;
-                            padding: 15px 5px;
-                            margin-bottom: 12px;
-                            text-align: center;
-                            height: 100px;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: center;
-                            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-                        ">
-                            <div style="font-size: 14px; font-weight: bold; text-transform: uppercase;">{plesso}</div>
-                            <div style="font-size: 10px; margin-top: 10px; font-weight: bold; opacity: 0.9;">{label}</div>
-                        </div>
-                    """, unsafe_allow_html=True)
+            with cols[j]:
+                st.markdown(f"""
+                    <div style="
+                        background-color: {bg};
+                        color: {txt};
+                        border: {border};
+                        border-radius: 4px;
+                        padding: 8px 2px;
+                        margin-bottom: 8px;
+                        text-align: center;
+                        height: 65px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                        box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
+                    ">
+                        <div style="font-size: 11px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{plesso}</div>
+                        <div style="font-size: 8px; margin-top: 4px; opacity: 0.8; font-weight: bold;">{label}</div>
+                    </div>
+                """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_15_new"):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
