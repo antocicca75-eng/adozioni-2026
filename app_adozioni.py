@@ -514,6 +514,49 @@ elif st.session_state.pagina == "Storico":
     if st.button("⬅️ Torna a Modulo Consegne"):
         st.session_state.pagina = "Consegne"; st.rerun()
 # =========================================================
+# --- BLOCCO 11: PAGINA RITIRI (CONSULTAZIONE RIENTRI) ---
+# INIZIO BLOCCO
+# =========================================================
+elif st.session_state.pagina == "Ritiri":
+    st.header("📦 Registro Collane Ritirate")
+    st.info("In questa sezione sono elencate le collane che sono state rimosse dai plessi e caricate come ritiri.")
+
+    if not st.session_state.get("storico_ritiri"):
+        st.warning("Non ci sono ancora collane ritirate in archivio.")
+    else:
+        # Elenco plessi ritirati ordinato
+        elenco_plessi_ritiri = sorted(list(st.session_state.storico_ritiri.keys()))
+        
+        for plesso in elenco_plessi_ritiri:
+            with st.expander(f"🏫 {plesso} (RITIRATI)", expanded=False):
+                per_tipo = st.session_state.storico_ritiri[plesso]
+                
+                for tipo in sorted(list(per_tipo.keys())):
+                    st.markdown(f"#### 📗 {tipo}")
+                    
+                    for i, lib in enumerate(per_tipo[tipo]):
+                        qta = lib.get('q', 1)
+                        col_t, col_q = st.columns([0.7, 0.3])
+                        
+                        col_t.markdown(f"**{lib['t']}**\n<small>{lib['e']} | Classi: {lib['c1']}{lib['c2']}{lib['c3']}</small>", unsafe_allow_html=True)
+                        
+                        # Mostra solo la quantità ritirata (senza tasti +/- per sicurezza, o li aggiungiamo se vuoi)
+                        col_q.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px; color:green;'>Qtà: {qta}</p>", unsafe_allow_html=True)
+                    st.markdown("---")
+
+    # Pulsanti di navigazione
+    st.markdown("---")
+    c1, c2 = st.columns(2)
+    if c1.button("⬅️ Torna al Registro Consegne"):
+        st.session_state.pagina = "Storico"
+        st.rerun()
+    if c2.button("🏠 Torna a Modulo Consegne"):
+        st.session_state.pagina = "Consegne"
+        st.rerun()
+# =========================================================
+# FINE BLOCCO 11
+# =========================================================
+# =========================================================
 # --- BLOCCO 11: PAGINA NUOVO LIBRO ---
 # INIZIO BLOCCO
 # =========================================================
@@ -694,6 +737,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
