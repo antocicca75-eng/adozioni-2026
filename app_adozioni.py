@@ -513,49 +513,80 @@ elif st.session_state.pagina == "Storico":
     st.markdown("---")
     if st.button("⬅️ Torna a Modulo Consegne"):
         st.session_state.pagina = "Consegne"; st.rerun()
+  # ... (fine del ciclo for dei plessi)
+    
+    # --- BARRA DI NAVIGAZIONE IN FONDO AL REGISTRO CONSEGNE ---
+    st.markdown("---")
+    col_nav1, col_nav2, col_nav3 = st.columns(3)
+    
+    if col_nav1.button("🏠 Home Consegne", use_container_width=True):
+        st.session_state.pagina = "Consegne"
+        st.rerun()
+        
+    if col_nav2.button("📦 VAI A RITIRI", use_container_width=True):
+        st.session_state.pagina = "Ritiri"
+        st.rerun()
+        
+    if col_nav3.button("🗑️ Svuota Registro", help="Attenzione: cancella tutto lo storico consegne", use_container_width=True):
+        st.session_state.storico_consegne = {}
+        salva_storico_cloud({})
+        st.rerun()      
 # =========================================================
-# --- BLOCCO 11: PAGINA RITIRI (CONSULTAZIONE RIENTRI) ---
-# INIZIO BLOCCO
+# --- BLOCCO 11: PAGINA RITIRI (CON RICERCA E TENDINA) ---
 # =========================================================
 elif st.session_state.pagina == "Ritiri":
     st.header("📦 Registro Collane Ritirate")
-    st.info("In questa sezione sono elencate le collane che sono state rimosse dai plessi e caricate come ritiri.")
-
+    
     if not st.session_state.get("storico_ritiri"):
         st.warning("Non ci sono ancora collane ritirate in archivio.")
+        if st.button("⬅️ Torna al Registro Consegne"):
+            st.session_state.pagina = "Storico"
+            st.rerun()
     else:
-        # Elenco plessi ritirati ordinato
+        # 1. RICERCA E TENDINA PER RITIRI
         elenco_plessi_ritiri = sorted(list(st.session_state.storico_ritiri.keys()))
+        opzioni_ritiri = ["- MOSTRA TUTTI I RITIRI -"] + elenco_plessi_ritiri
+        scuola_ritirata_sel = st.selectbox("🔍 Cerca tra i Ritiri:", opzioni_ritiri)
         
-        for plesso in elenco_plessi_ritiri:
+        st.markdown("---")
+        
+        plessi_da_mostrare = [scuola_ritirata_sel] if scuola_ritirata_sel != "- MOSTRA TUTTI I RITIRI -" else elenco_plessi_ritiri
+
+        for plesso in plessi_da_mostrare:
             with st.expander(f"🏫 {plesso} (RITIRATI)", expanded=False):
                 per_tipo = st.session_state.storico_ritiri[plesso]
                 
                 for tipo in sorted(list(per_tipo.keys())):
+                    # Titolo Tipologia con icona Verde
                     st.markdown(f"#### 📗 {tipo}")
                     
                     for i, lib in enumerate(per_tipo[tipo]):
                         qta = lib.get('q', 1)
-                        col_t, col_q = st.columns([0.7, 0.3])
+                        col_t, col_q, col_annulla = st.columns([0.6, 0.2, 0.2])
                         
                         col_t.markdown(f"**{lib['t']}**\n<small>{lib['e']} | Classi: {lib['c1']}{lib['c2']}{lib['c3']}</small>", unsafe_allow_html=True)
-                        
-                        # Mostra solo la quantità ritirata (senza tasti +/- per sicurezza, o li aggiungiamo se vuoi)
                         col_q.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px; color:green;'>Qtà: {qta}</p>", unsafe_allow_html=True)
+                        
+                        # Tasto per riportare indietro se hai sbagliato a ritirare
+                        if col_annulla.button("🔙", key=f"undo_{plesso}_{tipo}_{i}", help="Riporta in Consegne"):
+                            # Rimetti in consegne
+                            if plesso not in st.session_state.storico_consegne: st.session_state.storico_consegne[plesso] = {}
+                            if tipo not in st.session_state.storico_consegne[plesso]: st.session_state.storico_consegne[plesso][tipo] = []
+                            st.session_state.storico_consegne[plesso][tipo].append(st.session_state.storico_ritiri[plesso][tipo].pop(i))
+                            
+                            # Pulisci se vuoto
+                            if not st.session_state.storico_ritiri[plesso][tipo]: del st.session_state.storico_ritiri[plesso][tipo]
+                            if not st.session_state.storico_ritiri[plesso]: del st.session_state.storico_ritiri[plesso]
+                            
+                            salva_storico_cloud(st.session_state.storico_consegne)
+                            st.rerun()
                     st.markdown("---")
 
-    # Pulsanti di navigazione
-    st.markdown("---")
-    c1, c2 = st.columns(2)
-    if c1.button("⬅️ Torna al Registro Consegne"):
-        st.session_state.pagina = "Storico"
-        st.rerun()
-    if c2.button("🏠 Torna a Modulo Consegne"):
-        st.session_state.pagina = "Consegne"
-        st.rerun()
-# =========================================================
-# FINE BLOCCO 11
-# =========================================================
+        # Navigazione
+        st.markdown("---")
+        if st.button("⬅️ Torna al Registro Consegne (Blu)"):
+            st.session_state.pagina = "Storico"
+            st.rerun()
 # =========================================================
 # --- BLOCCO 11: PAGINA NUOVO LIBRO ---
 # INIZIO BLOCCO
@@ -737,6 +768,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
