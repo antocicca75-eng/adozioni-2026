@@ -220,18 +220,41 @@ if st.session_state.pagina == "Consegne":
         if col_btns[1].button("🗑️ SVUOTA TUTTO", use_container_width=True):
             reset_consegne_totale()
 
-        with st.expander("➕ Cerca e Aggiungi Libro"):
+   with st.expander("➕ Cerca e Aggiungi Libro"):
+            # Inizializza il contatore se non esiste
+            if "add_ctr" not in st.session_state:
+                st.session_state.add_ctr = 0
+            
+            actr = st.session_state.add_ctr
             df_cat = get_catalogo_libri()
+            
             if not df_cat.empty:
-                scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + sorted(df_cat.iloc[:, 0].astype(str).unique().tolist()))
+                # La key del selectbox cambia con actr per resettarsi
+                scelta_libro = st.selectbox(
+                    "Seleziona libro:", 
+                    ["- CERCA TITOLO -"] + sorted(df_cat.iloc[:, 0].astype(str).unique().tolist()),
+                    key=f"scelta_lib_{actr}"
+                )
+                
                 if scelta_libro != "- CERCA TITOLO -":
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
                     cc1, cc2, cc3, _ = st.columns([1, 1, 1, 5])
-                    c1in = cc1.text_input("N°", max_chars=2, key="in1")
-                    c2in = cc2.text_input("N° ", max_chars=2, key="in2")
-                    c3in = cc3.text_input("N°  ", max_chars=2, key="in3")
-                    if st.button("Conferma Aggiunta"):
-                        st.session_state.lista_consegne_attuale.append({"t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(), "c1": c1in, "c2": c2in, "c3": c3in})
+                    
+                    # Le key degli input ora sono dinamiche
+                    c1in = cc1.text_input("N°", max_chars=2, key=f"in1_{actr}")
+                    c2in = cc2.text_input("N° ", max_chars=2, key=f"in2_{actr}")
+                    c3in = cc3.text_input("N°  ", max_chars=2, key=f"in3_{actr}")
+                    
+                    if st.button("Conferma Aggiunta", key=f"btn_add_{actr}"):
+                        st.session_state.lista_consegne_attuale.append({
+                            "t": str(dati_libro.iloc[0]).upper(), 
+                            "e": str(dati_libro.iloc[2]).upper(), 
+                            "c1": c1in, 
+                            "c2": c2in, 
+                            "c3": c3in
+                        })
+                        # Incrementiamo il contatore: questo "distrugge" i vecchi widget e ne crea di nuovi vuoti
+                        st.session_state.add_ctr += 1
                         st.rerun()
 
     st.markdown("---")
@@ -426,5 +449,6 @@ elif st.session_state.pagina == "Modifica":
 
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
