@@ -775,48 +775,47 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (RECUPERO DAL DATABASE) ---
+# --- BLOCCO 15: TABELLONE GENERALE (FONT MAGGIORATO) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
     
-    # 1. RECUPERO AUTOMATICO DAL DATABASE ORIGINALE
-    # Cerchiamo i plessi nel database delle adozioni caricato all'inizio
+    # 1. RECUPERO TUTTI I PLESSI DAL DATABASE (Per visualizzare anche i bianchi)
     if "df_adozioni" in st.session_state and not st.session_state.df_adozioni.empty:
+        # Estrae ogni singolo plesso esistente nel file originale
         elenco_totale = sorted(st.session_state.df_adozioni['Plesso'].unique().tolist())
     else:
-        # Fallback se il database non è ancora caricato
+        # Fallback di emergenza se il database non è caricato
         elenco_totale = sorted(list(set(st.session_state.get("storico_consegne", {}).keys()) | 
                                     set(st.session_state.get("storico_ritiri", {}).keys())))
 
-    # Database per il controllo stati
+    # Database per il controllo colori
     consegnati = st.session_state.get("storico_consegne", {}).keys()
     ritirati = st.session_state.get("storico_ritiri", {}).keys()
 
     if not elenco_totale:
-        st.warning("⚠️ Nessun plesso trovato nel database. Verifica il caricamento dei dati.")
+        st.warning("⚠️ Carica prima il database delle adozioni per vedere i plessi.")
     else:
-        # 2. STATISTICHE SINTETICHE
+        # 2. STATISTICHE
         tot = len(elenco_totale)
         fatti = len([p for p in elenco_totale if p in ritirati or p in consegnati])
-        
         st.write(f"📈 **Avanzamento:** {fatti} su {tot} plessi gestiti")
         st.progress(fatti/tot if tot > 0 else 0)
 
-        # 3. GRIGLIA COMPATTA (6 Colonne)
-        n_col = 6
+        # 3. GRIGLIA A 4 COLONNE (Per avere celle più grandi e font più leggibile)
+        n_col = 4 
         for i in range(0, len(elenco_totale), n_col):
             cols = st.columns(n_col)
             for j, plesso in enumerate(elenco_totale[i:i+n_col]):
                 
-                # Default: Bianco (Da fare)
-                bg = "#FFFFFF"; txt = "#555"; label = "DA FARE"; border = "1px solid #ccc"
+                # Default: BIANCO (Da fare)
+                bg = "#FFFFFF"; txt = "#333"; label = "DA FARE"; border = "2px solid #DDDDDD"
 
                 if plesso in ritirati:
-                    bg = "#28a745"; txt = "#FFF"; label = "RITIRATO"; border = "1px solid #1e7e34"
+                    bg = "#28a745"; txt = "#FFFFFF"; label = "✅ RITIRATO"; border = "2px solid #1e7e34"
                 elif plesso in consegnati:
-                    bg = "#FFD700"; txt = "#000"; label = "CONSEGNATO"; border = "1px solid #d39e00"
+                    bg = "#FFD700"; txt = "#000000"; label = "🚚 CONSEGNATO"; border = "2px solid #d39e00"
 
                 with cols[j]:
                     st.markdown(f"""
@@ -824,29 +823,49 @@ elif st.session_state.pagina == "Tabellone Stato":
                             background-color: {bg};
                             color: {txt};
                             border: {border};
-                            border-radius: 4px;
-                            padding: 8px 2px;
-                            margin-bottom: 8px;
+                            border-radius: 8px;
+                            padding: 10px 5px;
+                            margin-bottom: 15px;
                             text-align: center;
-                            height: 60px;
+                            height: 110px;
                             display: flex;
                             flex-direction: column;
                             justify-content: center;
-                            box-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+                            align-items: center;
+                            box-shadow: 3px 3px 6px rgba(0,0,0,0.1);
                         ">
-                            <div style="font-size: 10px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{plesso}</div>
-                            <div style="font-size: 7px; margin-top: 4px; font-weight: bold;">{label}</div>
+                            <div style="
+                                font-size: 16px; 
+                                font-weight: 900; 
+                                line-height: 1.2; 
+                                word-wrap: break-word;
+                                text-transform: uppercase;
+                            ">
+                                {plesso}
+                            </div>
+                            <div style="
+                                font-size: 10px; 
+                                margin-top: 10px; 
+                                font-weight: bold; 
+                                letter-spacing: 1px;
+                                background: rgba(0,0,0,0.05);
+                                padding: 2px 8px;
+                                border-radius: 10px;
+                            ">
+                                {label}
+                            </div>
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final_auto"):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final_max"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
