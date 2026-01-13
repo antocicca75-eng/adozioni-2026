@@ -830,89 +830,87 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (VISTA A GRIGLIA) ---
+# --- BLOCCO 15: TABELLONE GENERALE (DINAMICO) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
     
-    # 1. ELENCO COMPLETO DEI PLESSI (Modifica questa lista con i tuoi nomi)
-    elenco_completo = [
-        "RODARI", "PASCOLI", "ALIGHIERI", "KING", "MONTESSORI", 
-        "GALILEI", "GRAMSCI", "LEOPARDI", "MANZONI", "CARDUCCI",
-        "DANTE", "FOSCOLO", "MARCONI", "VERGA", "UNGARETTI",
-        "PERTINI", "TOTI", "MAZZINI"
-    ]
-    elenco_completo.sort()
-
-    # Database attuali
-    consegnati = st.session_state.get("storico_consegne", {}).keys()
-    ritirati = st.session_state.get("storico_ritiri", {}).keys()
-
-    # 2. STATISTICHE RAPIDE
-    tot = len(elenco_completo)
-    fatti = len(set(consegnati) | set(ritirati))
-    mancanti = tot - fatti
+    # 1. RECUPERO AUTOMATICO DEI PLESSI DAI DATI ESISTENTI
+    # Estraiamo i nomi da entrambi i database per non perdere nulla
+    nomi_consegne = set(st.session_state.get("storico_consegne", {}).keys())
+    nomi_ritiri = set(st.session_state.get("storico_ritiri", {}).keys())
     
-    col_s1, col_s2, col_s3 = st.columns(3)
-    col_s1.metric("Plessi Totali", tot)
-    col_s2.metric("Gestiti", fatti, delta=f"{fatti/tot*100:.0f}%")
-    col_s3.metric("Da Gestire", mancanti)
-    
-    st.markdown("---")
+    # Unione dei due set e ordinamento alfabetico
+    elenco_dinamico = sorted(list(nomi_consegne | nomi_ritiri))
 
-    # 3. CREAZIONE GRIGLIA TIPO EXCEL (4 Colonne per riga)
-    n_colonne = 4
-    for i in range(0, len(elenco_completo), n_colonne):
-        cols = st.columns(n_colonne)
-        for j, plesso in enumerate(elenco_completo[i:i+n_colonne]):
-            
-            # Definizione Colore e Stato
-            bg = "#FFFFFF"  # Bianco
-            txt = "#333333" # Grigio scuro
-            label = "⚪ DA FARE"
-            border = "1px solid #ccc"
+    if not elenco_dinamico:
+        st.info("💡 Il tabellone è vuoto perché non hai ancora registrato consegne. I plessi appariranno qui automaticamente dopo la prima conferma.")
+        if st.button("⬅️ Torna a Modulo Consegne"):
+            st.session_state.pagina = "Consegne"
+            st.rerun()
+    else:
+        # 2. STATISTICHE RAPIDE
+        tot = len(elenco_dinamico)
+        fatti = len(nomi_ritiri) # Un plesso è considerato "completato" se è nei ritiri
+        mancanti = tot - fatti
+        
+        col_s1, col_s2, col_s3 = st.columns(3)
+        col_s1.metric("Plessi in Lista", tot)
+        col_s2.metric("Ritiri Effettuati", fatti, delta=f"{fatti/tot*100:.0f}%" if tot > 0 else "0%")
+        col_s3.metric("Solo Consegnati", mancanti)
+        
+        st.markdown("---")
 
-            if plesso in ritirati:
-                bg = "#28a745"  # Verde
-                txt = "#FFFFFF"
-                label = "🟢 RITIRATO"
-                border = "1px solid #1e7e34"
-            elif plesso in consegnati:
-                bg = "#FFD700"  # Giallo
-                txt = "#000000"
-                label = "🟡 CONSEGNATO"
-                border = "1px solid #d39e00"
+        # 3. CREAZIONE GRIGLIA AUTOMATICA (4 Colonne per riga)
+        n_colonne = 4
+        for i in range(0, len(elenco_dinamico), n_colonne):
+            cols = st.columns(n_colonne)
+            for j, plesso in enumerate(elenco_dinamico[i:i+n_colonne]):
+                
+                # Logica Colore basata sullo stato reale
+                if plesso in nomi_ritiri:
+                    bg = "#28a745"  # Verde
+                    txt = "#FFFFFF"
+                    label = "✅ RITIRATO"
+                    border = "1px solid #1e7e34"
+                else:
+                    # Se è nel tabellone ma non nei ritiri, è sicuramente consegnato (giallo)
+                    bg = "#FFD700"  # Giallo
+                    txt = "#000000"
+                    label = "🚚 CONSEGNATO"
+                    border = "1px solid #d39e00"
 
-            with cols[j]:
-                st.markdown(f"""
-                    <div style="
-                        background-color: {bg};
-                        color: {txt};
-                        border: {border};
-                        border-radius: 6px;
-                        padding: 12px;
-                        margin-bottom: 10px;
-                        text-align: center;
-                        height: 90px;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
-                    ">
-                        <div style="font-size: 14px; font-weight: bold; line-height: 1.2;">{plesso}</div>
-                        <div style="font-size: 10px; margin-top: 8px; font-weight: normal; opacity: 0.9;">{label}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                with cols[j]:
+                    st.markdown(f"""
+                        <div style="
+                            background-color: {bg};
+                            color: {txt};
+                            border: {border};
+                            border-radius: 8px;
+                            padding: 15px 5px;
+                            margin-bottom: 12px;
+                            text-align: center;
+                            height: 100px;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+                        ">
+                            <div style="font-size: 14px; font-weight: bold; text-transform: uppercase;">{plesso}</div>
+                            <div style="font-size: 10px; margin-top: 10px; font-weight: bold; opacity: 0.9;">{label}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_15"):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_15_new"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
