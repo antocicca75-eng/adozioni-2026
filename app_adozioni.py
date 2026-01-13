@@ -365,6 +365,7 @@ elif st.session_state.pagina == "Registro":
     if os.path.exists(DB_FILE):
         st.dataframe(pd.read_csv(DB_FILE), use_container_width=True)
 
+# --- PAGINA RICERCA (CORRETTA) ---
 elif st.session_state.pagina == "Ricerca":
     st.subheader("🔍 Motore di Ricerca Adozioni")
     if "r_attiva" not in st.session_state: st.session_state.r_attiva = False
@@ -382,6 +383,7 @@ elif st.session_state.pagina == "Ricerca":
             if st.button("🔍 AVVIA RICERCA", use_container_width=True, type="primary"): st.session_state.r_attiva = True
         with btn2:
             if st.button("🧹 PULISCI", use_container_width=True, on_click=reset_ricerca): st.rerun()
+            
     if st.session_state.r_attiva and os.path.exists(DB_FILE):
         df = pd.read_csv(DB_FILE).fillna("").astype(str)
         if f_ple: df = df[df["Plesso"].isin(f_ple)]
@@ -390,10 +392,14 @@ elif st.session_state.pagina == "Ricerca":
         if f_mat: df = df[df["Materia"].isin(f_mat)]
         if f_edi: df = df[df["Editore"].isin(f_edi)]
         if f_sag != "TUTTI": df = df[df["Saggio Consegna"] == f_sag]
+        
         if not df.empty:
+            # Visualizzazione singola (rimossa la duplicazione)
             st.dataframe(df.sort_index(ascending=False), use_container_width=True)
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
+        else:
+            st.warning("Nessun dato trovato con i filtri selezionati.")
 # ... fine della tua pagina precedente ...
         st.dataframe(df.sort_index(ascending=False), use_container_width=True)
         somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
@@ -455,6 +461,7 @@ elif st.session_state.pagina == "Modifica":
 
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
