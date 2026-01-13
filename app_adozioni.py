@@ -775,36 +775,45 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (CARICAMENTO AUTOMATICO) ---
+# --- BLOCCO 15: TABELLONE GENERALE (FIX CONNESSIONE) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # 1. FUNZIONE DI CARICAMENTO DIRETTO DA GOOGLE SHEETS
-    def scarica_tutti_i_plessi():
+    # 1. INIZIALIZZAZIONE CONNESSIONE (Se manca)
+    if "conn" not in st.session_state:
         try:
-            # Si collega al foglio "Plesso" che hai indicato
-            df_nomi = st.session_state.conn.read(worksheet="Plesso")
-            # Prende la prima colonna, toglie i vuoti e trasforma in lista
-            lista_raw = df_nomi.iloc[:, 0].dropna().unique().tolist()
-            # Pulizia: tutto in maiuscolo e niente spazi inutili
-            return sorted([str(x).strip().upper() for x in lista_raw if x])
+            from streamlit_gsheets import GSheetsConnection
+            st.session_state.conn = st.connection("gsheets", type=GSheetsConnection)
         except Exception as e:
-            st.error(f"Impossibile leggere il foglio 'Plesso': {e}")
-            return []
+            st.error("Configurazione Google Sheets mancante nel file secrets.toml")
 
-    # Carichiamo la lista completa (Bianchi + Gialli + Verdi)
+    # 2. FUNZIONE DI CARICAMENTO
+    def scarica_tutti_i_plessi():
+        if "conn" in st.session_state:
+            try:
+                # Carica il foglio "Plesso" dal tuo database
+                df_nomi = st.session_state.conn.read(worksheet="Plesso")
+                lista_raw = df_nomi.iloc[:, 0].dropna().unique().tolist()
+                return sorted([str(x).strip().upper() for x in lista_raw if x])
+            except Exception as e:
+                # Se il foglio "Plesso" non esiste o non è accessibile
+                return []
+        return []
+
     elenco_totale = scarica_tutti_i_plessi()
-
-    # Recupero database delle operazioni fatte
+    
+    # Recupero stati (Consegne e Ritiri)
     set_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
     set_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
 
     if not elenco_totale:
-        st.warning("⚠️ La lista dei plessi è vuota. Controlla il foglio 'Plesso' su Google Sheets.")
+        st.warning("⚠️ Non riesco a leggere il database. Verifica che il foglio si chiami esattamente 'Plesso' e che le chiavi API siano corrette.")
+        if st.button("🔄 Ricarica Pagina"):
+            st.rerun()
     else:
-        # 2. CONTATORI STATISTICI
+        # 3. STATISTICHE
         tot = len(elenco_totale)
         rit = len([p for p in elenco_totale if p in set_ritirati])
         cons = len([p for p in elenco_totale if p in set_consegnati and p not in set_ritirati])
@@ -817,21 +826,16 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         st.markdown("---")
 
-        # 3. BARRA DI RICERCA PER NAVIGAZIONE VELOCE
-        cerca = st.text_input("🔍 Cerca una scuola specifica...", "").upper()
-        
-        # Filtro istantaneo
+        # 4. RICERCA E GRIGLIA
+        cerca = st.text_input("🔍 Cerca scuola...", "").upper()
         lista_filtrata = [p for p in elenco_totale if cerca in p]
 
-        # 4. GRIGLIA A 4 COLONNE (STILE DASHBOARD)
         n_col = 4 
         for i in range(0, len(lista_filtrata), n_col):
             cols = st.columns(n_col)
             for j, plesso in enumerate(lista_filtrata[i:i+n_col]):
                 
-                # Definizione stati e colori
                 bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #EEEEEE")
-                
                 if plesso in set_ritirati:
                     bg, txt, lab, brd = ("#28a745", "#FFFFFF", "✅ RITIRATO", "2px solid #1e7e34")
                 elif plesso in set_consegnati:
@@ -849,20 +853,19 @@ elif st.session_state.pagina == "Tabellone Stato":
                             <div style="font-size: 15px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; opacity: 0.8; letter-spacing: 0.5px;">
+                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
                                 {lab}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_auto"):
+    if st.button("⬅️ Torna al Modulo Consegne"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
-# FINE BLOCCO 15
-# =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
