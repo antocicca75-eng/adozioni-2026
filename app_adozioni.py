@@ -775,89 +775,94 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (SINCRO TOTALE) ---
+# --- BLOCCO 15: TABELLONE TOTALE (SISTEMA INTEGRATO) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
-    st.header("📊 Tabellone Avanzamento Plessi")
+    st.header("📊 Monitoraggio Completo Plessi")
 
-    # 1. RECUPERO LISTA PLESSI (METODO INFALLIBILE)
-    # Usiamo lo stesso dizionario o dataframe che usa il modulo consegne
-    elenco_totale = []
+    # 1. RECUPERO LISTA PLESSI (PROVA TUTTE LE STRADE)
+    lista_finale = []
     
-    # Prova a prendere i plessi dal dataframe principale
+    # Strada A: Dal database caricato (la più probabile)
     if "df_adozioni" in st.session_state and not st.session_state.df_adozioni.empty:
-        elenco_totale = sorted(st.session_state.df_adozioni['Plesso'].unique().tolist())
+        lista_finale = sorted(st.session_state.df_adozioni['Plesso'].unique().tolist())
     
-    # Se per qualche motivo è vuoto, integriamo con quelli già toccati
+    # Strada B: Se la Strada A fallisce, prova a vedere se esiste una lista globale
+    elif "lista_plessi" in st.session_state:
+        lista_finale = sorted(st.session_state.lista_plessi)
+        
+    # Strada C: Recupero dai dati salvati (Consegne e Ritiri)
     set_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
     set_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
     
-    if not elenco_totale:
-        elenco_totale = sorted(list(set_consegnati | set_ritirati))
+    if not lista_finale:
+        lista_finale = sorted(list(set_consegnati | set_ritirati))
 
-    # --- CONTROLLO SICUREZZA ---
-    if not elenco_totale:
-        st.warning("⚠️ Non trovo la lista dei plessi. Torna al Modulo Consegne e assicurati che i dati siano caricati.")
-        if st.button("⬅️ Torna al Modulo Consegne"):
-            st.session_state.pagina = "Consegne"
-            st.rerun()
+    # --- RICERCA RAPIDA ---
+    search = st.text_input("🔍 Cerca un plesso specifico...", "").upper()
+    if search:
+        lista_visualizzata = [p for p in lista_finale if search in p.upper()]
     else:
-        # 2. STATISTICHE (Sempre aggiornate)
-        tot_plessi = len(elenco_totale)
-        n_ritirati = len(set_ritirati)
-        n_consegnati = len(set_consegnati - set_ritirati) # Gialli: consegnati ma non ritirati
-        n_da_fare = tot_plessi - (n_ritirati + n_consegnati)
+        lista_visualizzata = lista_finale
 
-        # Grafica statistiche
-        c1, c2, c3 = st.columns(3)
-        c1.metric("⚪ DA INIZIARE", n_da_fare)
-        c2.metric("🟡 DA RITIRARE", n_consegnati)
-        c3.metric("🟢 COMPLETATI", n_ritirati)
+    if not lista_visualizzata:
+        st.warning("⚠️ Nessun plesso trovato. Assicurati di aver caricato il file Excel nella Home.")
+    else:
+        # 2. CONTATORI STATISTICI
+        tot_p = len(lista_finale)
+        rit = len(set_ritirati)
+        cons = len(set_consegnati - set_ritirati)
+        mancano = tot_p - (rit + cons)
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("⚪ DA INIZIARE", mancano)
+        col2.metric("🟡 DA RITIRARE", cons)
+        col3.metric("🟢 COMPLETATI", rit)
         
         st.markdown("---")
 
-        # 3. VISUALIZZAZIONE TUTTI I PLESSI (Senza Slider se possibile)
-        # Se i plessi sono troppi, Streamlit li gestisce meglio in colonne
-        n_col = 4 
-        for i in range(0, len(elenco_totale), n_col):
+        # 3. GRIGLIA DINAMICA (AUMENTATA A 4 COLONNE)
+        n_col = 4
+        for i in range(0, len(lista_visualizzata), n_col):
             cols = st.columns(n_col)
-            for j, plesso in enumerate(elenco_totale[i:i+n_col]):
+            for j, plesso in enumerate(lista_visualizzata[i:i+n_col]):
                 
                 # Default: BIANCO
-                bg = "#FFFFFF"; txt = "#333"; label = "DA CONSEGNARE"; border = "2px solid #DDDDDD"
+                bg = "#FFFFFF"; txt = "#333"; lab = "DA CONSEGNARE"; brd = "2px solid #EEE"
 
                 if plesso in set_ritirati:
-                    bg = "#28a745"; txt = "#FFFFFF"; label = "✅ RITIRATO"; border = "2px solid #1e7e34"
+                    bg = "#28a745"; txt = "#FFF"; lab = "✅ RITIRATO"; brd = "2px solid #1e7e34"
                 elif plesso in set_consegnati:
-                    bg = "#FFD700"; txt = "#000000"; label = "🚚 CONSEGNATO"; border = "2px solid #d39e00"
+                    bg = "#FFD700"; txt = "#000"; lab = "🚚 CONSEGNATO"; brd = "2px solid #d39e00"
 
                 with cols[j]:
                     st.markdown(f"""
                         <div style="
-                            background-color: {bg}; color: {txt}; border: {border};
-                            border-radius: 8px; padding: 12px 5px; margin-bottom: 12px;
-                            text-align: center; height: 120px; display: flex;
+                            background-color: {bg}; color: {txt}; border: {brd};
+                            border-radius: 12px; padding: 15px 5px; margin-bottom: 15px;
+                            text-align: center; height: 130px; display: flex;
                             flex-direction: column; justify-content: center; align-items: center;
-                            box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+                            box-shadow: 4px 4px 10px rgba(0,0,0,0.08);
                         ">
-                            <div style="font-size: 16px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
+                            <div style="font-size: 18px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
-                                {label}
+                            <div style="font-size: 10px; margin-top: 12px; font-weight: bold; background: rgba(0,0,0,0.05); padding: 2px 10px; border-radius: 20px;">
+                                {lab}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna alla Home", key="btn_back_home"):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_final_v5"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
