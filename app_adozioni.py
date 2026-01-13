@@ -432,7 +432,7 @@ if st.session_state.pagina == "Consegne":
             
             salva_storico_cloud(st.session_state.storico_consegne)
 # =========================================================
-# --- BLOCCO 10: PAGINA STORICO (DOPPIO EXPANDER E FONT OTTIMIZZATI) ---
+# --- BLOCCO 10: PAGINA STORICO (ICONE COLORATE E DOPPIO EXPANDER) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Storico":
@@ -456,15 +456,16 @@ elif st.session_state.pagina == "Storico":
         else:
             plessi_da_mostrare = elenco_plessi_storico
 
-        # Visualizzazione con doppio expander
+        # Visualizzazione con icone e doppio expander
         for plesso in plessi_da_mostrare:
-            # Primo livello: Il Plesso (sempre chiuso di default come richiesto)
+            # Primo livello: Il Plesso
             with st.expander(f"🏫 {plesso}", expanded=False):
                 per_tipo = st.session_state.storico_consegne[plesso]
                 
-                # Secondo livello: Le Tipologie (Expander interni)
+                # Secondo livello: Le Tipologie con icona colorata
                 for tipo in sorted(list(per_tipo.keys())):
-                    with st.expander(f"📖 {tipo}", expanded=False):
+                    # Usiamo un'icona blu per le tipologie per farle risaltare
+                    with st.expander(f"📘 {tipo}", expanded=False):
                         
                         for i, lib in enumerate(per_tipo[tipo]):
                             qta_salvata = lib.get('q', 1)
@@ -472,11 +473,11 @@ elif st.session_state.pagina == "Storico":
                             # Layout bilanciato
                             col_titolo, col_qta, col_del = st.columns([0.60, 0.30, 0.1])
                             
-                            # Font leggermente aumentati (16px per titolo, 13px per editore)
+                            # Info Titolo
                             col_titolo.markdown(f"""
                                 <p style='margin-bottom:-5px;'>
-                                    <b style='font-size:16px;'>{lib['t']}</b><br>
-                                    <span style='font-size:13px; color:#555;'>{lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}</span>
+                                    <b style='font-size:16px; color:#1E3A8A;'>{lib['t']}</b><br>
+                                    <span style='font-size:13px; color:#444;'>{lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}</span>
                                 </p>
                                 """, unsafe_allow_html=True)
                             
@@ -488,7 +489,7 @@ elif st.session_state.pagina == "Storico":
                                     salva_storico_cloud(st.session_state.storico_consegne)
                                     st.rerun()
                             
-                            # Numero in blu leggermente più grande (18px)
+                            # Numero in blu reale
                             v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px; color:blue; margin-top:5px;'>{qta_salvata}</p>", unsafe_allow_html=True)
                             
                             if p1.button("➕", key=f"h_p_{plesso}_{tipo}_{i}"):
@@ -693,6 +694,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
