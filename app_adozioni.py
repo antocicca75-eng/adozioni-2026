@@ -432,56 +432,69 @@ if st.session_state.pagina == "Consegne":
             
             salva_storico_cloud(st.session_state.storico_consegne)
 # =========================================================
-# --- BLOCCO 10: PAGINA STORICO (REGISTRO FEDELE) ---
+# --- BLOCCO 10: PAGINA STORICO (RICERCA E REGISTRO FEDELE) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Storico":
-    st.header("📚 Registro Collane Consegnate")
+    # Layout Intestazione con Ricerca
+    col_h, col_s = st.columns([0.6, 0.4])
+    col_h.header("📚 Registro Collane Consegnate")
+    search_plesso = col_s.text_input("🔍 Cerca Plesso...", placeholder="Scrivi nome scuola...")
     
     if not st.session_state.get("storico_consegne"):
         st.info("Nessuna consegna registrata.")
     else:
-        # Mostra i plessi
-        for plesso in list(st.session_state.storico_consegne.keys()):
-            with st.expander(f"🏫 {plesso}", expanded=False):
-                per_tipo = st.session_state.storico_consegne[plesso]
+        # Lista dei plessi filtrata in base alla ricerca
+        elenco_plessi_storico = list(st.session_state.storico_consegne.keys())
+        if search_plesso:
+            elenco_plessi_storico = [p for p in elenco_plessi_storico if search_plesso.lower() in p.lower()]
+
+        if not elenco_plessi_storico:
+            st.warning("Nessun plesso corrisponde alla ricerca.")
+        else:
+            for plesso in elenco_plessi_storico:
+                # Se l'utente sta cercando, espandiamo automaticamente il risultato
+                is_expanded = True if search_plesso else False
                 
-                # Mostra le tipologie consegnate a quel plesso
-                for tipo in list(per_tipo.keys()):
-                    st.markdown(f"#### 📖 {tipo}")
+                with st.expander(f"🏫 {plesso}", expanded=is_expanded):
+                    per_tipo = st.session_state.storico_consegne[plesso]
                     
-                    for i, lib in enumerate(per_tipo[tipo]):
-                        # Legge la quantità salvata nello storico (es. le 4 copie confermate)
-                        qta_salvata = lib.get('q', 1)
+                    for tipo in list(per_tipo.keys()):
+                        st.markdown(f"#### 📖 {tipo}")
                         
-                        col_titolo, col_qta, col_del = st.columns([0.6, 0.3, 0.1])
-                        
-                        # Descrizione pulita
-                        col_titolo.markdown(f"**{lib['t']}** \n{lib['e']} — Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
-                        
-                        # Visualizzazione Quantità con tasti di correzione
-                        m1, v1, p1 = col_qta.columns([1,1,1])
-                        if m1.button("➖", key=f"h_m_{plesso}_{tipo}_{i}"):
-                            if lib['q'] > 1:
-                                st.session_state.storico_consegne[plesso][tipo][i]['q'] -= 1
+                        for i, lib in enumerate(per_tipo[tipo]):
+                            # Legge la quantità salvata (es. 4 se hai confermato 4)
+                            qta_salvata = lib.get('q', 1)
+                            
+                            col_titolo, col_qta, col_del = st.columns([0.6, 0.3, 0.1])
+                            
+                            # Descrizione pulita
+                            col_titolo.markdown(f"**{lib['t']}** \n{lib['e']} — Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
+                            
+                            # Quantità a destra prima della X
+                            m1, v1, p1 = col_qta.columns([1,1,1])
+                            if m1.button("➖", key=f"h_m_{plesso}_{tipo}_{i}"):
+                                if lib['q'] > 1:
+                                    st.session_state.storico_consegne[plesso][tipo][i]['q'] -= 1
+                                    salva_storico_cloud(st.session_state.storico_consegne)
+                                    st.rerun()
+                            
+                            v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:20px; color:blue;'>{qta_salvata}</p>", unsafe_allow_html=True)
+                            
+                            if p1.button("➕", key=f"h_p_{plesso}_{tipo}_{i}"):
+                                st.session_state.storico_consegne[plesso][tipo][i]['q'] += 1
                                 salva_storico_cloud(st.session_state.storico_consegne)
                                 st.rerun()
-                        
-                        # Qui vedrai il numero reale (es. 4)
-                        v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:20px; color:blue;'>{qta_salvata}</p>", unsafe_allow_html=True)
-                        
-                        if p1.button("➕", key=f"h_p_{plesso}_{tipo}_{i}"):
-                            st.session_state.storico_consegne[plesso][tipo][i]['q'] += 1
-                            salva_storico_cloud(st.session_state.storico_consegne)
-                            st.rerun()
 
-                        if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
-                            st.session_state.storico_consegne[plesso][tipo].pop(i)
-                            if not st.session_state.storico_consegne[plesso][tipo]: 
-                                del st.session_state.storico_consegne[plesso][tipo]
-                            salva_storico_cloud(st.session_state.storico_consegne)
-                            st.rerun()
-                    st.markdown("---")
+                            if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
+                                st.session_state.storico_consegne[plesso][tipo].pop(i)
+                                if not st.session_state.storico_consegne[plesso][tipo]: 
+                                    del st.session_state.storico_consegne[plesso][tipo]
+                                if not st.session_state.storico_consegne[plesso]:
+                                    del st.session_state.storico_consegne[plesso]
+                                salva_storico_cloud(st.session_state.storico_consegne)
+                                st.rerun()
+                        st.markdown("---")
 
     if st.button("⬅️ Torna a Modulo Consegne", key="btn_back_st"):
         st.session_state.pagina = "Consegne"
@@ -489,7 +502,6 @@ elif st.session_state.pagina == "Storico":
 # =========================================================
 # FINE BLOCCO 10
 # =========================================================
-
 # =========================================================
 # --- BLOCCO 11: PAGINA NUOVO LIBRO ---
 # INIZIO BLOCCO
@@ -671,6 +683,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
