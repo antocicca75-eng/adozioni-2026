@@ -1,7 +1,18 @@
 import streamlit as st
 import pandas as pd
 import json # Assicurati che ci sia anche questo import in alto
+import os
+from datetime import datetime
+from openpyxl import load_workbook
+import io
+import gspread
+from google.oauth2.service_account import Credentials
+from fpdf import FPDF 
 
+# =========================================================
+# --- BLOCCO 1: FUNZIONI CONFIGURAZIONE CONSEGNE ---
+# INIZIO BLOCCO
+# =========================================================
 def salva_config_consegne(db_dict):
     sh = connetti_google_sheets()
     if sh:
@@ -31,7 +42,15 @@ def carica_config_consegne():
                 db_caricato[r["Categoria"]] = json.loads(r["Dati_JSON"])
         except: pass 
     return db_caricato
+# =========================================================
+# FINE BLOCCO 1
+# =========================================================
 
+
+# =========================================================
+# --- BLOCCO 2: FUNZIONI STORICO CLOUD ---
+# INIZIO BLOCCO
+# =========================================================
 def salva_storico_cloud(storico_dict):
     sh = connetti_google_sheets()
     if sh:
@@ -57,24 +76,28 @@ def carica_storico_cloud():
                 storico_caricato[r["Plesso"]] = json.loads(r["Dati_JSON"])
         except: pass
     return storico_caricato
-import os
-from datetime import datetime
-from openpyxl import load_workbook
-import io
-import gspread
-from google.oauth2.service_account import Credentials
-import json
-from fpdf import FPDF 
+# =========================================================
+# FINE BLOCCO 2
+# =========================================================
 
-# --- CONFIGURAZIONE FILE ---
+
+# =========================================================
+# --- BLOCCO 3: CONFIGURAZIONE E COSTANTI ---
+# INIZIO BLOCCO
+# =========================================================
 DB_FILE = "dati_adozioni.csv"
 CONFIG_FILE = "anagrafiche.xlsx"
 ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
 
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
+# =========================================================
+# FINE BLOCCO 3
+# =========================================================
+
 
 # =========================================================
-# --- CLASSE PDF PER MODULO CONSEGNE ---
+# --- BLOCCO 4: CLASSE PDF ---
+# INIZIO BLOCCO
 # =========================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
@@ -113,8 +136,15 @@ class PDF_CONSEGNA(FPDF):
             self.cell(35, 6.2, label, border=1, align='L')
             self.set_font('Arial', '', 7.5)
             self.cell(94, 6.2, str(val).upper(), border=1, ln=1, align='L')
+# =========================================================
+# FINE BLOCCO 4
+# =========================================================
 
-# --- FUNZIONE CONNESSIONE GOOGLE SHEETS ---
+
+# =========================================================
+# --- BLOCCO 5: CONNESSIONE GOOGLE E BACKUP ---
+# INIZIO BLOCCO
+# =========================================================
 def connetti_google_sheets():
     try:
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -142,33 +172,15 @@ def backup_su_google_sheets(df_da_salvare):
             st.sidebar.error(f"Errore scrittura Cloud: {e}")
             return False
     return False
-def salva_storico_cloud(storico_dict):
-    sh = connetti_google_sheets()
-    if sh:
-        try:
-            try: foglio = sh.worksheet("StoricoConsegne")
-            except: foglio = sh.add_worksheet(title="StoricoConsegne", rows="1000", cols="20")
-            
-            foglio.clear()
-            righe = [["Plesso", "Dati_JSON"]]
-            for plesso, dati in storico_dict.items():
-                righe.append([plesso, json.dumps(dati)])
-            foglio.update(righe)
-        except Exception as e:
-            st.sidebar.error(f"Errore salvataggio storico: {e}")
+# =========================================================
+# FINE BLOCCO 5
+# =========================================================
 
-def carica_storico_cloud():
-    sh = connetti_google_sheets()
-    storico_caricato = {}
-    if sh:
-        try:
-            foglio = sh.worksheet("StoricoConsegne")
-            dati = foglio.get_all_records()
-            for r in dati:
-                storico_caricato[r["Plesso"]] = json.loads(r["Dati_JSON"])
-        except: pass
-    return storico_caricato
-# --- STILE CSS ---
+
+# =========================================================
+# --- BLOCCO 6: STILE CSS E CACHE DATI ---
+# INIZIO BLOCCO
+# =========================================================
 st.markdown("""
     <style>
     [data-testid="stDataEditor"] thead tr th { background-color: #004a99 !important; color: white !important; }
@@ -177,7 +189,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNZIONI CARICAMENTO ---
 @st.cache_data(ttl=3600)
 def get_catalogo_libri():
     sh = connetti_google_sheets()
@@ -218,8 +229,15 @@ def aggiungi_libro_a_excel(t, m, e, a):
         st.cache_data.clear() 
         return True
     except: return False
+# =========================================================
+# FINE BLOCCO 6
+# =========================================================
 
-# --- PREPARAZIONE DATI ---
+
+# =========================================================
+# --- BLOCCO 7: PREPARAZIONE STATO SESSIONE ---
+# INIZIO BLOCCO
+# =========================================================
 catalogo = get_catalogo_libri()
 if not catalogo.empty:
     elenco_titoli = sorted([str(x) for x in catalogo.iloc[:, 0].unique() if str(x).strip() != ""])
@@ -234,7 +252,6 @@ elenco_plessi = get_lista_plessi()
 if "pagina" not in st.session_state:
     st.session_state.pagina = "Inserimento"
 
-# Cerca questa riga e sostituiscila
 if 'db_consegne' not in st.session_state:
     st.session_state.db_consegne = carica_config_consegne()
 if 'lista_consegne_attuale' not in st.session_state:
@@ -248,8 +265,15 @@ def reset_ricerca():
     st.session_state.fm = []
     st.session_state.fe = []
     st.session_state.fsag = "TUTTI"
+# =========================================================
+# FINE BLOCCO 7
+# =========================================================
 
-# --- SIDEBAR NAVIGAZIONE ---
+
+# =========================================================
+# --- BLOCCO 8: SIDEBAR NAVIGAZIONE ---
+# INIZIO BLOCCO
+# =========================================================
 with st.sidebar:
     st.title("🧭 MENU")
     if st.button("➕ NUOVA ADOZIONE", use_container_width=True): st.session_state.pagina = "Inserimento"; st.rerun()
@@ -259,14 +283,18 @@ with st.sidebar:
     if st.button("🔍 FILTRA E RICERCA", use_container_width=True): st.session_state.pagina = "Ricerca"; st.rerun()
     if st.button("📄 MODULO CONSEGNE", use_container_width=True): st.session_state.pagina = "Consegne"; st.rerun()
     if st.button("📚 COLLANE CONSEGNATE", use_container_width=True): st.session_state.pagina = "Storico"; st.rerun()
+# =========================================================
+# FINE BLOCCO 8
+# =========================================================
 
-# --- LOGICA PAGINE ---
 
-# --- PAGINA CONSEGNE (VERSIONE CORRETTA E PULITA) ---
+# =========================================================
+# --- BLOCCO 9: PAGINA CONSEGNE ---
+# INIZIO BLOCCO
+# =========================================================
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
-    # Inizializzazione caricando dal Cloud (se non già fatto)
     if "storico_consegne" not in st.session_state: 
         st.session_state.storico_consegne = carica_storico_cloud()
     
@@ -277,7 +305,6 @@ if st.session_state.pagina == "Consegne":
         st.session_state.last_cat = None
         st.rerun()
 
-    # Contatori per resettare i widget
     if "reset_ctr" not in st.session_state: st.session_state.reset_ctr = 0
     if "add_ctr" not in st.session_state: st.session_state.add_ctr = 0
     
@@ -297,7 +324,6 @@ if st.session_state.pagina == "Consegne":
 
     if cat_scelta != "- SELEZIONA -":
         st.markdown("---")
-        # Visualizzazione lista attuale
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
             ci, cd = st.columns([0.9, 0.1])
             ci.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
@@ -308,7 +334,6 @@ if st.session_state.pagina == "Consegne":
         col_btns = st.columns(2)
         if col_btns[0].button("💾 REGISTRA LISTA", use_container_width=True):
             st.session_state.db_consegne[cat_scelta] = list(st.session_state.lista_consegne_attuale)
-            # SALVATAGGIO PERMANENTE CONFIGURAZIONE
             salva_config_consegne(st.session_state.db_consegne)
             st.success("Configurazione salvata permanentemente!")
         
@@ -316,7 +341,6 @@ if st.session_state.pagina == "Consegne":
             st.session_state.reset_ctr += 1
             reset_consegne_totale()
 
-        # EXPANDER PER AGGIUNTA LIBRO
         with st.expander("➕ Cerca e Aggiungi Libro"):
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
@@ -366,11 +390,17 @@ if st.session_state.pagina == "Consegne":
             if p_scelto not in st.session_state.storico_consegne: 
                 st.session_state.storico_consegne[p_scelto] = {}
             st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
-            # SALVATAGGIO PERMANENTE STORICO
             salva_storico_cloud(st.session_state.storico_consegne)
             st.success(f"Consegna registrata per {p_scelto}!")
+# =========================================================
+# FINE BLOCCO 9
+# =========================================================
 
-# --- PAGINA STORICO (PULITA E SALVATAGGIO) ---
+
+# =========================================================
+# --- BLOCCO 10: PAGINA STORICO ---
+# INIZIO BLOCCO
+# =========================================================
 elif st.session_state.pagina == "Storico":
     st.header("📚 Registro Collane Consegnate")
     if not st.session_state.get("storico_consegne"):
@@ -388,36 +418,20 @@ elif st.session_state.pagina == "Storico":
                                 st.session_state.storico_consegne[plesso][tipo].pop(i)
                                 if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
                                 if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                                # AGGIORNAMENTO CLOUD DOPO CANCELLAZIONE
                                 salva_storico_cloud(st.session_state.storico_consegne)
                                 st.rerun()
 
     if st.button("⬅️ Torna a Modulo Consegne", key="btn_back_st"):
         st.session_state.pagina = "Consegne"; st.rerun()
-# --- PAGINA STORICO (PULITA) ---
-elif st.session_state.pagina == "Storico":
-    st.header("📚 Registro Collane Consegnate")
-    if not st.session_state.get("storico_consegne"):
-        st.info("Nessuna consegna registrata.")
-    else:
-        for plesso in list(st.session_state.storico_consegne.keys()):
-            with st.expander(f"🏫 {plesso}", expanded=False):
-                per_tipo = st.session_state.storico_consegne[plesso]
-                for tipo in list(per_tipo.keys()):
-                    with st.expander(f"📖 {tipo}", expanded=False):
-                        for i, lib in enumerate(per_tipo[tipo]):
-                            c_inf, c_del = st.columns([0.85, 0.15])
-                            c_inf.write(f"**{lib['t']}** — {lib['e']} ({lib['c1']} {lib['c2']} {lib['c3']})")
-                            if c_del.button("❌", key=f"rit_{plesso}_{tipo}_{i}"):
-                                st.session_state.storico_consegne[plesso][tipo].pop(i)
-                                if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
-                                if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                                st.rerun()
+# =========================================================
+# FINE BLOCCO 10
+# =========================================================
 
-    if st.button("⬅️ Torna a Modulo Consegne", key="btn_back_st"):
-        st.session_state.pagina = "Consegne"; st.rerun()
 
-# --- PAGINA NUOVO LIBRO ---
+# =========================================================
+# --- BLOCCO 11: PAGINA NUOVO LIBRO ---
+# INIZIO BLOCCO
+# =========================================================
 elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo")
     with st.container(border=True):
@@ -430,7 +444,15 @@ elif st.session_state.pagina == "NuovoLibro":
             if nt and m_val and e_val:
                 if aggiungi_libro_a_excel(nt, m_val, e_val, a_val):
                     st.success("Libro aggiunto!"); st.rerun()
+# =========================================================
+# FINE BLOCCO 11
+# =========================================================
 
+
+# =========================================================
+# --- BLOCCO 12: PAGINA INSERIMENTO ADOZIONE ---
+# INIZIO BLOCCO
+# =========================================================
 elif st.session_state.pagina == "Inserimento":
     st.subheader("Nuova Registrazione Adozione")
     if "form_id" not in st.session_state: st.session_state.form_id = 0
@@ -467,9 +489,15 @@ elif st.session_state.pagina == "Inserimento":
                 st.rerun()
             elif saggio == "-": st.error("⚠️ Devi specificare SI/NO!")
             else: st.error("⚠️ Seleziona Titolo e Plesso!")
+# =========================================================
+# FINE BLOCCO 12
+# =========================================================
 
 
-# --- PAGINA REGISTRO ---
+# =========================================================
+# --- BLOCCO 13: PAGINA REGISTRO E RICERCA ---
+# INIZIO BLOCCO
+# =========================================================
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
     if os.path.exists(DB_FILE):
@@ -513,6 +541,15 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else:
             st.warning("Nessun dato trovato con i filtri selezionati.")
+# =========================================================
+# FINE BLOCCO 13
+# =========================================================
+
+
+# =========================================================
+# --- BLOCCO 14: PAGINA MODIFICA ---
+# INIZIO BLOCCO
+# =========================================================
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
     if os.path.exists(DB_FILE):
@@ -567,18 +604,8 @@ elif st.session_state.pagina == "Modifica":
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
                                 df_full = pd.read_csv(DB_FILE).fillna("").astype(str); df_full = df_full.drop(int(i))
                                 df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full); st.rerun()
-
+# =========================================================
+# FINE BLOCCO 14
+# =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
-
-
-
-
-
-
-
-
-
-
-
-
