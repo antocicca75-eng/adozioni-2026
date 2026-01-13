@@ -775,35 +775,41 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (FIX RANGE ERROR) ---
+# --- BLOCCO 15: TABELLONE GENERALE (SINCRO TOTALE) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # 1. RECUPERO DATI
-    set_tutti = set()
-    if "df_adozioni" in st.session_state and not st.session_state.df_adozioni.empty:
-        set_tutti.update(st.session_state.df_adozioni['Plesso'].unique())
+    # 1. RECUPERO LISTA PLESSI (METODO INFALLIBILE)
+    # Usiamo lo stesso dizionario o dataframe che usa il modulo consegne
+    elenco_totale = []
     
+    # Prova a prendere i plessi dal dataframe principale
+    if "df_adozioni" in st.session_state and not st.session_state.df_adozioni.empty:
+        elenco_totale = sorted(st.session_state.df_adozioni['Plesso'].unique().tolist())
+    
+    # Se per qualche motivo è vuoto, integriamo con quelli già toccati
     set_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
     set_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
     
-    elenco_totale = sorted(list(set_tutti | set_consegnati | set_ritirati))
-
-    # --- CONTROLLO SICUREZZA PER EVITARE RANGE ERROR ---
     if not elenco_totale:
-        st.info("👋 Benvenuto! Carica il file Excel o registra la prima consegna per attivare il tabellone.")
+        elenco_totale = sorted(list(set_consegnati | set_ritirati))
+
+    # --- CONTROLLO SICUREZZA ---
+    if not elenco_totale:
+        st.warning("⚠️ Non trovo la lista dei plessi. Torna al Modulo Consegne e assicurati che i dati siano caricati.")
         if st.button("⬅️ Torna al Modulo Consegne"):
             st.session_state.pagina = "Consegne"
             st.rerun()
     else:
-        # 2. STATISTICHE
+        # 2. STATISTICHE (Sempre aggiornate)
         tot_plessi = len(elenco_totale)
         n_ritirati = len(set_ritirati)
-        n_consegnati = len(set_consegnati - set_ritirati)
+        n_consegnati = len(set_consegnati - set_ritirati) # Gialli: consegnati ma non ritirati
         n_da_fare = tot_plessi - (n_ritirati + n_consegnati)
 
+        # Grafica statistiche
         c1, c2, c3 = st.columns(3)
         c1.metric("⚪ DA INIZIARE", n_da_fare)
         c2.metric("🟡 DA RITIRARE", n_consegnati)
@@ -811,31 +817,14 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         st.markdown("---")
 
-        # 3. PAGINAZIONE (Con protezione se num_pagine < 2)
-        plessi_per_pagina = 20
-        num_pagine = (tot_plessi + plessi_per_pagina - 1) // plessi_per_pagina
-        
-        # Se c'è solo una pagina, non mostriamo lo slider per evitare errori
-        if num_pagine > 1:
-            scelta_pag = st.select_slider(
-                "📖 Sfoglia Plessi", 
-                options=range(1, num_pagine + 1),
-                value=1
-            )
-            inizio = (scelta_pag - 1) * plessi_per_pagina
-        else:
-            inizio = 0
-            st.caption(f"Visualizzazione di tutti i {tot_plessi} plessi")
-        
-        fine = inizio + plessi_per_pagina
-        pagina_attuale = elenco_totale[inizio:fine]
-
-        # 4. GRIGLIA A 4 COLONNE
+        # 3. VISUALIZZAZIONE TUTTI I PLESSI (Senza Slider se possibile)
+        # Se i plessi sono troppi, Streamlit li gestisce meglio in colonne
         n_col = 4 
-        for i in range(0, len(pagina_attuale), n_col):
+        for i in range(0, len(elenco_totale), n_col):
             cols = st.columns(n_col)
-            for j, plesso in enumerate(pagina_attuale[i:i+n_col]):
+            for j, plesso in enumerate(elenco_totale[i:i+n_col]):
                 
+                # Default: BIANCO
                 bg = "#FFFFFF"; txt = "#333"; label = "DA CONSEGNARE"; border = "2px solid #DDDDDD"
 
                 if plesso in set_ritirati:
@@ -847,28 +836,29 @@ elif st.session_state.pagina == "Tabellone Stato":
                     st.markdown(f"""
                         <div style="
                             background-color: {bg}; color: {txt}; border: {border};
-                            border-radius: 10px; padding: 15px 5px; margin-bottom: 15px;
-                            text-align: center; height: 130px; display: flex;
+                            border-radius: 8px; padding: 12px 5px; margin-bottom: 12px;
+                            text-align: center; height: 120px; display: flex;
                             flex-direction: column; justify-content: center; align-items: center;
-                            box-shadow: 3px 3px 8px rgba(0,0,0,0.1);
+                            box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
                         ">
-                            <div style="font-size: 17px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
+                            <div style="font-size: 16px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="font-size: 10px; margin-top: 12px; font-weight: bold; opacity: 0.8;">
+                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
                                 {label}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_safe"):
+    if st.button("⬅️ Torna alla Home", key="btn_back_home"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
