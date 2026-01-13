@@ -775,102 +775,95 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE SINCRONIZZATO GOOGLE SHEETS ---
+# --- BLOCCO 15: TABELLONE GENERALE (CARICAMENTO AUTOMATICO) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # --- CONFIGURAZIONE NOMI (Controlla che siano uguali al tuo Sheet) ---
-    nome_foglio_scuole = "Plesso" 
-    colonna_nome_scuole = "Plesso" # Cambia in "Scuola" o "Nome" se necessario
+    # 1. FUNZIONE DI CARICAMENTO DIRETTO DA GOOGLE SHEETS
+    def scarica_tutti_i_plessi():
+        try:
+            # Si collega al foglio "Plesso" che hai indicato
+            df_nomi = st.session_state.conn.read(worksheet="Plesso")
+            # Prende la prima colonna, toglie i vuoti e trasforma in lista
+            lista_raw = df_nomi.iloc[:, 0].dropna().unique().tolist()
+            # Pulizia: tutto in maiuscolo e niente spazi inutili
+            return sorted([str(x).strip().upper() for x in lista_raw if x])
+        except Exception as e:
+            st.error(f"Impossibile leggere il foglio 'Plesso': {e}")
+            return []
 
-    # 1. TENTATIVO DI RECUPERO LISTA COMPLETA
-    elenco_totale = []
+    # Carichiamo la lista completa (Bianchi + Gialli + Verdi)
+    elenco_totale = scarica_tutti_i_plessi()
 
-    # Cerchiamo di caricare i dati dal connettore Google Sheets
-    try:
-        if "conn" in st.session_state:
-            # Legge direttamente il foglio Plesso dal tuo Google Sheets
-            df_plessi_full = st.session_state.conn.read(worksheet=nome_foglio_scuole)
-            if not df_plessi_full.empty:
-                elenco_totale = sorted(df_plessi_full[colonna_nome_scuole].dropna().unique().tolist())
-        
-        # Se fallisce il caricamento diretto, prova dal dataframe in memoria
-        if not elenco_totale and "df_adozioni" in st.session_state:
-            elenco_totale = sorted(st.session_state.df_adozioni['Plesso'].unique().tolist())
-    except Exception as e:
-        st.error(f"⚠️ Errore di connessione al foglio '{nome_foglio_scuole}': {e}")
-
-    # Recupero stati per i colori
+    # Recupero database delle operazioni fatte
     set_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
     set_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
 
-    # Se ancora non abbiamo nulla, usiamo i dati di sessione come ultima spiaggia
     if not elenco_totale:
-        elenco_totale = sorted(list(set_consegnati | set_ritirati))
-
-    # --- INTERFACCIA ---
-    if not elenco_totale:
-        st.warning("🔍 Non riesco a leggere la lista dal foglio Google 'Plesso'. Verifica il nome del foglio.")
-        if st.button("🔄 Riprova Caricamento"):
-            st.rerun()
+        st.warning("⚠️ La lista dei plessi è vuota. Controlla il foglio 'Plesso' su Google Sheets.")
     else:
-        # 2. CONTATORI DINAMICI
-        tot_p = len(elenco_totale)
+        # 2. CONTATORI STATISTICI
+        tot = len(elenco_totale)
         rit = len([p for p in elenco_totale if p in set_ritirati])
         cons = len([p for p in elenco_totale if p in set_consegnati and p not in set_ritirati])
-        mancano = tot_p - (rit + cons)
+        da_fare = tot - (rit + cons)
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("⚪ DA CONSEGNARE", mancano)
-        c2.metric("🟡 DA RITIRARE", cons)
-        c3.metric("🟢 COMPLETATI", rit)
+        col1, col2, col3 = st.columns(3)
+        col1.metric("⚪ DA INIZIARE", da_fare)
+        col2.metric("🟡 DA RITIRARE", cons)
+        col3.metric("🟢 COMPLETATI", rit)
         
         st.markdown("---")
 
-        # 3. BARRA DI RICERCA E GRIGLIA
-        cerca = st.text_input("🔍 Cerca scuola nel database...", "").upper()
-        lista_da_mostrare = [p for p in elenco_totale if cerca in p.upper()]
+        # 3. BARRA DI RICERCA PER NAVIGAZIONE VELOCE
+        cerca = st.text_input("🔍 Cerca una scuola specifica...", "").upper()
         
+        # Filtro istantaneo
+        lista_filtrata = [p for p in elenco_totale if cerca in p]
+
+        # 4. GRIGLIA A 4 COLONNE (STILE DASHBOARD)
         n_col = 4 
-        for i in range(0, len(lista_da_mostrare), n_col):
+        for i in range(0, len(lista_filtrata), n_col):
             cols = st.columns(n_col)
-            for j, plesso in enumerate(lista_da_mostrare[i:i+n_col]):
+            for j, plesso in enumerate(lista_filtrata[i:i+n_col]):
                 
-                # Colori basati sullo stato
-                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #EEE")
+                # Definizione stati e colori
+                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #EEEEEE")
+                
                 if plesso in set_ritirati:
-                    bg, txt, lab, brd = ("#28a745", "#FFF", "✅ RITIRATO", "2px solid #1e7e34")
+                    bg, txt, lab, brd = ("#28a745", "#FFFFFF", "✅ RITIRATO", "2px solid #1e7e34")
                 elif plesso in set_consegnati:
-                    bg, txt, lab, brd = ("#FFD700", "#000", "🚚 CONSEGNATO", "2px solid #d39e00")
+                    bg, txt, lab, brd = ("#FFD700", "#000000", "🚚 CONSEGNATO", "2px solid #d39e00")
 
                 with cols[j]:
                     st.markdown(f"""
                         <div style="
                             background-color: {bg}; color: {txt}; border: {brd};
-                            border-radius: 12px; padding: 15px 5px; margin-bottom: 15px;
-                            text-align: center; height: 130px; display: flex;
+                            border-radius: 10px; padding: 12px 5px; margin-bottom: 12px;
+                            text-align: center; height: 110px; display: flex;
                             flex-direction: column; justify-content: center; align-items: center;
-                            box-shadow: 3px 3px 8px rgba(0,0,0,0.1);
+                            box-shadow: 2px 2px 6px rgba(0,0,0,0.06);
                         ">
-                            <div style="font-size: 18px; font-weight: 900; text-transform: uppercase; line-height: 1.1;">
+                            <div style="font-size: 15px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="font-size: 10px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
+                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; opacity: 0.8; letter-spacing: 0.5px;">
                                 {lab}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne"):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_auto"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
