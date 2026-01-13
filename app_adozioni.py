@@ -432,7 +432,7 @@ if st.session_state.pagina == "Consegne":
             
             salva_storico_cloud(st.session_state.storico_consegne)
 # =========================================================
-# --- BLOCCO 10: PAGINA STORICO (COMPATTO E ORDINATO) ---
+# --- BLOCCO 10: PAGINA STORICO (DOPPIO EXPANDER E FONT OTTIMIZZATI) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Storico":
@@ -456,49 +456,55 @@ elif st.session_state.pagina == "Storico":
         else:
             plessi_da_mostrare = elenco_plessi_storico
 
-        # Visualizzazione compatta
+        # Visualizzazione con doppio expander
         for plesso in plessi_da_mostrare:
-            # L'expander ora è sempre CHIUSO all'inizio (expanded=False)
+            # Primo livello: Il Plesso (sempre chiuso di default come richiesto)
             with st.expander(f"🏫 {plesso}", expanded=False):
                 per_tipo = st.session_state.storico_consegne[plesso]
                 
+                # Secondo livello: Le Tipologie (Expander interni)
                 for tipo in sorted(list(per_tipo.keys())):
-                    # Font ridotto per la tipologia
-                    st.markdown(f"<p style='font-size:15px; font-weight:bold; color:#555; margin-bottom:2px;'>📖 {tipo}</p>", unsafe_allow_html=True)
-                    
-                    for i, lib in enumerate(per_tipo[tipo]):
-                        qta_salvata = lib.get('q', 1)
+                    with st.expander(f"📖 {tipo}", expanded=False):
                         
-                        # Layout più denso per occupare meno spazio
-                        col_titolo, col_qta, col_del = st.columns([0.65, 0.25, 0.1])
-                        
-                        # Font ridotto per il titolo del libro e info
-                        col_titolo.markdown(f"<p style='font-size:14px; margin-bottom:-10px;'><b>{lib['t']}</b><br><span style='font-size:12px; color:#666;'>{lib['e']} | Classi: {lib['c1']}{lib['c2']}{lib['c3']}</span></p>", unsafe_allow_html=True)
-                        
-                        # Gestore quantità miniaturizzato
-                        m1, v1, p1 = col_qta.columns([1,1,1])
-                        if m1.button("➖", key=f"h_m_{plesso}_{tipo}_{i}"):
-                            if lib['q'] > 1:
-                                st.session_state.storico_consegne[plesso][tipo][i]['q'] -= 1
+                        for i, lib in enumerate(per_tipo[tipo]):
+                            qta_salvata = lib.get('q', 1)
+                            
+                            # Layout bilanciato
+                            col_titolo, col_qta, col_del = st.columns([0.60, 0.30, 0.1])
+                            
+                            # Font leggermente aumentati (16px per titolo, 13px per editore)
+                            col_titolo.markdown(f"""
+                                <p style='margin-bottom:-5px;'>
+                                    <b style='font-size:16px;'>{lib['t']}</b><br>
+                                    <span style='font-size:13px; color:#555;'>{lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}</span>
+                                </p>
+                                """, unsafe_allow_html=True)
+                            
+                            # Gestore quantità
+                            m1, v1, p1 = col_qta.columns([1,1,1])
+                            if m1.button("➖", key=f"h_m_{plesso}_{tipo}_{i}"):
+                                if lib['q'] > 1:
+                                    st.session_state.storico_consegne[plesso][tipo][i]['q'] -= 1
+                                    salva_storico_cloud(st.session_state.storico_consegne)
+                                    st.rerun()
+                            
+                            # Numero in blu leggermente più grande (18px)
+                            v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px; color:blue; margin-top:5px;'>{qta_salvata}</p>", unsafe_allow_html=True)
+                            
+                            if p1.button("➕", key=f"h_p_{plesso}_{tipo}_{i}"):
+                                st.session_state.storico_consegne[plesso][tipo][i]['q'] += 1
                                 salva_storico_cloud(st.session_state.storico_consegne)
                                 st.rerun()
-                        
-                        v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:16px; color:blue; margin-top:5px;'>{qta_salvata}</p>", unsafe_allow_html=True)
-                        
-                        if p1.button("➕", key=f"h_p_{plesso}_{tipo}_{i}"):
-                            st.session_state.storico_consegne[plesso][tipo][i]['q'] += 1
-                            salva_storico_cloud(st.session_state.storico_consegne)
-                            st.rerun()
 
-                        if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
-                            st.session_state.storico_consegne[plesso][tipo].pop(i)
-                            if not st.session_state.storico_consegne[plesso][tipo]: 
-                                del st.session_state.storico_consegne[plesso][tipo]
-                            if not st.session_state.storico_consegne[plesso]:
-                                del st.session_state.storico_consegne[plesso]
-                            salva_storico_cloud(st.session_state.storico_consegne)
-                            st.rerun()
-                    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
+                            # Tasto cancella
+                            if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
+                                st.session_state.storico_consegne[plesso][tipo].pop(i)
+                                if not st.session_state.storico_consegne[plesso][tipo]: 
+                                    del st.session_state.storico_consegne[plesso][tipo]
+                                if not st.session_state.storico_consegne[plesso]:
+                                    del st.session_state.storico_consegne[plesso]
+                                salva_storico_cloud(st.session_state.storico_consegne)
+                                st.rerun()
 
     if st.button("⬅️ Torna a Modulo Consegne", key="btn_back_st"):
         st.session_state.pagina = "Consegne"
@@ -687,6 +693,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
