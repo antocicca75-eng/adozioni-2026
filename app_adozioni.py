@@ -1,5 +1,62 @@
 import streamlit as st
 import pandas as pd
+import json # Assicurati che ci sia anche questo import in alto
+
+def salva_config_consegne(db_dict):
+    sh = connetti_google_sheets()
+    if sh:
+        try:
+            try: foglio = sh.worksheet("ConfigConsegne")
+            except: foglio = sh.add_worksheet(title="ConfigConsegne", rows="100", cols="20")
+            foglio.clear()
+            righe = [["Categoria", "Dati_JSON"]]
+            for k, v in db_dict.items():
+                righe.append([k, json.dumps(v)])
+            foglio.update(righe)
+        except Exception as e:
+            st.sidebar.error(f"Errore salvataggio config: {e}")
+
+def carica_config_consegne():
+    sh = connetti_google_sheets()
+    db_caricato = {
+        "LETTURE CLASSE PRIMA": [], "LETTURE CLASSE QUARTA": [],
+        "SUSSIDIARI DISCIPLINE": [], "INGLESE CLASSE PRIMA": [], 
+        "INGLESE CLASSE QUARTA": [], "RELIGIONE": []
+    }
+    if sh:
+        try:
+            foglio = sh.worksheet("ConfigConsegne")
+            dati = foglio.get_all_records()
+            for r in dati:
+                db_caricato[r["Categoria"]] = json.loads(r["Dati_JSON"])
+        except: pass 
+    return db_caricato
+
+def salva_storico_cloud(storico_dict):
+    sh = connetti_google_sheets()
+    if sh:
+        try:
+            try: foglio = sh.worksheet("StoricoConsegne")
+            except: foglio = sh.add_worksheet(title="StoricoConsegne", rows="1000", cols="20")
+            foglio.clear()
+            righe = [["Plesso", "Dati_JSON"]]
+            for plesso, dati in storico_dict.items():
+                righe.append([plesso, json.dumps(dati)])
+            foglio.update(righe)
+        except Exception as e:
+            st.sidebar.error(f"Errore salvataggio storico: {e}")
+
+def carica_storico_cloud():
+    sh = connetti_google_sheets()
+    storico_caricato = {}
+    if sh:
+        try:
+            foglio = sh.worksheet("StoricoConsegne")
+            dati = foglio.get_all_records()
+            for r in dati:
+                storico_caricato[r["Plesso"]] = json.loads(r["Dati_JSON"])
+        except: pass
+    return storico_caricato
 import os
 from datetime import datetime
 from openpyxl import load_workbook
@@ -515,6 +572,7 @@ elif st.session_state.pagina == "Modifica":
 
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
