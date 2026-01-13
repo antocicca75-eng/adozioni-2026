@@ -324,13 +324,33 @@ if st.session_state.pagina == "Consegne":
         st.session_state.lista_consegne_attuale = list(st.session_state.db_consegne.get(cat_scelta, []))
         st.session_state.last_cat = cat_scelta
 
-    # --- SOTTO-BLOCCO: ELENCO LIBRI IN MODULO ---
+    # --- SOTTO-BLOCCO: ELENCO LIBRI IN MODULO CON TASTI + E - ---
     if cat_scelta != "- SELEZIONA -":
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
-            ci, cd = st.columns([0.9, 0.1])
-            ci.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
-            if cd.button("❌", key=f"del_{cat_scelta}_{i}"):
+            # Inizializza il campo quantità se non esiste (per i vecchi salvataggi)
+            if 'q' not in lib: lib['q'] = 1
+            
+            c_info, c_quant, c_del = st.columns([0.6, 0.3, 0.1])
+            
+            # Info Libro
+            c_info.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
+            
+            # Tasti + e - per le copie
+            m1, v1, p1 = c_quant.columns([1,1,1])
+            if m1.button("➖", key=f"min_{cat_scelta}_{i}"):
+                if lib['q'] > 1:
+                    lib['q'] -= 1
+                    st.rerun()
+            
+            v1.markdown(f"<p style='text-align:center; font-size:20px; font-weight:bold; margin-top:5px;'>{lib['q']}</p>", unsafe_allow_html=True)
+            
+            if p1.button("➕", key=f"plus_{cat_scelta}_{i}"):
+                lib['q'] += 1
+                st.rerun()
+
+            # Tasto elimina
+            if c_del.button("❌", key=f"del_{cat_scelta}_{i}"):
                 st.session_state.lista_consegne_attuale.pop(i)
                 st.rerun()
 
@@ -357,19 +377,20 @@ if st.session_state.pagina == "Consegne":
                 if scelta_libro != "- CERCA TITOLO -":
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
                     
-                    # Layout: Copie ristrette + i 3 campi Classi ripristinati
+                    # Layout: Copie ristrette + i 3 campi Classi rinominati
                     c_q, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
                     
                     n_copie = c_q.number_input("Copie", min_value=1, max_value=20, value=1, key=f"qta_{actr}")
-                    c1in = c1.text_input("N°", max_chars=2, key=f"in1_{actr}")
-                    c2in = c2.text_input("N° ", max_chars=2, key=f"in2_{actr}")
-                    c3in = c3.text_input("N°  ", max_chars=2, key=f"in3_{actr}")
+                    c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
+                    c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
+                    c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
                     
                     if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
                         st.session_state.lista_consegne_attuale.append({
                             "t": str(dati_libro.iloc[0]).upper(), 
                             "e": str(dati_libro.iloc[2]).upper(), 
-                            "c1": f"{n_copie} - {c1in}" if c1in else str(n_copie), 
+                            "q": n_copie, # Quantità salvata separatamente
+                            "c1": c1in, 
                             "c2": c2in, 
                             "c3": c3in
                         })
@@ -617,6 +638,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
