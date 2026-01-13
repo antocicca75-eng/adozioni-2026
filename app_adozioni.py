@@ -283,9 +283,11 @@ with st.sidebar:
     if st.button("🔍 FILTRA E RICERCA", use_container_width=True): st.session_state.pagina = "Ricerca"; st.rerun()
     if st.button("📄 MODULO CONSEGNE", use_container_width=True): st.session_state.pagina = "Consegne"; st.rerun()
     if st.button("📚 COLLANE CONSEGNATE", use_container_width=True): st.session_state.pagina = "Storico"; st.rerun()
-    if st.sidebar.button("📊 APRI TABELLONE STATO"):
+    # Linea 286
+if st.sidebar.button("📊 APRI TABELLONE STATO"):
+    # Linea 287 (DEVE ESSERE RIENTRATA RISPETTO ALL'IF)
     st.session_state.pagina = "Tabellone Stato"
-    st.rerun()    
+    st.rerun()
 # =========================================================
 # --- TABELLONE MONITORAGGIO IN FONDO ALLA SIDEBAR ---
 # =========================================================
@@ -911,6 +913,7 @@ elif st.session_state.pagina == "Tabellone Stato":
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
