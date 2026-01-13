@@ -289,7 +289,7 @@ with st.sidebar:
 
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE (AGGIORNATO) ---
+# --- BLOCCO 9: PAGINA CONSEGNE (GESTIONE COPIE VOLATILI) ---
 # INIZIO BLOCCO
 # =========================================================
 if st.session_state.pagina == "Consegne":
@@ -305,11 +305,8 @@ if st.session_state.pagina == "Consegne":
         st.session_state.last_cat = None
         st.rerun()
 
-    if "reset_ctr" not in st.session_state: st.session_state.reset_ctr = 0
-    if "add_ctr" not in st.session_state: st.session_state.add_ctr = 0
-    
-    ctr = st.session_state.reset_ctr
-    actr = st.session_state.add_ctr
+    ctr = st.session_state.get('reset_ctr', 0)
+    actr = st.session_state.get('add_ctr', 0)
 
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
@@ -318,20 +315,24 @@ if st.session_state.pagina == "Consegne":
     altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
     cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
 
+    # Caricamento e RESET COPIE A 1 (Default ogni volta che si apre la tipologia)
     if cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
-        st.session_state.lista_consegne_attuale = list(st.session_state.db_consegne.get(cat_scelta, []))
+        caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
+        # Forza ogni libro caricato ad avere quantità 1
+        for voce in caricati:
+            voce['q'] = 1
+        st.session_state.lista_consegne_attuale = caricati
         st.session_state.last_cat = cat_scelta
 
     if cat_scelta != "- SELEZIONA -":
         st.markdown("---")
-        # --- VISUALIZZAZIONE LISTA CON GESTIONE COPIE (+/-) ---
+        # --- LISTA ATTUALE CON TASTI +/- PER CONSEGNA CORRENTE ---
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
-            if 'q' not in lib: lib['q'] = 1  # Inizializza se manca
+            if 'q' not in lib: lib['q'] = 1
             
             c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
             c_info.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
             
-            # Tasti incremento/decremento
             m1, v1, p1 = c_qta.columns([1,1,1])
             if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
                 if lib['q'] > 1:
@@ -347,16 +348,23 @@ if st.session_state.pagina == "Consegne":
                 st.rerun()
 
         col_btns = st.columns(2)
-        if col_btns[0].button("💾 REGISTRA LISTA", use_container_width=True):
-            st.session_state.db_consegne[cat_scelta] = list(st.session_state.lista_consegne_attuale)
+        if col_btns[0].button("💾 REGISTRA LISTA BASE", use_container_width=True):
+            # Salva la lista, ma ci assicuriamo che le quantità salvate siano 1
+            lista_da_salvare = []
+            for item in st.session_state.lista_consegne_attuale:
+                nuovo_item = item.copy()
+                nuovo_item['q'] = 1 # Salvataggio permanente sempre a 1
+                lista_da_salvare.append(nuovo_item)
+            
+            st.session_state.db_consegne[cat_scelta] = lista_da_salvare
             salva_config_consegne(st.session_state.db_consegne)
-            st.success("Configurazione salvata permanentemente!")
+            st.success("Configurazione salvata (Quantità predefinita: 1)")
         
-        if col_btns[1].button("🗑️ SVUOTA TUTTO", use_container_width=True):
-            st.session_state.reset_ctr += 1
+        if col_btns[1].button("🗑️ SVUOTA SCHERMATA", use_container_width=True):
+            st.session_state.reset_ctr = st.session_state.get('reset_ctr', 0) + 1
             reset_consegne_totale()
 
-        # --- AGGIUNTA MANUALE LIBRO ---
+        # --- CERCA E AGGIUNGI LIBRO ---
         with st.expander("➕ Cerca e Aggiungi Libro"):
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
@@ -369,10 +377,10 @@ if st.session_state.pagina == "Consegne":
                 if scelta_libro != "- CERCA TITOLO -":
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
                     
-                    # Layout: Copie ristrette + i 3 campi Classi
-                    c_q, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
+                    # Sostituito campo Copie con campo Sezione
+                    c_sez, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
                     
-                    n_copie = c_q.number_input("Copie", min_value=1, max_value=50, value=1, key=f"qta_{actr}")
+                    sez_in = c_sez.text_input("Sezione", key=f"sez_{actr}") # Nuovo campo Sezione
                     c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
                     c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
                     c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
@@ -381,12 +389,13 @@ if st.session_state.pagina == "Consegne":
                         st.session_state.lista_consegne_attuale.append({
                             "t": str(dati_libro.iloc[0]).upper(), 
                             "e": str(dati_libro.iloc[2]).upper(), 
-                            "q": n_copie,
+                            "q": 1, # Default 1 all'aggiunta manuale
                             "c1": c1in, 
                             "c2": c2in, 
-                            "c3": c3in
+                            "c3": c3in,
+                            "sez": sez_in # Memorizziamo la sezione
                         })
-                        st.session_state.add_ctr += 1
+                        st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1
                         st.rerun()
 
     # --- DATI RICEVENTE E GENERAZIONE PDF ---
@@ -412,10 +421,10 @@ if st.session_state.pagina == "Consegne":
                 st.session_state.storico_consegne[p_scelto] = {}
             st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
             salva_storico_cloud(st.session_state.storico_consegne)
-            st.success(f"Consegna registrata per {p_scelto}!")
+            st.success(f"Consegna registrata!")
 # =========================================================
 # FINE BLOCCO 9
-# ========================================================= 
+# =========================================================
 # =========================================================
 # --- BLOCCO 10: PAGINA STORICO ---
 # INIZIO BLOCCO
@@ -628,6 +637,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
