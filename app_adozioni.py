@@ -357,17 +357,21 @@ if st.session_state.pagina == "Consegne":
                 if scelta_libro != "- CERCA TITOLO -":
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
                     
-                    # MODIFICA RICHIESTA: Campo copie con default 1 e tasti +
-                    col_q, _ = st.columns([1, 2])
-                    n_copie = col_q.number_input("Copie da aggiungere:", min_value=1, value=1, step=1, key=f"qta_{actr}")
+                    # Layout: Copie ristrette + i 3 campi Classi ripristinati
+                    c_q, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
+                    
+                    n_copie = c_q.number_input("Copie", min_value=1, max_value=20, value=1, key=f"qta_{actr}")
+                    c1in = c1.text_input("N°", max_chars=2, key=f"in1_{actr}")
+                    c2in = c2.text_input("N° ", max_chars=2, key=f"in2_{actr}")
+                    c3in = c3.text_input("N°  ", max_chars=2, key=f"in3_{actr}")
                     
                     if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
                         st.session_state.lista_consegne_attuale.append({
                             "t": str(dati_libro.iloc[0]).upper(), 
                             "e": str(dati_libro.iloc[2]).upper(), 
-                            "c1": str(n_copie), # Inserisce la quantità scelta
-                            "c2": "", 
-                            "c3": ""
+                            "c1": f"{n_copie} - {c1in}" if c1in else str(n_copie), 
+                            "c2": c2in, 
+                            "c3": c3in
                         })
                         st.session_state.add_ctr += 1
                         st.rerun()
@@ -400,7 +404,6 @@ if st.session_state.pagina == "Consegne":
 # =========================================================
 # FINE BLOCCO 9
 # =========================================================
-
 
 # =========================================================
 # --- BLOCCO 10: PAGINA STORICO ---
@@ -614,5 +617,6 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
