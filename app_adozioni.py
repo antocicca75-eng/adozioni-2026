@@ -775,47 +775,61 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (FONT MAGGIORATO) ---
+# --- BLOCCO 15: TABELLONE GENERALE (DATABASE COMPLETO) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
     
-    # 1. RECUPERO TUTTI I PLESSI DAL DATABASE (Per visualizzare anche i bianchi)
+    # 1. RECUPERO LISTA COMPLETA (Database + Storico)
+    # Creiamo una lista unica di tutti i plessi possibili
+    set_plessi_db = set()
     if "df_adozioni" in st.session_state and not st.session_state.df_adozioni.empty:
-        # Estrae ogni singolo plesso esistente nel file originale
-        elenco_totale = sorted(st.session_state.df_adozioni['Plesso'].unique().tolist())
-    else:
-        # Fallback di emergenza se il database non è caricato
-        elenco_totale = sorted(list(set(st.session_state.get("storico_consegne", {}).keys()) | 
-                                    set(st.session_state.get("storico_ritiri", {}).keys())))
-
-    # Database per il controllo colori
-    consegnati = st.session_state.get("storico_consegne", {}).keys()
-    ritirati = st.session_state.get("storico_ritiri", {}).keys()
+        set_plessi_db = set(st.session_state.df_adozioni['Plesso'].unique())
+    
+    set_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
+    set_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
+    
+    # L'elenco totale deve contenere TUTTO quello che c'è nel DB originale
+    elenco_totale = sorted(list(set_plessi_db | set_consegnati | set_ritirati))
 
     if not elenco_totale:
-        st.warning("⚠️ Carica prima il database delle adozioni per vedere i plessi.")
+        st.warning("⚠️ Caricare il database adozioni o effettuare una consegna per popolare il tabellone.")
     else:
-        # 2. STATISTICHE
-        tot = len(elenco_totale)
-        fatti = len([p for p in elenco_totale if p in ritirati or p in consegnati])
-        st.write(f"📈 **Avanzamento:** {fatti} su {tot} plessi gestiti")
-        st.progress(fatti/tot if tot > 0 else 0)
+        # 2. CALCOLO STATISTICHE (I tre contatori richiesti)
+        tot_plessi = len(elenco_totale)
+        
+        # Plessi Gialli (Consegnati ma non ancora ritirati)
+        plessi_da_ritirare = len(set_consegnati) 
+        
+        # Plessi Verdi (Completati)
+        plessi_ritirati_ok = len(set_ritirati)
+        
+        # Plessi Bianchi (Ancora da iniziare)
+        plessi_da_consegnare = tot_plessi - (len(set_consegnati) + len(set_ritirati))
 
-        # 3. GRIGLIA A 4 COLONNE (Per avere celle più grandi e font più leggibile)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("⚪ DA CONSEGNARE", plessi_da_consegnare)
+        c2.metric("🟡 DA RITIRARE", plessi_da_ritirare)
+        c3.metric("🟢 RITIRI COMPLETATI", plessi_ritirati_ok)
+        
+        st.markdown("---")
+
+        # 3. GRIGLIA A 4 COLONNE CON FONT GRANDE
         n_col = 4 
         for i in range(0, len(elenco_totale), n_col):
             cols = st.columns(n_col)
             for j, plesso in enumerate(elenco_totale[i:i+n_col]):
                 
-                # Default: BIANCO (Da fare)
-                bg = "#FFFFFF"; txt = "#333"; label = "DA FARE"; border = "2px solid #DDDDDD"
+                # Default: BIANCO (Ancora da consegnare)
+                bg = "#FFFFFF"; txt = "#333"; label = "DA CONSEGNARE"; border = "2px solid #DDDDDD"
 
-                if plesso in ritirati:
-                    bg = "#28a745"; txt = "#FFFFFF"; label = "✅ RITIRATO"; border = "2px solid #1e7e34"
-                elif plesso in consegnati:
-                    bg = "#FFD700"; txt = "#000000"; label = "🚚 CONSEGNATO"; border = "2px solid #d39e00"
+                # Priorità Verde (Ritiro effettuato)
+                if plesso in set_ritirati:
+                    bg = "#28a745"; txt = "#FFFFFF"; label = "RITIRATO"; border = "2px solid #1e7e34"
+                # Priorità Giallo (Consegna effettuata)
+                elif plesso in set_consegnati:
+                    bg = "#FFD700"; txt = "#000000"; label = "CONSEGNATO"; border = "2px solid #d39e00"
 
                 with cols[j]:
                     st.markdown(f"""
@@ -827,44 +841,31 @@ elif st.session_state.pagina == "Tabellone Stato":
                             padding: 10px 5px;
                             margin-bottom: 15px;
                             text-align: center;
-                            height: 110px;
+                            height: 115px;
                             display: flex;
                             flex-direction: column;
                             justify-content: center;
                             align-items: center;
-                            box-shadow: 3px 3px 6px rgba(0,0,0,0.1);
+                            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
                         ">
-                            <div style="
-                                font-size: 16px; 
-                                font-weight: 900; 
-                                line-height: 1.2; 
-                                word-wrap: break-word;
-                                text-transform: uppercase;
-                            ">
+                            <div style="font-size: 16px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="
-                                font-size: 10px; 
-                                margin-top: 10px; 
-                                font-weight: bold; 
-                                letter-spacing: 1px;
-                                background: rgba(0,0,0,0.05);
-                                padding: 2px 8px;
-                                border-radius: 10px;
-                            ">
+                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
                                 {label}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final_max"):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_v3"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
