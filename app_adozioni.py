@@ -289,12 +289,13 @@ with st.sidebar:
 
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE ---
-# INIZIO BLOCCO
+# --- BLOCCO 9: PAGINA CONSEGNE (GESTIONE E STAMPA) ---
+# INIZIO BLOCCO 9
 # =========================================================
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
+    # --- SOTTO-BLOCCO: CARICAMENTO DATI ---
     if "storico_consegne" not in st.session_state: 
         st.session_state.storico_consegne = carica_storico_cloud()
     
@@ -311,6 +312,7 @@ if st.session_state.pagina == "Consegne":
     ctr = st.session_state.reset_ctr
     actr = st.session_state.add_ctr
 
+    # --- SOTTO-BLOCCO: SELEZIONE PLESSO E CATEGORIA ---
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
     
@@ -322,6 +324,7 @@ if st.session_state.pagina == "Consegne":
         st.session_state.lista_consegne_attuale = list(st.session_state.db_consegne.get(cat_scelta, []))
         st.session_state.last_cat = cat_scelta
 
+    # --- SOTTO-BLOCCO: ELENCO LIBRI IN MODULO ---
     if cat_scelta != "- SELEZIONA -":
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
@@ -341,6 +344,7 @@ if st.session_state.pagina == "Consegne":
             st.session_state.reset_ctr += 1
             reset_consegne_totale()
 
+        # --- SOTTO-BLOCCO: AGGIUNTA MANUALE LIBRO ---
         with st.expander("➕ Cerca e Aggiungi Libro"):
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
@@ -369,6 +373,7 @@ if st.session_state.pagina == "Consegne":
                         st.session_state.add_ctr += 1
                         st.rerun()
 
+    # --- SOTTO-BLOCCO: DATI RICEVENTE E GENERAZIONE ---
     st.markdown("---")
     d1, d2 = st.columns(2)
     docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
@@ -385,6 +390,7 @@ if st.session_state.pagina == "Consegne":
             pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
             st.download_button("📥 SCARICA PDF", bytes(pdf.output()), f"consegna.pdf", "application/pdf")
 
+    # --- SOTTO-BLOCCO: SALVATAGGIO STORICO ---
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True, key="conf_consegna_btn"):
         if p_scelto != "- SELEZIONA PLESSO -" and cat_scelta != "- SELEZIONA -":
             if p_scelto not in st.session_state.storico_consegne: 
@@ -609,3 +615,4 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
