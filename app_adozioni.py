@@ -403,9 +403,6 @@ elif st.session_state.pagina == "Ricerca":
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
         else:
             st.warning("Nessun dato trovato con i filtri selezionati.")
-        st.dataframe(df.sort_index(ascending=False), use_container_width=True)
-        somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
-        st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
     if os.path.exists(DB_FILE):
@@ -463,6 +460,7 @@ elif st.session_state.pagina == "Modifica":
 
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
