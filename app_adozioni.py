@@ -85,7 +85,32 @@ def backup_su_google_sheets(df_da_salvare):
             st.sidebar.error(f"Errore scrittura Cloud: {e}")
             return False
     return False
+def salva_storico_cloud(storico_dict):
+    sh = connetti_google_sheets()
+    if sh:
+        try:
+            try: foglio = sh.worksheet("StoricoConsegne")
+            except: foglio = sh.add_worksheet(title="StoricoConsegne", rows="1000", cols="20")
+            
+            foglio.clear()
+            righe = [["Plesso", "Dati_JSON"]]
+            for plesso, dati in storico_dict.items():
+                righe.append([plesso, json.dumps(dati)])
+            foglio.update(righe)
+        except Exception as e:
+            st.sidebar.error(f"Errore salvataggio storico: {e}")
 
+def carica_storico_cloud():
+    sh = connetti_google_sheets()
+    storico_caricato = {}
+    if sh:
+        try:
+            foglio = sh.worksheet("StoricoConsegne")
+            dati = foglio.get_all_records()
+            for r in dati:
+                storico_caricato[r["Plesso"]] = json.loads(r["Dati_JSON"])
+        except: pass
+    return storico_caricato
 # --- STILE CSS ---
 st.markdown("""
     <style>
@@ -185,8 +210,10 @@ with st.sidebar:
 # --- PAGINA CONSEGNE (VERSIONE CORRETTA E PULITA) ---
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
+    
+    # Inizializzazione caricando dal Cloud (se non già fatto)
     if "storico_consegne" not in st.session_state: 
-        st.session_state.storico_consegne = {}
+        st.session_state.storico_consegne = carica_storico_cloud()
     
     elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
     
@@ -226,13 +253,15 @@ if st.session_state.pagina == "Consegne":
         col_btns = st.columns(2)
         if col_btns[0].button("💾 REGISTRA LISTA", use_container_width=True):
             st.session_state.db_consegne[cat_scelta] = list(st.session_state.lista_consegne_attuale)
-            st.success("Salvato!")
+            # SALVATAGGIO PERMANENTE CONFIGURAZIONE
+            salva_config_consegne(st.session_state.db_consegne)
+            st.success("Configurazione salvata permanentemente!")
         
         if col_btns[1].button("🗑️ SVUOTA TUTTO", use_container_width=True):
             st.session_state.reset_ctr += 1
             reset_consegne_totale()
 
-        # EXPANDER PER AGGIUNTA LIBRO (Sistemato Indentation e Reset)
+        # EXPANDER PER AGGIUNTA LIBRO
         with st.expander("➕ Cerca e Aggiungi Libro"):
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
@@ -258,7 +287,6 @@ if st.session_state.pagina == "Consegne":
                             "c2": c2in, 
                             "c3": c3in
                         })
-                        # Incrementiamo il contatore per svuotare i campi al prossimo rerun
                         st.session_state.add_ctr += 1
                         st.rerun()
 
@@ -283,7 +311,34 @@ if st.session_state.pagina == "Consegne":
             if p_scelto not in st.session_state.storico_consegne: 
                 st.session_state.storico_consegne[p_scelto] = {}
             st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
+            # SALVATAGGIO PERMANENTE STORICO
+            salva_storico_cloud(st.session_state.storico_consegne)
             st.success(f"Consegna registrata per {p_scelto}!")
+
+# --- PAGINA STORICO (PULITA E SALVATAGGIO) ---
+elif st.session_state.pagina == "Storico":
+    st.header("📚 Registro Collane Consegnate")
+    if not st.session_state.get("storico_consegne"):
+        st.info("Nessuna consegna registrata.")
+    else:
+        for plesso in list(st.session_state.storico_consegne.keys()):
+            with st.expander(f"🏫 {plesso}", expanded=False):
+                per_tipo = st.session_state.storico_consegne[plesso]
+                for tipo in list(per_tipo.keys()):
+                    with st.expander(f"📖 {tipo}", expanded=False):
+                        for i, lib in enumerate(per_tipo[tipo]):
+                            c_inf, c_del = st.columns([0.85, 0.15])
+                            c_inf.write(f"**{lib['t']}** — {lib['e']} ({lib['c1']} {lib['c2']} {lib['c3']})")
+                            if c_del.button("❌", key=f"rit_{plesso}_{tipo}_{i}"):
+                                st.session_state.storico_consegne[plesso][tipo].pop(i)
+                                if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
+                                if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
+                                # AGGIORNAMENTO CLOUD DOPO CANCELLAZIONE
+                                salva_storico_cloud(st.session_state.storico_consegne)
+                                st.rerun()
+
+    if st.button("⬅️ Torna a Modulo Consegne", key="btn_back_st"):
+        st.session_state.pagina = "Consegne"; st.rerun()
 # --- PAGINA STORICO (PULITA) ---
 elif st.session_state.pagina == "Storico":
     st.header("📚 Registro Collane Consegnate")
@@ -460,6 +515,7 @@ elif st.session_state.pagina == "Modifica":
 
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
