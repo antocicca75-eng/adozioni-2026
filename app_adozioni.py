@@ -283,69 +283,14 @@ with st.sidebar:
     if st.button("🔍 FILTRA E RICERCA", use_container_width=True): st.session_state.pagina = "Ricerca"; st.rerun()
     if st.button("📄 MODULO CONSEGNE", use_container_width=True): st.session_state.pagina = "Consegne"; st.rerun()
     if st.button("📚 COLLANE CONSEGNATE", use_container_width=True): st.session_state.pagina = "Storico"; st.rerun()
-    # Linea 286
-if st.sidebar.button("📊 APRI TABELLONE STATO"):
-    # Linea 287 (DEVE ESSERE RIENTRATA RISPETTO ALL'IF)
-    st.session_state.pagina = "Tabellone Stato"
-    st.rerun()
-# =========================================================
-# --- TABELLONE MONITORAGGIO IN FONDO ALLA SIDEBAR ---
-# =========================================================
-
-# 1. Recuperiamo l'elenco unico di tutti i plessi coinvolti
-# (Puoi sostituire questa riga con una lista fissa tipo: plessi_target = ["Scuola A", "Scuola B"...])
-plessi_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
-plessi_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
-tutti_i_nomi = sorted(list(plessi_consegnati | plessi_ritirati))
-
-if tutti_i_nomi:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📊 Stato Plessi")
     
-    # Creiamo una griglia a 2 colonne nella sidebar
-    cols_side = st.sidebar.columns(2)
+    st.markdown("---")
     
-    for i, nome_plesso in enumerate(tutti_i_nomi):
-        # LOGICA COLORI:
-        # Se è nei ritiri -> VERDE
-        # Se è solo nelle consegne -> GIALLO
-        # Altrimenti -> BIANCO (se avessi una lista fissa precaricata)
-        
-        bg_color = "#FFFFFF" # Default Bianco
-        text_color = "#000000" # Testo Nero
-        
-        if nome_plesso in plessi_ritirati:
-            bg_color = "#28a745" # Verde
-            text_color = "#FFFFFF" # Testo Bianco per leggere meglio sul verde
-        elif nome_plesso in plessi_consegnati:
-            bg_color = "#FFD700" # Giallo Oro
-            text_color = "#000000"
-            
-        # Rendering della cella stile Excel
-        with cols_side[i % 2]:
-            st.markdown(f"""
-                <div style="
-                    background-color: {bg_color};
-                    color: {text_color};
-                    border: 1px dotted #ccc;
-                    border-radius: 2px;
-                    padding: 4px;
-                    margin-bottom: 4px;
-                    text-align: center;
-                    font-size: 10px;
-                    font-weight: bold;
-                    min-height: 40px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    line-height: 1.1;
-                    box-shadow: 1px 1px 2px rgba(0,0,0,0.05);
-                ">
-                    {nome_plesso}
-                </div>
-            """, unsafe_allow_html=True)
+    # Pulsante per il Tabellone a tutto schermo
+    if st.button("📊 APRI TABELLONE STATO", use_container_width=True):
+        st.session_state.pagina = "Tabellone Stato"
+        st.rerun()
 
-    st.sidebar.caption("⚪ Iniziale | 🟡 Consegnato | 🟢 Ritirato")        
 # =========================================================
 # FINE BLOCCO 8
 # =========================================================
@@ -910,6 +855,7 @@ elif st.session_state.pagina == "Tabellone Stato":
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
