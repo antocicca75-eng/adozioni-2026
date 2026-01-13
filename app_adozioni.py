@@ -775,13 +775,13 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE COMPLETO CON PAGINAZIONE ---
+# --- BLOCCO 15: TABELLONE GENERALE (FIX RANGE ERROR) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # 1. RECUPERO LISTA COMPLETA DA OGNI FONTE POSSIBILE
+    # 1. RECUPERO DATI
     set_tutti = set()
     if "df_adozioni" in st.session_state and not st.session_state.df_adozioni.empty:
         set_tutti.update(st.session_state.df_adozioni['Plesso'].unique())
@@ -789,13 +789,16 @@ elif st.session_state.pagina == "Tabellone Stato":
     set_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
     set_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
     
-    # Unione finale (DB + Consegne + Ritiri) per non perdere nulla
     elenco_totale = sorted(list(set_tutti | set_consegnati | set_ritirati))
 
+    # --- CONTROLLO SICUREZZA PER EVITARE RANGE ERROR ---
     if not elenco_totale:
-        st.warning("⚠️ Nessun plesso trovato nel database. Carica il file o registra una consegna.")
+        st.info("👋 Benvenuto! Carica il file Excel o registra la prima consegna per attivare il tabellone.")
+        if st.button("⬅️ Torna al Modulo Consegne"):
+            st.session_state.pagina = "Consegne"
+            st.rerun()
     else:
-        # 2. STATISTICHE REALI
+        # 2. STATISTICHE
         tot_plessi = len(elenco_totale)
         n_ritirati = len(set_ritirati)
         n_consegnati = len(set_consegnati - set_ritirati)
@@ -808,29 +811,31 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         st.markdown("---")
 
-        # 3. SISTEMA DI PAGINAZIONE (Per vedere tutti i plessi senza bloccare la pagina)
+        # 3. PAGINAZIONE (Con protezione se num_pagine < 2)
         plessi_per_pagina = 20
         num_pagine = (tot_plessi + plessi_per_pagina - 1) // plessi_per_pagina
         
-        scelta_pag = st.select_slider(
-            "📖 Sfoglia Plessi (Pagina)", 
-            options=range(1, num_pagine + 1),
-            value=1
-        )
+        # Se c'è solo una pagina, non mostriamo lo slider per evitare errori
+        if num_pagine > 1:
+            scelta_pag = st.select_slider(
+                "📖 Sfoglia Plessi", 
+                options=range(1, num_pagine + 1),
+                value=1
+            )
+            inizio = (scelta_pag - 1) * plessi_per_pagina
+        else:
+            inizio = 0
+            st.caption(f"Visualizzazione di tutti i {tot_plessi} plessi")
         
-        inizio = (scelta_pag - 1) * plessi_per_pagina
         fine = inizio + plessi_per_pagina
         pagina_attuale = elenco_totale[inizio:fine]
 
-        st.write(f"Visualizzazione da {inizio + 1} a {min(fine, tot_plessi)} di {tot_plessi} plessi")
-
-        # 4. GRIGLIA A 4 COLONNE CON FONT EXTRA GRANDE
+        # 4. GRIGLIA A 4 COLONNE
         n_col = 4 
         for i in range(0, len(pagina_attuale), n_col):
             cols = st.columns(n_col)
             for j, plesso in enumerate(pagina_attuale[i:i+n_col]):
                 
-                # Default: BIANCO
                 bg = "#FFFFFF"; txt = "#333"; label = "DA CONSEGNARE"; border = "2px solid #DDDDDD"
 
                 if plesso in set_ritirati:
@@ -847,23 +852,24 @@ elif st.session_state.pagina == "Tabellone Stato":
                             flex-direction: column; justify-content: center; align-items: center;
                             box-shadow: 3px 3px 8px rgba(0,0,0,0.1);
                         ">
-                            <div style="font-size: 18px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
+                            <div style="font-size: 17px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="font-size: 10px; margin-top: 12px; font-weight: bold; opacity: 0.8; letter-spacing: 1px;">
+                            <div style="font-size: 10px; margin-top: 12px; font-weight: bold; opacity: 0.8;">
                                 {label}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_pag"):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_safe"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
