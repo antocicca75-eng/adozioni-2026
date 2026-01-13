@@ -228,8 +228,15 @@ if st.session_state.pagina == "Consegne":
             actr = st.session_state.add_ctr
             df_cat = get_catalogo_libri()
             
+          # --- BLOCCO AGGIUNTA LIBRO CORRETTO ---
+        with st.expander("➕ Cerca e Aggiungi Libro"):
+            if "add_ctr" not in st.session_state:
+                st.session_state.add_ctr = 0
+            
+            actr = st.session_state.add_ctr
+            df_cat = get_catalogo_libri()
+            
             if not df_cat.empty:
-                # La key del selectbox cambia con actr per resettarsi
                 scelta_libro = st.selectbox(
                     "Seleziona libro:", 
                     ["- CERCA TITOLO -"] + sorted(df_cat.iloc[:, 0].astype(str).unique().tolist()),
@@ -240,7 +247,6 @@ if st.session_state.pagina == "Consegne":
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
                     cc1, cc2, cc3, _ = st.columns([1, 1, 1, 5])
                     
-                    # Le key degli input ora sono dinamiche
                     c1in = cc1.text_input("N°", max_chars=2, key=f"in1_{actr}")
                     c2in = cc2.text_input("N° ", max_chars=2, key=f"in2_{actr}")
                     c3in = cc3.text_input("N°  ", max_chars=2, key=f"in3_{actr}")
@@ -253,10 +259,8 @@ if st.session_state.pagina == "Consegne":
                             "c2": c2in, 
                             "c3": c3in
                         })
-                        # Incrementiamo il contatore: questo "distrugge" i vecchi widget e ne crea di nuovi vuoti
                         st.session_state.add_ctr += 1
                         st.rerun()
-
     st.markdown("---")
     d1, d2 = st.columns(2)
     docente = d1.text_input("Insegnante ricevente")
@@ -449,6 +453,7 @@ elif st.session_state.pagina == "Modifica":
 
 
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
