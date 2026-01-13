@@ -824,8 +824,91 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 # FINE BLOCCO 14
 # =========================================================
+# =========================================================
+# --- BLOCCO 15: TABELLONE GENERALE (VISTA A GRIGLIA) ---
+# INIZIO BLOCCO
+# =========================================================
+elif st.session_state.pagina == "Tabellone Stato":
+    st.header("📊 Tabellone Avanzamento Plessi")
+    
+    # 1. ELENCO COMPLETO DEI PLESSI (Modifica questa lista con i tuoi nomi)
+    elenco_completo = [
+        "RODARI", "PASCOLI", "ALIGHIERI", "KING", "MONTESSORI", 
+        "GALILEI", "GRAMSCI", "LEOPARDI", "MANZONI", "CARDUCCI",
+        "DANTE", "FOSCOLO", "MARCONI", "VERGA", "UNGARETTI",
+        "PERTINI", "TOTI", "MAZZINI"
+    ]
+    elenco_completo.sort()
 
+    # Database attuali
+    consegnati = st.session_state.get("storico_consegne", {}).keys()
+    ritirati = st.session_state.get("storico_ritiri", {}).keys()
+
+    # 2. STATISTICHE RAPIDE
+    tot = len(elenco_completo)
+    fatti = len(set(consegnati) | set(ritirati))
+    mancanti = tot - fatti
+    
+    col_s1, col_s2, col_s3 = st.columns(3)
+    col_s1.metric("Plessi Totali", tot)
+    col_s2.metric("Gestiti", fatti, delta=f"{fatti/tot*100:.0f}%")
+    col_s3.metric("Da Gestire", mancanti)
+    
+    st.markdown("---")
+
+    # 3. CREAZIONE GRIGLIA TIPO EXCEL (4 Colonne per riga)
+    n_colonne = 4
+    for i in range(0, len(elenco_completo), n_colonne):
+        cols = st.columns(n_colonne)
+        for j, plesso in enumerate(elenco_completo[i:i+n_colonne]):
+            
+            # Definizione Colore e Stato
+            bg = "#FFFFFF"  # Bianco
+            txt = "#333333" # Grigio scuro
+            label = "⚪ DA FARE"
+            border = "1px solid #ccc"
+
+            if plesso in ritirati:
+                bg = "#28a745"  # Verde
+                txt = "#FFFFFF"
+                label = "🟢 RITIRATO"
+                border = "1px solid #1e7e34"
+            elif plesso in consegnati:
+                bg = "#FFD700"  # Giallo
+                txt = "#000000"
+                label = "🟡 CONSEGNATO"
+                border = "1px solid #d39e00"
+
+            with cols[j]:
+                st.markdown(f"""
+                    <div style="
+                        background-color: {bg};
+                        color: {txt};
+                        border: {border};
+                        border-radius: 6px;
+                        padding: 12px;
+                        margin-bottom: 10px;
+                        text-align: center;
+                        height: 90px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+                    ">
+                        <div style="font-size: 14px; font-weight: bold; line-height: 1.2;">{plesso}</div>
+                        <div style="font-size: 10px; margin-top: 8px; font-weight: normal; opacity: 0.9;">{label}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_15"):
+        st.session_state.pagina = "Consegne"
+        st.rerun()
+# =========================================================
+# FINE BLOCCO 15
+# =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
