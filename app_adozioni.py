@@ -775,100 +775,97 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (SISTEMA SCANNER) ---
+# =========================================================
+# --- BLOCCO 15: TABELLONE GENERALE (SINCRO DATABASE) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
-    st.header("📊 Monitoraggio Completo Plessi")
+    st.header("📊 Tabellone Avanzamento Plessi")
 
-    # 1. SCANNER TOTALE DELLA MEMORIA PER TROVARE I PLESSI
-    elenco_totale = []
+    # 1. RECUPERO LISTA COMPLETA DAL FOGLIO "Plesso" 
+    # (Proprio come nel tuo database su Google Sheets)
+    @st.cache_data(ttl=300)
+    def get_lista_totale():
+        try:
+            # Mi collego al foglio "Plesso" del database
+            df_nomi = st.session_state.conn.read(worksheet="Plesso")
+            # Prendo la prima colonna e la pulisco
+            lista = df_nomi.iloc[:, 0].dropna().unique().tolist()
+            return sorted([str(x).strip().upper() for x in lista if x])
+        except:
+            # Se il foglio non risponde, uso i dati già presenti nello storico
+            set_c = set(st.session_state.get("storico_consegne", {}).keys())
+            set_r = set(st.session_state.get("storico_ritiri", {}).keys())
+            return sorted(list(set_c | set_r))
 
-    # Cerchiamo in tutte le variabili possibili usate da Streamlit
-    fonti = [
-        st.session_state.get("df_adozioni"), 
-        st.session_state.get("df_plessi"),
-        st.session_state.get("database")
-    ]
+    elenco_totale = get_lista_totale()
 
-    for f in fonti:
-        if f is not None and hasattr(f, 'columns'):
-            if 'Plesso' in f.columns:
-                elenco_totale = sorted(f['Plesso'].dropna().unique().tolist())
-                break
-    
-    # Se ancora vuoto, proviamo a vedere se esiste una lista semplice
-    if not elenco_totale:
-        elenco_totale = st.session_state.get("lista_plessi", [])
-
-    # Recupero dati movimento
-    set_consegnati = set(st.session_state.get("storico_consegne", {}).keys())
-    set_ritirati = set(st.session_state.get("storico_ritiri", {}).keys())
-
-    # Integriamo comunque con chi è già stato movimentato
-    elenco_totale = sorted(list(set(elenco_totale) | set_consegnati | set_ritirati))
+    # Database per i colori (stessa logica del Blocco 10)
+    consegnati = st.session_state.get("storico_consegne", {})
+    ritirati = st.session_state.get("storico_ritiri", {})
 
     if not elenco_totale:
-        st.error("❌ Errore critico: Il Tabellone non trova la lista dei plessi.")
-        st.info("💡 Suggerimento: Vai nel Modulo Consegne, seleziona una scuola qualsiasi e poi torna qui.")
-        if st.button("⬅️ Torna al Modulo"):
-            st.session_state.pagina = "Consegne"
-            st.rerun()
+        st.warning("⚠️ Lista plessi non trovata nel foglio 'Plesso'.")
     else:
-        # 2. CONTATORI
-        tot_p = len(elenco_totale)
-        rit = len([p for p in elenco_totale if p in set_ritirati])
-        cons = len([p for p in elenco_totale if p in set_consegnati and p not in set_ritirati])
-        mancano = tot_p - (rit + cons)
+        # 2. CONTATORI STATISTICI
+        n_tot = len(elenco_totale)
+        n_ritirati = len([p for p in elenco_totale if p in ritirati])
+        n_consegnati = len([p for p in elenco_totale if p in consegnati])
+        n_bianchi = n_tot - (n_ritirati + n_consegnati)
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("⚪ DA INIZIARE", mancano)
-        c2.metric("🟡 DA RITIRARE", cons)
-        c3.metric("🟢 COMPLETATI", rit)
+        c1.metric("⚪ DA INIZIARE", n_bianchi)
+        c2.metric("🟡 DA RITIRARE", n_consegnati)
+        c3.metric("🟢 COMPLETATI", n_ritirati)
         
         st.markdown("---")
 
-        # 3. RICERCA E GRIGLIA
-        cerca = st.text_input("🔍 Cerca scuola...", "").upper()
-        lista_visualizzata = [p for p in elenco_totale if cerca in str(p).upper()]
+        # 3. RICERCA RAPIDA
+        cerca = st.text_input("🔍 Cerca Plesso...", "").upper()
+        mostra = [p for p in elenco_totale if cerca in p]
 
+        # 4. GRIGLIA A 4 COLONNE (FONT GRANDE)
         n_col = 4 
-        for i in range(0, len(lista_visualizzata), n_col):
+        for i in range(0, len(mostra), n_col):
             cols = st.columns(n_col)
-            for j, plesso in enumerate(lista_visualizzata[i:i+n_col]):
+            for j, plesso in enumerate(mostra[i:i+n_col]):
                 
-                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #EEE")
-                if plesso in set_ritirati:
+                # COLORI
+                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #DDD")
+                
+                # Se il plesso è nello storico ritiri (Verde)
+                if plesso in ritirati:
                     bg, txt, lab, brd = ("#28a745", "#FFF", "✅ RITIRATO", "2px solid #1e7e34")
-                elif plesso in set_consegnati:
+                # Se il plesso è nello storico consegne (Giallo)
+                elif plesso in consegnati:
                     bg, txt, lab, brd = ("#FFD700", "#000", "🚚 CONSEGNATO", "2px solid #d39e00")
 
                 with cols[j]:
                     st.markdown(f"""
                         <div style="
                             background-color: {bg}; color: {txt}; border: {brd};
-                            border-radius: 10px; padding: 15px 5px; margin-bottom: 12px;
-                            text-align: center; height: 110px; display: flex;
+                            border-radius: 10px; padding: 15px 5px; margin-bottom: 15px;
+                            text-align: center; height: 125px; display: flex;
                             flex-direction: column; justify-content: center; align-items: center;
                             box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
                         ">
-                            <div style="font-size: 15px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
+                            <div style="font-size: 16px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="font-size: 8px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
+                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
                                 {lab}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo"):
-        st.session_state.pagina = "Consegne"
-        st.rerun()
+    if st.button("⬅️ Torna al Modulo Consegne"):
+        st.session_state.pagina = "Consegne"; st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
