@@ -18,7 +18,6 @@ ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
 
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
-# Stile CSS
 st.markdown("""
     <style>
     [data-testid="stDataEditor"] thead tr th { background-color: #004a99 !important; color: white !important; }
@@ -28,7 +27,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # =========================================================
-# --- BLOCCO 2: CONNESSIONE GOOGLE E BACKUP ---
+# --- BLOCCO 2: CONNESSIONE E BACKUP CLOUD ---
 # =========================================================
 def connetti_google_sheets():
     try:
@@ -59,7 +58,7 @@ def backup_su_google_sheets(df_da_salvare):
     return False
 
 # =========================================================
-# --- BLOCCO 3: FUNZIONI CONFIGURAZIONE CONSEGNE ---
+# --- BLOCCO 3: GESTIONE CONFIGURAZIONI CONSEGNE ---
 # =========================================================
 def salva_config_consegne(db_dict):
     sh = connetti_google_sheets()
@@ -92,7 +91,7 @@ def carica_config_consegne():
     return db_caricato
 
 # =========================================================
-# --- BLOCCO 4: FUNZIONI STORICO CLOUD ---
+# --- BLOCCO 4: GESTIONE STORICO CONSEGNE ---
 # =========================================================
 def salva_storico_cloud(storico_dict):
     sh = connetti_google_sheets()
@@ -121,71 +120,10 @@ def carica_storico_cloud():
     return storico_caricato
 
 # =========================================================
-# --- BLOCCO 5: CACHE E UTILITY DATI ---
+# --- BLOCCO 5: CACHE E CATALOGO ---
 # =========================================================
 @st.cache_data(ttl=3600)
 def get_catalogo_libri():
     sh = connetti_google_sheets()
     if sh:
         try:
-            df = pd.DataFrame(sh.worksheet("Catalogo").get_all_records())
-            return df.fillna("")
-        except: pass
-    return pd.DataFrame()
-
-@st.cache_data(ttl=3600)
-def get_lista_plessi():
-    sh = connetti_google_sheets()
-    if sh:
-        try:
-            df = pd.DataFrame(sh.worksheet("Plesso").get_all_records())
-            return sorted(df.iloc[:, 0].dropna().unique().tolist())
-        except: pass
-    return []
-
-def aggiungi_libro_a_excel(t, m, e, a):
-    try:
-        wb = load_workbook(CONFIG_FILE)
-        ws = wb["ListaLibri"]
-        ws.append([t, m, e, a])
-        wb.save(CONFIG_FILE)
-        st.cache_data.clear() 
-        return True
-    except: return False
-
-# =========================================================
-# --- BLOCCO 6: CLASSE PDF ---
-# =========================================================
-class PDF_CONSEGNA(FPDF):
-    def __init__(self, logo_data=None):
-        super().__init__(orientation='L', unit='mm', format='A4')
-        self.logo_data = logo_data
-
-    def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        if self.logo_data:
-            with open("temp_logo.png", "wb") as f: f.write(self.logo_data.getbuffer())
-            self.image("temp_logo.png", x=x_offset + 34, y=8, w=80)
-        
-        self.set_y(38); self.set_x(x_offset + 10)
-        self.set_fill_color(230, 230, 230); self.set_font('Arial', 'B', 9)
-        self.cell(129, 8, str(categoria).upper(), border=1, ln=1, align='C', fill=True)
-        
-        self.set_x(x_offset + 10); self.set_fill_color(245, 245, 245)
-        self.cell(75, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
-        self.cell(24, 7, 'CLASSE', border=1, align='C', fill=True) 
-        self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
-        
-        for i, lib in enumerate(libri):
-            fill = i % 2 == 1
-            self.set_x(x_offset + 10); self.set_fill_color(250, 250, 250) if fill else self.set_fill_color(255, 255, 255)
-            self.set_font('Arial', 'B', 7.5)
-            self.cell(75, 6, f" {str(lib['t'])[:45]}", border=1, align='L', fill=fill)
-            self.set_font('Arial', '', 8)
-            self.cell(8, 6, str(lib.get('c1','')), border=1, align='C', fill=fill)
-            self.cell(8, 6, str(lib.get('c2','')), border=1, align='C', fill=fill)
-            self.cell(8, 6, str(lib.get('c3','')), border=1, align='C', fill=fill)
-            self.cell(30, 6, str(lib.get('e',''))[:20], border=1, ln=1, align='C', fill=fill)
-
-        self.set_y(145); self.set_x(x_offset + 10); self.set_fill_color(240, 240, 240); self.set_font('Arial', 'B', 8)
-        self.cell(129, 7, ' DETTAGLI DI CONSEGNA', border=1, ln=1, fill=True)
-        for label, val in [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]:
