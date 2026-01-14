@@ -296,8 +296,7 @@ with st.sidebar:
 # FINE BLOCCO 8
 # =========================================================
 
-
-## =========================================================
+# =========================================================
 # --- BLOCCO 9: PAGINA CONSEGNE (GESTIONE MASSIVA E COPIE) ---
 # =========================================================
 if st.session_state.pagina == "Consegne":
@@ -390,14 +389,22 @@ if st.session_state.pagina == "Consegne":
                 pdf = PDF_CONSEGNA() 
                 pdf.add_page()
                 
-                # --- INSERIMENTO LOGO IRPINIA LIBRI ---
-                try:
-                    # COPIA SINISTRA: x=10, y=8, larghezza=50
-                    pdf.image('logo.jpg', 10, 8, 50) 
-                    # COPIA DESTRA: x=158.5 (148.5 della metà + 10), y=8, larghezza=50
-                    pdf.image('logo.jpg', 158.5, 8, 50) 
-                except:
-                    st.warning("⚠️ File 'logo.jpg' non trovato. Caricalo su GitHub.")
+                # --- FUNZIONE LOGO CENTRATO CON BORDO ---
+                def draw_centered_logo(x_start, x_end):
+                    w_logo = 50
+                    h_logo = 21
+                    x_mid = x_start + ((x_end - x_start) / 2) - (w_logo / 2)
+                    # Bordo grigio sottile
+                    pdf.set_draw_color(100, 100, 100)
+                    pdf.rect(x_mid - 2, 6, w_logo + 4, h_logo + 4)
+                    try:
+                        pdf.image('logo.jpg', x_mid, 8, w_logo)
+                    except:
+                        pass
+
+                # Esecuzione per le due metà
+                draw_centered_logo(0, 148.5)
+                draw_centered_logo(148.5, 297)
 
                 # POSIZIONAMENTO TESTO SOTTO IL LOGO (Margine Y = 35)
                 pdf.set_y(35)
@@ -427,6 +434,7 @@ if st.session_state.pagina == "Consegne":
                 st.success(f"Consegna registrata!")
             
             salva_storico_cloud(st.session_state.storico_consegne)
+
 # --- BLOCCO 10: PAGINA STORICO REGISTRO (PULITA) ---
 # =========================================================
 elif st.session_state.pagina == "Storico":
@@ -897,6 +905,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
