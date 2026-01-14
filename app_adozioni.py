@@ -275,20 +275,41 @@ def reset_ricerca():
 # --- BLOCCO 8: SIDEBAR NAVIGAZIONE ---
 # INIZIO BLOCCO
 # =========================================================
+# =========================================================
+# --- SIDEBAR NAVIGAZIONE AGGIORNATA ---
+# =========================================================
 with st.sidebar:
     st.title("🧭 MENU")
-    if st.button("➕ NUOVA ADOZIONE", use_container_width=True): st.session_state.pagina = "Inserimento"; st.rerun()
-    if st.button("✏️ MODIFICA ADOZIONE", use_container_width=True): st.session_state.pagina = "Modifica"; st.rerun()
-    if st.button("🆕 AGGIUNGI A CATALOGO", use_container_width=True): st.session_state.pagina = "NuovoLibro"; st.rerun()
-    if st.button("📊 REGISTRO COMPLETO", use_container_width=True): st.session_state.pagina = "Registro"; st.rerun()
-    if st.button("🔍 FILTRA E RICERCA", use_container_width=True): st.session_state.pagina = "Ricerca"; st.rerun()
-    if st.button("📄 MODULO CONSEGNE", use_container_width=True): st.session_state.pagina = "Consegne"; st.rerun()
-    if st.button("📚 COLLANE CONSEGNATE", use_container_width=True): st.session_state.pagina = "Storico"; st.rerun()
-    if st.button("🔍 RICERCA COLLANE", use_container_width=True): 
-    st.session_state.pagina = "Ricerca Collane"
-    st.rerun()
-    st.markdown("---")
+    if st.button("➕ NUOVA ADOZIONE", use_container_width=True): 
+        st.session_state.pagina = "Inserimento"; st.rerun()
     
+    if st.button("✏️ MODIFICA ADOZIONE", use_container_width=True): 
+        st.session_state.pagina = "Modifica"; st.rerun()
+    
+    if st.button("🆕 AGGIUNGI A CATALOGO", use_container_width=True): 
+        st.session_state.pagina = "NuovoLibro"; st.rerun()
+    
+    if st.button("📊 REGISTRO COMPLETO", use_container_width=True): 
+        st.session_state.pagina = "Registro"; st.rerun()
+    
+    if st.button("🔍 FILTRA E RICERCA", use_container_width=True): 
+        st.session_state.pagina = "Ricerca"; st.rerun()
+    
+    if st.button("📄 MODULO CONSEGNE", use_container_width=True): 
+        st.session_state.pagina = "Consegne"; st.rerun()
+    
+    if st.button("📚 COLLANE CONSEGNATE", use_container_width=True): 
+        st.session_state.pagina = "Storico"; st.rerun()
+
+    # PULSANTE RICERCA COLLANE CON INDENTAZIONE CORRETTA
+    if st.button("🔍 RICERCA COLLANE", use_container_width=True): 
+        st.session_state.pagina = "Ricerca Collane"
+        st.rerun()
+
+    if st.button("📊 TABELLONE STATO", use_container_width=True): 
+        st.session_state.pagina = "Tabellone Stato"; st.rerun()
+        
+    st.markdown("---")
     # Pulsante per il Tabellone a tutto schermo
     if st.button("📊 APRI TABELLONE STATO", use_container_width=True):
         st.session_state.pagina = "Tabellone Stato"
@@ -946,6 +967,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne. Registra una consegna per iniziare.")  
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
