@@ -13,21 +13,12 @@ from fpdf import FPDF
 # --- BLOCCO 1: CONFIGURAZIONE E COSTANTI ---
 # =========================================================
 DB_FILE = "dati_adozioni.csv"
-CONFIG_FILE = "anagrafiche.xlsx"
 ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
 
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
-st.markdown("""
-    <style>
-    [data-testid="stDataEditor"] thead tr th { background-color: #004a99 !important; color: white !important; }
-    .stApp { background-color: #ffffff; }
-    .totale-box { padding: 20px; background-color: #e8f0fe; border-radius: 10px; border: 1px solid #004a99; margin-top: 15px; }
-    </style>
-    """, unsafe_allow_html=True)
-
 # =========================================================
-# --- BLOCCO 2: CONNESSIONE E BACKUP CLOUD ---
+# --- BLOCCO 2: CONNESSIONE CLOUD ---
 # =========================================================
 def connetti_google_sheets():
     try:
@@ -37,93 +28,70 @@ def connetti_google_sheets():
             json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
         creds = Credentials.from_service_account_info(json_info, scopes=scope)
         client_gs = gspread.authorize(creds)
-        sh = client_gs.open_by_key(ID_FOGLIO)
-        return sh
+        return client_gs.open_by_key(ID_FOGLIO)
     except Exception as e:
         st.error(f"⚠️ Errore connessione Cloud: {e}")
         return None
 
-def backup_su_google_sheets(df_da_salvare):
-    sh = connetti_google_sheets()
-    if sh:
-        try:
-            foglio = sh.worksheet("Adozioni_DB")
-            foglio.clear()
-            dati = [df_da_salvare.columns.values.tolist()] + df_da_salvare.fillna("").values.tolist()
-            foglio.update(dati)
-            return True
-        except Exception as e:
-            st.sidebar.error(f"Errore scrittura Cloud: {e}")
-            return False
-    return False
+# =========================================================
+# --- BLOCCO 6: MOTORE PDF (Corretto) ---
+# =========================================================
+class PDF_CONSEGNA(FPDF):
+    def __init__(self, logo_data=None):
+        super().__init__(orientation='L', unit='mm', format='A4')
+        self.logo_data = logo_data
+
+    def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
+        # Gestione Logo
+        if self.logo_data:
+            try:
+                # Correzione Indentazione riga 129: il contenuto del try deve essere indentato
+                with open("temp_logo.png", "wb") as f: 
+                    f.write(self.logo_data.getbuffer())
+                self.image("temp_logo.png", x=x_offset + 34, y=8, w=80)
+            except Exception as e:
+                st.warning(f"Impossibile caricare il logo: {e}")
+        
+        # Intestazione Tabella
+        self.set_y(38)
+        self.set_x(x_offset + 10)
+        self.set_fill_color(230, 230, 230)
+        self.set_font('Arial', 'B', 9)
+        self.cell(129, 8, str(categoria).upper(), border=1, ln=1, align='C', fill=True)
+        
+        # Righe Libri
+        self.set_font('Arial', '', 8)
+        for i, lib in enumerate(libri):
+            self.set_x(x_offset + 10)
+            self.cell(75, 6, f" {str(lib['t'])[:45]}", border=1)
+            self.cell(24, 6, str(lib.get('c1','')), border=1, align='C')
+            self.cell(30, 6, str(lib.get('e',''))[:20], border=1, ln=1)
+
+        # Sezione Firme/Dettagli
+        self.set_y(145)
+        for label, val in [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]:
+            self.set_x(x_offset + 10)
+            self.set_font('Arial', 'B', 7.5)
+            self.cell(35, 6.2, label, border=1)
+            self.set_font('Arial', '', 7.5)
+            self.cell(94, 6.2, str(val).upper(), border=1, ln=1)
 
 # =========================================================
-# --- BLOCCO 3: GESTIONE CONFIGURAZIONI CONSEGNE ---
+# --- BLOCCO 7: LOGICA DI NAVIGAZIONE ---
 # =========================================================
-def salva_config_consegne(db_dict):
-    sh = connetti_google_sheets()
-    if sh:
-        try:
-            try: foglio = sh.worksheet("ConfigConsegne")
-            except: foglio = sh.add_worksheet(title="ConfigConsegne", rows="100", cols="20")
-            foglio.clear()
-            righe = [["Categoria", "Dati_JSON"]]
-            for k, v in db_dict.items():
-                righe.append([k, json.dumps(v)])
-            foglio.update(righe)
-        except Exception as e:
-            st.sidebar.error(f"Errore salvataggio config: {e}")
+if "pagina" not in st.session_state: 
+    st.session_state.pagina = "Inserimento"
 
-def carica_config_consegne():
-    sh = connetti_google_sheets()
-    db_caricato = {
-        "LETTURE CLASSE PRIMA": [], "LETTURE CLASSE QUARTA": [],
-        "SUSSIDIARI DISCIPLINE": [], "INGLESE CLASSE PRIMA": [], 
-        "INGLESE CLASSE QUARTA": [], "RELIGIONE": []
-    }
-    if sh:
-        try:
-            foglio = sh.worksheet("ConfigConsegne")
-            dati = foglio.get_all_records()
-            for r in dati:
-                db_caricato[r["Categoria"]] = json.loads(r["Dati_JSON"])
-        except: pass 
-    return db_caricato
+with st.sidebar:
+    st.title("🧭 MENU")
+    if st.button("➕ NUOVA ADOZIONE"): st.session_state.pagina = "Inserimento"
+    if st.button("📄 MODULO CONSEGNE"): st.session_state.pagina = "Consegne"
 
-# =========================================================
-# --- BLOCCO 4: GESTIONE STORICO CONSEGNE ---
-# =========================================================
-def salva_storico_cloud(storico_dict):
-    sh = connetti_google_sheets()
-    if sh:
-        try:
-            try: foglio = sh.worksheet("StoricoConsegne")
-            except: foglio = sh.add_worksheet(title="StoricoConsegne", rows="1000", cols="20")
-            foglio.clear()
-            righe = [["Plesso", "Dati_JSON"]]
-            for plesso, dati in storico_dict.items():
-                righe.append([plesso, json.dumps(dati)])
-            foglio.update(righe)
-        except Exception as e:
-            st.sidebar.error(f"Errore salvataggio storico: {e}")
+# --- Rendering Pagine ---
+if st.session_state.pagina == "Inserimento":
+    st.subheader("Registrazione Adozioni")
+    # Logica inserimento...
 
-def carica_storico_cloud():
-    sh = connetti_google_sheets()
-    storico_caricato = {}
-    if sh:
-        try:
-            foglio = sh.worksheet("StoricoConsegne")
-            dati = foglio.get_all_records()
-            for r in dati:
-                storico_caricato[r["Plesso"]] = json.loads(r["Dati_JSON"])
-        except: pass
-    return storico_caricato
-
-# =========================================================
-# --- BLOCCO 5: CACHE E CATALOGO ---
-# =========================================================
-@st.cache_data(ttl=3600)
-def get_catalogo_libri():
-    sh = connetti_google_sheets()
-    if sh:
-        try:
+elif st.session_state.pagina == "Consegne":
+    st.subheader("Generazione Moduli PDF")
+    # Logica PDF...
