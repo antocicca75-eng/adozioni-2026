@@ -297,7 +297,7 @@ with st.sidebar:
 # =========================================================
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE (GESTIONE MASSIVA E COPIE) ---
+# --- BLOCCO 9: PAGINA CONSEGNE (VERSIONE COMPATIBILE) ---
 # =========================================================
 if st.session_state.pagina == "Consegne":
     st.subheader("📄 Generazione Moduli Consegna")
@@ -318,63 +318,35 @@ if st.session_state.pagina == "Consegne":
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
     
-    # Selezione Tipologie
     basi = ["- SELEZIONA -", "TUTTE LE TIPOLOGIE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
     altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
     cat_scelta = col_c.selectbox("Tipologia:", basi + altre, key=f"c_sel_{ctr}")
 
-    # --- LOGICA CARICAMENTO ---
     if cat_scelta == "TUTTE LE TIPOLOGIE":
         st.info("💡 Assegnazione massiva: clicca su 'CONFERMA CONSEGNA' per registrare tutto il database su questo plesso.")
         st.session_state.lista_consegne_attuale = [] 
         st.session_state.last_cat = "TUTTE"
-
     elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
         caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
-        for voce in caricati:
-            voce['q'] = 1
+        for voce in caricati: voce['q'] = 1
         st.session_state.lista_consegne_attuale = caricati
         st.session_state.last_cat = cat_scelta
 
-    # --- VISUALIZZAZIONE LISTA ---
     if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
             if 'q' not in lib: lib['q'] = 1
-            
             c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
             c_info.info(f"{lib['t']} | {lib['e']}")
-            
             m1, v1, p1 = c_qta.columns([1,1,1])
             if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
-                if lib['q'] > 1:
-                    lib['q'] -= 1
-                    st.rerun()
+                if lib['q'] > 1: lib['q'] -= 1; st.rerun()
             v1.markdown(f"<p style='text-align:center; font-weight:bold;'>{lib['q']}</p>", unsafe_allow_html=True)
             if p1.button("➕", key=f"p_{cat_scelta}_{i}"):
-                lib['q'] += 1
-                st.rerun()
-
+                lib['q'] += 1; st.rerun()
             if c_del.button("❌", key=f"del_{cat_scelta}_{i}"):
-                st.session_state.lista_consegne_attuale.pop(i)
-                st.rerun()
+                st.session_state.lista_consegne_attuale.pop(i); st.rerun()
 
-        col_btns = st.columns(2)
-        if col_btns[0].button("💾 SALVA CONFIG. BASE", use_container_width=True):
-            lista_da_salvare = []
-            for item in st.session_state.lista_consegne_attuale:
-                nuovo_item = item.copy()
-                nuovo_item['q'] = 1 
-                lista_da_salvare.append(nuovo_item)
-            st.session_state.db_consegne[cat_scelta] = lista_da_salvare
-            salva_config_consegne(st.session_state.db_consegne)
-            st.success("Configurazione salvata!")
-        
-        if col_btns[1].button("🗑️ SVUOTA", use_container_width=True):
-            st.session_state.reset_ctr = st.session_state.get('reset_ctr', 0) + 1
-            reset_consegne_totale()
-
-    # --- DATI RICEVENTE E PDF ---
     st.markdown("---")
     d1, d2 = st.columns(2)
     docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
@@ -389,34 +361,28 @@ if st.session_state.pagina == "Consegne":
                 pdf = PDF_CONSEGNA() 
                 pdf.add_page()
                 
-                # --- FUNZIONE LOGO CENTRATO CON BORDO ARROTONDATO ---
+                # --- FUNZIONE LOGO CENTRATO (VERSIONE COMPATIBILE RECT) ---
                 def draw_centered_logo(x_start, x_end):
                     w_logo = 50
                     h_logo = 21
                     x_mid = x_start + ((x_end - x_start) / 2) - (w_logo / 2)
                     
-                    # Colore bordo grigio e angoli arrotondati (r=3)
+                    # Usiamo 'rect' che è supportato da tutte le versioni di FPDF
                     pdf.set_draw_color(100, 100, 100)
                     pdf.set_line_width(0.2)
-                    pdf.rounded_rect(x_mid - 2, 6, w_logo + 4, h_logo + 4, 3) 
+                    pdf.rect(x_mid - 2, 6, w_logo + 4, h_logo + 4) 
                     
                     try:
                         pdf.image('logo.jpg', x_mid, 8, w_logo)
                     except:
                         pass
 
-                # Esecuzione per le due metà del foglio
                 draw_centered_logo(0, 148.5)
                 draw_centered_logo(148.5, 297)
 
-                # POSIZIONAMENTO TESTO SOTTO IL LOGO
                 pdf.set_y(35)
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-                
-                # Linea tratteggiata centrale
                 pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
-                
-                # SECONDA COPIA SOTTO IL LOGO
                 pdf.set_y(35)
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
@@ -426,17 +392,14 @@ if st.session_state.pagina == "Consegne":
         if p_scelto != "- SELEZIONA PLESSO -":
             if p_scelto not in st.session_state.storico_consegne: 
                 st.session_state.storico_consegne[p_scelto] = {}
-            
             if cat_scelta == "TUTTE LE TIPOLOGIE":
                 for k, v in st.session_state.db_consegne.items():
                     lista_clean = [dict(item, q=1) for item in v]
                     st.session_state.storico_consegne[p_scelto][k] = lista_clean
-                st.success(f"REGISTRAZIONE MASSIVA COMPLETATA!")
             else:
                 st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
-                st.success(f"Consegna registrata!")
-            
             salva_storico_cloud(st.session_state.storico_consegne)
+            st.success("Registrato!")
 
 # --- BLOCCO 10: PAGINA STORICO REGISTRO (PULITA) ---
 # =========================================================
@@ -908,6 +871,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
