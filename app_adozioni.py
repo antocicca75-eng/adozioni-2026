@@ -284,7 +284,9 @@ with st.sidebar:
     if st.button("🔍 FILTRA E RICERCA", use_container_width=True): st.session_state.pagina = "Ricerca"; st.rerun()
     if st.button("📄 MODULO CONSEGNE", use_container_width=True): st.session_state.pagina = "Consegne"; st.rerun()
     if st.button("📚 COLLANE CONSEGNATE", use_container_width=True): st.session_state.pagina = "Storico"; st.rerun()
-    
+    if st.button("🔍 RICERCA COLLANE", use_container_width=True): 
+    st.session_state.pagina = "Ricerca Collane"
+    st.rerun()
     st.markdown("---")
     
     # Pulsante per il Tabellone a tutto schermo
@@ -873,9 +875,78 @@ elif st.session_state.pagina == "Tabellone Stato":
     if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final"):
         st.session_state.pagina = "Consegne"; st.rerun()
 # =========================================================  
+# =========================================================
+# --- BLOCCO 16: RICERCA COLLANE E CONSEGNE ---
+# =========================================================
+elif st.session_state.pagina == "Ricerca Collane":
+    st.subheader("🔍 Motore di Ricerca Collane Consegnate")
+
+    # 1. Recupero dati dallo storico cloud (già esistente)
+    if "storico_consegne" not in st.session_state:
+        st.session_state.storico_consegne = carica_storico_cloud()
+
+    # 2. Trasformazione dello storico in formato Tabella (DataFrame)
+    righe_storico = []
+    if st.session_state.storico_consegne:
+        for plesso, categorie in st.session_state.storico_consegne.items():
+            for cat, libri in categorie.items():
+                for lib in libri:
+                    righe_storico.append({
+                        "Plesso": plesso,
+                        "Tipologia": cat,
+                        "Titolo": lib.get('t', ''),
+                        "Editore": lib.get('e', ''),
+                        "Quantità": lib.get('q', 0)
+                    })
+    
+    df_collane = pd.DataFrame(righe_storico)
+
+    if not df_collane.empty:
+        # --- AREA FILTRI ---
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            # Filtri dinamici basati sui dati presenti
+            f_ple = c1.multiselect("🏫 Filtra Plesso", sorted(df_collane["Plesso"].unique()), key="f_coll_p")
+            f_tip = c2.multiselect("📚 Filtra Tipologia", sorted(df_collane["Tipologia"].unique()), key="f_coll_t")
+            f_edi = c3.multiselect("🏢 Filtra Editore", sorted(df_collane["Editore"].unique()), key="f_coll_e")
+            
+            # Bottone di ricerca opzionale (Streamlit aggiorna già in tempo reale, ma questo aiuta l'utente)
+            st.info("💡 La tabella si aggiorna automaticamente selezionando i filtri sopra.")
+
+        # --- APPLICAZIONE FILTRI ---
+        df_filtrato = df_collane.copy()
+        if f_ple: df_filtrato = df_filtrato[df_filtrato["Plesso"].isin(f_ple)]
+        if f_tip: df_filtrato = df_filtrato[df_filtrato["Tipologia"].isin(f_tip)]
+        if f_edi: df_filtrato = df_filtrato[df_filtrato["Editore"].isin(f_edi)]
+
+        # --- RISULTATI E TOTALI ---
+        st.markdown("---")
         
+        # Calcolo del totale delle copie filtrate
+        totale_copie_collane = int(df_filtrato["Quantità"].sum())
+
+        # Box Totale Grafico
+        st.markdown(f"""
+            <div style="padding:20px; background-color:#e8f0fe; border-radius:10px; border-left:8px solid #004a99; margin-bottom:20px;">
+                <h3 style='margin:0; color:#004a99;'>Riepilogo Consegne</h3>
+                <p style='font-size:24px; margin:5px 0 0 0;'>
+                    Totale Libri Trovati: <b>{totale_copie_collane}</b>
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Tabella dati
+        st.dataframe(df_filtrato, use_container_width=True, hide_index=True)
+        
+        # Esportazione CSV dei risultati filtrati
+        csv_collane = df_filtrato.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Scarica Report Ricerca", csv_collane, "ricerca_collane.csv", "text/csv")
+
+    else:
+        st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne. Registra una consegna per iniziare.")  
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
