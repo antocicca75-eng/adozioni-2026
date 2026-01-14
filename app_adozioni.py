@@ -806,13 +806,13 @@ elif st.session_state.pagina == "Storico":
     if st.button("⬅️ Torna a Modulo Consegne"):
         st.session_state.pagina = "Consegne"; st.rerun()
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (FILTRI AVANZATI) ---
+# --- BLOCCO 15: TABELLONE GENERALE (VERSIONE BIG FONT) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # Mappatura Sigle (Aggiornata con R1\4)
+    # Mappatura Sigle
     mappa_sigle = {
         "LETTURE CLASSE PRIMA": "L1",
         "LETTURE CLASSE QUARTA": "L4",
@@ -822,16 +822,14 @@ elif st.session_state.pagina == "Tabellone Stato":
         "INGLESE CLASSE QUARTA": "E4"
     }
 
-    # 1. RECUPERO LISTA DALLA FUNZIONE MADRE
     elenco_totale = get_lista_plessi()
-    
     consegnati = st.session_state.get("storico_consegne", {})
     ritirati = st.session_state.get("storico_ritiri", {})
 
     if not elenco_totale:
-        st.warning("⚠️ Nessun plesso trovato. Verifica il foglio 'Plesso' nel database.")
+        st.warning("⚠️ Nessun plesso trovato.")
     else:
-        # 2. CONTATORI STATISTICI
+        # Statistiche in alto
         n_tot = len(elenco_totale)
         n_ritirati_count = len([p for p in elenco_totale if p in ritirati and not consegnati.get(p)])
         n_consegnati_count = len([p for p in elenco_totale if p in consegnati])
@@ -844,7 +842,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         st.markdown("---")
 
-        # 3. NUOVO SISTEMA DI FILTRI (Ricerca + Stato)
+        # Filtri
         f1, f2 = st.columns([2, 1])
         with f1:
             cerca = st.text_input("🔍 Cerca Plesso...", "").upper()
@@ -852,32 +850,22 @@ elif st.session_state.pagina == "Tabellone Stato":
             filtro_stato = st.selectbox("📂 Filtra per Stato", 
                                        ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
 
-        # Logica di filtraggio
         mostra = []
         for p in elenco_totale:
-            # Controllo ricerca testuale
-            if cerca not in str(p).upper():
-                continue
-                
-            # Recupero sigle per determinare lo stato
+            if cerca not in str(p).upper(): continue
             cat_attive = consegnati.get(p, {}).keys()
             ha_sigle = len(cat_attive) > 0
             e_ritirato = p in ritirati and not ha_sigle
             e_bianco = p not in consegnati and p not in ritirati
 
-            # Controllo filtro stato
-            if filtro_stato == "TUTTI":
-                mostra.append(p)
-            elif filtro_stato == "DA INIZIARE" and e_bianco:
-                mostra.append(p)
-            elif filtro_stato == "DA RITIRARE" and ha_sigle:
-                mostra.append(p)
-            elif filtro_stato == "RITIRATI" and e_ritirato:
-                mostra.append(p)
+            if filtro_stato == "TUTTI": mostra.append(p)
+            elif filtro_stato == "DA INIZIARE" and e_bianco: mostra.append(p)
+            elif filtro_stato == "DA RITIRARE" and ha_sigle: mostra.append(p)
+            elif filtro_stato == "RITIRATI" and e_ritirato: mostra.append(p)
 
-        # 4. GRIGLIA A 4 COLONNE
+        # Griglia Plessi
         if not mostra:
-            st.info("ℹ️ Nessun plesso corrisponde ai criteri di ricerca.")
+            st.info("ℹ️ Nessun plesso trovato.")
         else:
             n_col = 4 
             for i in range(0, len(mostra), n_col):
@@ -887,34 +875,47 @@ elif st.session_state.pagina == "Tabellone Stato":
                     categorie_attive = consegnati.get(plesso, {}).keys()
                     sigle_da_mostrare = [mappa_sigle.get(cat, cat[:2]) for cat in categorie_attive]
                     
-                    bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #DDD")
+                    # Colori di base
+                    bg, txt, lab, brd = ("#f8f9fa", "#333", "DA INIZIARE", "2px solid #dee2e6")
                     
                     if plesso in ritirati and not sigle_da_mostrare:
-                        bg, txt, lab, brd = ("#28a745", "#FFF", "✅ RITIRATO", "2px solid #1e7e34")
+                        bg, txt, lab, brd = ("#28a745", "#FFF", "✅ COMPLETATO", "2px solid #1e7e34")
                     elif sigle_da_mostrare:
-                        bg, txt, lab, brd = ("#FF8C00", "#FFF", "🚚 DA RITIRARE", "2px solid #e67e22")
+                        bg, txt, lab, brd = ("#FF8C00", "#FFF", "🚚 IN CONSEGNA", "2px solid #e67e22")
 
+                    # --- COSTRUZIONE BOX SIGLE (PIÙ GRANDI) ---
                     html_blocco_sigle = ""
                     if sigle_da_mostrare:
                         span_sigle = "".join([
-                            f'<span style="background:white; color:black; padding:2px 5px; border-radius:3px; font-size:10px; font-weight:900; margin:2px; border:1px solid #333; display:inline-block;">{s}</span>' 
+                            f'''<span style="
+                                background: white; 
+                                color: #d35400; 
+                                padding: 4px 8px; 
+                                border-radius: 5px; 
+                                font-size: 14px; 
+                                font-weight: 900; 
+                                margin: 3px; 
+                                border: 2px solid #333; 
+                                display: inline-block;
+                                box-shadow: 1px 1px 0px #333;
+                            ">{s}</span>''' 
                             for s in sigle_da_mostrare
                         ])
-                        html_blocco_sigle = f'<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: 5px;">{span_sigle}</div>'
+                        html_blocco_sigle = f'<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 10px;">{span_sigle}</div>'
 
                     with cols[j]:
                         st.markdown(f"""
                             <div style="
                                 background-color: {bg}; color: {txt}; border: {brd};
-                                border-radius: 10px; padding: 10px 5px; margin-bottom: 15px;
-                                text-align: center; min-height: 135px; display: flex;
+                                border-radius: 12px; padding: 20px 10px; margin-bottom: 20px;
+                                text-align: center; min-height: 180px; display: flex;
                                 flex-direction: column; justify-content: center; align-items: center;
-                                box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+                                box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
                             ">
-                                <div style="font-size: 14px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
+                                <div style="font-size: 20px; font-weight: 900; line-height: 1.2; text-transform: uppercase; margin-bottom: 5px;">
                                     {plesso}
                                 </div>
-                                <div style="font-size: 9px; margin-top: 5px; font-weight: bold; opacity: 0.9;">
+                                <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">
                                     {lab}
                                 </div>
                                 {html_blocco_sigle}
@@ -926,10 +927,11 @@ elif st.session_state.pagina == "Tabellone Stato":
         st.session_state.pagina = "Consegne"; st.rerun()
 # =========================================================
 # FINE BLOCCO 15
-# =========================================================        
+# =========================================================      
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
