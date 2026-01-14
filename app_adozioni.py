@@ -408,6 +408,8 @@ if st.session_state.pagina == "Consegne":
             # Reset automatico dopo la registrazione
             reset_totale()
 # =========================================================
+# --- BLOCCO 10: PAGINA STORICO (VERSIONE CORRETTA) ---
+# =========================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
     
@@ -416,10 +418,19 @@ elif st.session_state.pagina == "Storico":
 
     if not st.session_state.get("storico_consegne"):
         st.info("Nessuna consegna registrata nel database.")
+        if st.button("⬅️ TORNA A MODULO CONSEGNE", use_container_width=True):
+            st.session_state.pagina = "Consegne"
+            st.rerun()
     else:
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
         opzioni_ricerca = ["- MOSTRA TUTTI -"] + elenco_plessi_storico
-        scuola_selezionata = st.selectbox("🔍 Filtra per Plesso:", opzioni_ricerca)
+        
+        # Aggiunta key dinamica per permettere il reset esterno
+        scuola_selezionata = st.selectbox(
+            "🔍 Filtra per Plesso:", 
+            opzioni_ricerca, 
+            key=f"hist_sel_{st.session_state.get('reset_ctr', 0)}"
+        )
         
         st.markdown("---")
         plessi_da_mostrare = [scuola_selezionata] if scuola_selezionata != "- MOSTRA TUTTI -" else elenco_plessi_storico
@@ -438,9 +449,6 @@ elif st.session_state.pagina == "Storico":
                 per_tipo = st.session_state.storico_consegne[plesso]
                 
                 for tipo in sorted(list(per_tipo.keys())):
-                    # Abbiamo rimosso la riga st.markdown(f"#### 📘 {tipo}") per eliminare la scritta gigante
-                    
-                    c_btn_tipo = st.columns([1])
                     if st.button(f"📦 Ritira tutto: {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
                         if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                         st.session_state.storico_ritiri[plesso][tipo] = per_tipo[tipo]
@@ -449,7 +457,6 @@ elif st.session_state.pagina == "Storico":
                         salva_storico_cloud(st.session_state.storico_consegne)
                         st.rerun()
 
-                    # Il nome della tipologia ora è qui, sulla barra dell'expander (molto più pulito)
                     with st.expander(f"📘 {tipo.upper()}", expanded=True):
                         lista_libri = list(per_tipo[tipo])
                         for i, lib in enumerate(lista_libri):
@@ -485,8 +492,7 @@ elif st.session_state.pagina == "Storico":
                                 salva_storico_cloud(st.session_state.storico_consegne)
                                 st.rerun()
 
-        # --- FINE DEL CICLO FOR: I PULSANTI VANNO QUI SOTTO ---
-        # Devono essere allineati con il comando "for plesso in..."
+        # --- PULSANTI DI NAVIGAZIONE (IDENTAZIONE CORRETTA) ---
         st.markdown("---")
         c_res, c_back = st.columns(2)
 
@@ -499,7 +505,6 @@ elif st.session_state.pagina == "Storico":
         if c_back.button("⬅️ TORNA A MODULO CONSEGNE", use_container_width=True):
             st.session_state.pagina = "Consegne"
             st.rerun()
-
    
 # =========================================================
 # --- BLOCCO 11: PAGINA NUOVO LIBRO ---
@@ -903,6 +908,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
