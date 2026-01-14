@@ -441,7 +441,7 @@ if st.session_state.pagina == "Consegne":
             
             salva_storico_cloud(st.session_state.storico_consegne)
 # =========================================================
-# --- BLOCCO 10: PAGINA STORICO (CON RITIRI PARZIALI) ---
+# --- BLOCCO 10: PAGINA STORICO (VERSIONE CORRETTA) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Storico":
@@ -475,6 +475,7 @@ elif st.session_state.pagina == "Storico":
                 for tipo in sorted(list(per_tipo.keys())):
                     c_t, c_btn = st.columns([0.7, 0.3])
                     c_t.markdown(f"#### 📘 {tipo}")
+                    
                     if c_btn.button(f"🔄 Ritira Tutto {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
                         if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                         st.session_state.storico_ritiri[plesso][tipo] = per_tipo[tipo]
@@ -484,31 +485,39 @@ elif st.session_state.pagina == "Storico":
                         st.rerun()
 
                     with st.expander(f"Dettaglio {tipo}", expanded=True):
-                        for i, lib in enumerate(per_tipo[tipo]):
-                            qta_salvata = lib.get('q', 1)
+                        # Usiamo list() per evitare errori di iterazione se rimuoviamo elementi
+                        for i, lib in enumerate(list(per_tipo[tipo])):
+                            # --- PROTEZIONE VALORI ---
+                            try:
+                                qta_carico = int(lib.get('q', 1))
+                            except:
+                                qta_carico = 1
+                            
+                            # Se la quantità a sistema è 0, la consideriamo 1 per non bloccare il widget
+                            qta_min_safe = max(1, qta_carico)
+                            
                             col_titolo, col_qta, col_ritiro, col_del = st.columns([0.45, 0.20, 0.25, 0.10])
                             
                             col_titolo.markdown(f"<b style='font-size:15px; color:#1E3A8A;'>{lib['t']}</b><br><small>{lib['e']}</small>", unsafe_allow_html=True)
-                            
-                            # Colonna Quantità Attuale
-                            col_qta.markdown(f"<p style='text-align:center; font-size:14px;'>In carico:<br><b>{qta_salvata}</b></p>", unsafe_allow_html=True)
+                            col_qta.markdown(f"<p style='text-align:center; font-size:14px;'>In carico:<br><b>{qta_carico}</b></p>", unsafe_allow_html=True)
 
-                            # --- LOGICA RITIRO PARZIALE ---
                             with col_ritiro:
-                                q_rit = st.number_input("Qtà da ritirare", min_value=1, max_value=int(qta_salvata), value=int(qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}")
-                                if st.button("🔄 RITIRA", key=f"btn_rit_{plesso}_{tipo}_{i}"):
+                                # Protezione: min_value=1, value non può essere minore di min_value
+                                q_rit = st.number_input("Ritiro", min_value=1, max_value=qta_min_safe, value=qta_min_safe, key=f"qrit_{plesso}_{tipo}_{i}")
+                                
+                                if st.button("🔄", key=f"btn_rit_{plesso}_{tipo}_{i}"):
                                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                                     if tipo not in st.session_state.storico_ritiri[plesso]: st.session_state.storico_ritiri[plesso][tipo] = []
                                     
-                                    # Prepariamo il dato per i ritiri
+                                    # Registro il ritiro
                                     ritiro_item = lib.copy()
                                     ritiro_item['q'] = q_rit
                                     st.session_state.storico_ritiri[plesso][tipo].append(ritiro_item)
                                     
-                                    # Sottrazione dalla consegna
-                                    lib['q'] -= q_rit
+                                    # Sottraggo dalla consegna
+                                    lib['q'] = qta_carico - q_rit
                                     
-                                    # Se quantità arriva a zero, rimuovi dalla lista consegne
+                                    # Se non restano copie, elimino la riga dalle consegne
                                     if lib['q'] <= 0:
                                         per_tipo[tipo].pop(i)
                                     
@@ -517,7 +526,7 @@ elif st.session_state.pagina == "Storico":
                                     if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                                     
                                     salva_storico_cloud(st.session_state.storico_consegne)
-                                    st.success(f"Ritirate {q_rit} copie."); st.rerun()
+                                    st.rerun()
                             
                             if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
                                 per_tipo[tipo].pop(i)
@@ -528,8 +537,6 @@ elif st.session_state.pagina == "Storico":
     st.markdown("---")
     if st.button("⬅️ Torna a Modulo Consegne"):
         st.session_state.pagina = "Consegne"; st.rerun()
-# =========================================================
-# FINE BLOCCO 10
 # =========================================================
 # =========================================================
 # --- BLOCCO 11: PAGINA NUOVO LIBRO ---
@@ -798,7 +805,9 @@ elif st.session_state.pagina == "Storico":
     st.markdown("---")
     if st.button("⬅️ Torna a Modulo Consegne"):
         st.session_state.pagina = "Consegne"; st.rerun()
+        
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
