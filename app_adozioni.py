@@ -659,17 +659,15 @@ elif st.session_state.pagina == "Ricerca":
 # =========================================================
 # --- BLOCCO 14: PAGINA TABELLONE AVANZAMENTO STATO ---
 # =========================================================
-if st.session_state.pagina == "Tabellone Stato":
+elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Stato Avanzamento Plessi")
 
     # Recupero dati necessari
-    df_catalogo = get_catalogo_libri()
-    lista_plessi_tab = get_lista_plessi() # Forza il ricaricamento dalla cache/cloud
+    lista_plessi_tab = get_lista_plessi() 
     
     if not lista_plessi_tab:
-        st.warning("⚠️ Nessun plesso trovato nell'anagrafica. Controlla il foglio 'Plesso' su Google Sheets o il file Excel.")
+        st.warning("⚠️ Nessun plesso trovato nell'anagrafica. Controlla il foglio 'Plesso' su Google Sheets.")
     else:
-        # Selezione Plesso con protezione se la lista è cambiata
         col_sel, col_info = st.columns([1, 2])
         plesso_target = col_sel.selectbox(
             "🔍 Seleziona Plesso per il controllo:", 
@@ -680,19 +678,14 @@ if st.session_state.pagina == "Tabellone Stato":
         if plesso_target != "- SELEZIONA -":
             st.markdown(f"### Stato attuale: **{plesso_target}**")
             
-            # Recuperiamo cosa risulta consegnato nello storico cloud
             storico = carica_storico_cloud()
             consegnati_plesso = storico.get(plesso_target, {})
-
-            # Definiamo le categorie attese (quelle presenti nel db_consegne)
             categorie_attese = st.session_state.db_consegne.keys()
             
-            # Creazione Tabella di Riepilogo
             dati_tabella = []
             for cat in categorie_attese:
                 stato = "✅ COMPLETATO" if cat in consegnati_plesso else "❌ DA CONSEGNARE"
                 dettaglio = ""
-                
                 if cat in consegnati_plesso:
                     libri = consegnati_plesso[cat]
                     dettaglio = f"{len(libri)} titoli registrati"
@@ -705,17 +698,17 @@ if st.session_state.pagina == "Tabellone Stato":
 
             df_status = pd.DataFrame(dati_tabella)
             
-            # Visualizzazione con colori
+            # Applichiamo lo stile
             def color_stato(val):
-                color = '#d4edda' if "COMPLETATO" in val else '#f8d7da'
-                return f'background-color: {color}'
+                if val == "✅ COMPLETATO":
+                    return 'background-color: #d4edda; color: #155724; font-weight: bold;'
+                return 'background-color: #f8d7da; color: #721c24;'
 
             st.table(df_status.style.applymap(color_stato, subset=['Stato Consegna']))
 
-            # Bottone di ritorno veloce
-            if st.button("⬅️ Torna al Menu"):
-                st.session_state.pagina = "Inserimento"
-                st.rerun()
+    if st.button("⬅️ Torna alla Home"):
+        st.session_state.pagina = "Inserimento"
+        st.rerun()
 # =========================================================
 # --- BLOCCO 10: PAGINA STORICO (VERSIONE CORRETTA) ---
 # INIZIO BLOCCO
@@ -927,6 +920,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
