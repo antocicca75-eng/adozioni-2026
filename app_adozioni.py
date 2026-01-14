@@ -297,7 +297,7 @@ with st.sidebar:
 # =========================================================
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE (LOGO GRANDE + SPAZIATURA) ---
+# --- BLOCCO 9: PAGINA CONSEGNE (SPAZIATURA OTTIMIZZATA) ---
 # =========================================================
 if st.session_state.pagina == "Consegne":
     st.subheader("📄 Generazione Moduli Consegna")
@@ -363,7 +363,7 @@ if st.session_state.pagina == "Consegne":
                     w_logo = 65  
                     h_logo = 27  
                     x_mid = x_start + ((x_end - x_start) / 2) - (w_logo / 2)
-                    pdf.set_draw_color(150, 150, 150) # Grigio ancora più chiaro per il bordo
+                    pdf.set_draw_color(180, 180, 180) # Grigio molto chiaro
                     pdf.set_line_width(0.2)
                     pdf.rect(x_mid - 3, 5, w_logo + 6, h_logo + 6) 
                     try:
@@ -374,14 +374,14 @@ if st.session_state.pagina == "Consegne":
                 draw_centered_logo(0, 148.5)
                 draw_centered_logo(148.5, 297)
 
-                # --- AUMENTO SPAZIO VERTICALE ---
-                # Portiamo a 48mm l'inizio del modulo per staccarlo bene dal logo
-                pdf.set_y(48)
+                # --- NUOVA SPAZIATURA OTTIMIZZATA ---
+                # Portiamo a 55mm per distanziarlo bene dal logo grande
+                pdf.set_y(55)
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
                 pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
                 
-                pdf.set_y(48)
+                pdf.set_y(55)
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
@@ -868,6 +868,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
