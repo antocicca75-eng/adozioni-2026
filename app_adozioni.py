@@ -352,25 +352,101 @@ elif st.session_state.pagina == "Registro Storico":
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
-    mappa_sigle = {"LETTURE CLASSE PRIMA": "L1", "LETTURE CLASSE QUARTA": "L4", "SUSSIDIARI DISCIPLINE": "S4", "RELIGIONE": "R1\\4", "INGLESE CLASSE PRIMA": "E1", "INGLESE CLASSE QUARTA": "E4"}
+    
+    mappa_sigle = {
+        "LETTURE CLASSE PRIMA": "L1", 
+        "LETTURE CLASSE QUARTA": "L4", 
+        "SUSSIDIARI DISCIPLINE": "S4", 
+        "RELIGIONE": "R1/4", 
+        "INGLESE CLASSE PRIMA": "E1", 
+        "INGLESE CLASSE QUARTA": "E4"
+    }
+    
     storico = st.session_state.get("storico_consegne", {})
     mostra = get_lista_plessi()
-    n_col = 4
-    for i in range(0, len(mostra), n_col):
-        cols = st.columns(n_col)
-        for j, plesso in enumerate(mostra[i:i+n_col]):
-            cat_attive = storico.get(plesso, {}).keys()
-            sigle = [mappa_sigle.get(c, c[:2]) for c in cat_attive]
-            bg = "#FF8C00" if sigle else "#f8f9fa"
-            txt = "#FFF" if sigle else "#333"
-            with cols[j]:
-              <div style="font-weight:bold;">{plesso}</div>
-                    <div style="margin-top:10px;">{' '.join([f'<span style="background:white; color:black; padding:2px 5px; border-radius:4px; font-size:12px; font-weight:bold; border:1px solid black; margin:2px;">{s}</span>' for s in sigle])}</div>
-                </div>""", unsafe_allow_html=True)
+    
+    if not mostra:
+        st.warning("Nessun plesso trovato in anagrafica.")
+    else:
+        n_col = 4
+        for i in range(0, len(mostra), n_col):
+            cols = st.columns(n_col)
+            for j, plesso in enumerate(mostra[i:i+n_col]):
+                cat_attive = storico.get(plesso, {}).keys()
+                sigle = [mappa_sigle.get(c, c[:2]) for c in cat_attive]
+                
+                # Colore: Arancio se ha consegne, Grigio se vuoto
+                bg_color = "#FF8C00" if sigle else "#f0f2f6"
+                txt_color = "white" if sigle else "#333"
+                
+                with cols[j]:
+                    html_card = f"""
+                    <div style="background:{bg_color}; color:{txt_color}; border-radius:10px; padding:15px; text-align:center; min-height:100px; border:1px solid #ddd; margin-bottom:10px;">
+                        <div style="font-weight:bold; font-size:16px;">{plesso}</div>
+                        <div style="margin-top:10px;">
+                            {' '.join([f'<span style="background:white; color:black; padding:2px 5px; border-radius:4px; font-size:11px; font-weight:bold; border:1px solid #000; margin:2px;">{s}</span>' for s in sigle])}
+                        </div>
+                    </div>
+                    """
+                    st.markdown(html_card, unsafe_allow_html=True)
 
-    st.markdown("---")
-    if st.button("⬅️ Torna Indietro", key="btn_back_tab"):
-        st.session_state.pagina = "Consegne"; st.rerun()
+    if st.button("⬅️ Torna Indietro", key="back_tab"):
+        st.session_state.pagina = "Consegne"
+        st.rerun()
+
+# =========================================================
+# --- BLOCCO 16: RICERCA AVANZATA CONSEGNE ---
+# =========================================================
+elif st.session_state.pagina == "Ricerca Avanzata Consegne":
+    st.header("🚀 Ricerca Avanzata Consegne")
+    
+    storico = st.session_state.get("storico_consegne", {})
+    
+    # Prepariamo i dati
+    tutte_righe = []
+    for p, collane in storico.items():
+        for nome_c, libri in collane.items():
+            for lib in libri:
+                tutte_righe.append({
+                    "DATA": lib.get('data', '-'),
+                    "PLESSO": p,
+                    "COLLANA": nome_c,
+                    "TITOLO": lib.get('t', ''),
+                    "EDITORE": lib.get('e', ''),
+                    "Q.TÀ": lib.get('q', 0)
+                })
+    
+    df_storico = pd.DataFrame(tutte_righe)
+
+    with st.container(border=True):
+        st.subheader("🔍 Parametri di Ricerca")
+        c1, c2, c3 = st.columns(3)
+        
+        with c1:
+            f_plesso = st.multiselect("🏫 Plesso", options=sorted(df_storico["PLESSO"].unique()) if not df_storico.empty else [])
+        with c2:
+            f_collana = st.multiselect("📘 Collana", options=sorted(df_storico["COLLANA"].unique()) if not df_storico.empty else [])
+        with c3:
+            f_editore = st.multiselect("🏢 Editore", options=sorted(df_storico["EDITORE"].unique()) if not df_storico.empty else [])
+
+        b1, b2, _ = st.columns([1,1,2])
+        avvia = b1.button("🔍 AVVIA RICERCA", type="primary", use_container_width=True)
+        if b2.button("🧹 RESET", use_container_width=True):
+            st.rerun()
+
+    if avvia:
+        if not df_storico.empty:
+            df_f = df_storico.copy()
+            if f_plesso: df_f = df_f[df_f["PLESSO"].isin(f_plesso)]
+            if f_collana: df_f = df_f[df_f["COLLANA"].isin(f_collana)]
+            if f_editore: df_f = df_f[df_f["EDITORE"].isin(f_editore)]
+            st.dataframe(df_f, use_container_width=True, hide_index=True)
+        else:
+            st.info("Nessun dato nel registro.")
+
+    if st.button("⬅️ Torna al Menu"):
+        st.session_state.pagina = "Consegne"
+        st.rerun()
 
 # =========================================================
 # --- BLOCCO 16: RICERCA AVANZATA CONSEGNE ---
@@ -429,3 +505,4 @@ elif st.session_state.pagina == "Ricerca Avanzata Consegne":
     st.markdown("---")
     if st.button("⬅️ Torna Indietro"):
         st.session_state.pagina = "Consegne"; st.rerun()
+
