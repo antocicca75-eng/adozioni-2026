@@ -389,31 +389,34 @@ if st.session_state.pagina == "Consegne":
                 pdf = PDF_CONSEGNA() 
                 pdf.add_page()
                 
-                # --- FUNZIONE LOGO CENTRATO CON BORDO ---
+                # --- FUNZIONE LOGO CENTRATO CON BORDO ARROTONDATO ---
                 def draw_centered_logo(x_start, x_end):
                     w_logo = 50
                     h_logo = 21
                     x_mid = x_start + ((x_end - x_start) / 2) - (w_logo / 2)
-                    # Bordo grigio sottile
+                    
+                    # Colore bordo grigio e angoli arrotondati (r=3)
                     pdf.set_draw_color(100, 100, 100)
-                    pdf.rect(x_mid - 2, 6, w_logo + 4, h_logo + 4)
+                    pdf.set_line_width(0.2)
+                    pdf.rounded_rect(x_mid - 2, 6, w_logo + 4, h_logo + 4, 3) 
+                    
                     try:
                         pdf.image('logo.jpg', x_mid, 8, w_logo)
                     except:
                         pass
 
-                # Esecuzione per le due metà
+                # Esecuzione per le due metà del foglio
                 draw_centered_logo(0, 148.5)
                 draw_centered_logo(148.5, 297)
 
-                # POSIZIONAMENTO TESTO SOTTO IL LOGO (Margine Y = 35)
+                # POSIZIONAMENTO TESTO SOTTO IL LOGO
                 pdf.set_y(35)
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
                 # Linea tratteggiata centrale
                 pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
                 
-                # POSIZIONAMENTO SECONDA COPIA SOTTO IL LOGO
+                # SECONDA COPIA SOTTO IL LOGO
                 pdf.set_y(35)
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
@@ -905,6 +908,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
