@@ -484,45 +484,45 @@ elif st.session_state.pagina == "Ricerca":
         sh = connetti_google_sheets()
         if sh:
             try:
-                # Caricamento e pulizia nomi colonne
+                # Carichiamo i dati
                 data = sh.worksheet("Adozioni_DB").get_all_records()
                 df = pd.DataFrame(data)
                 
-                # PULIZIA: Rimuove spazi bianchi dai nomi delle colonne per evitare l'errore KeyError
-                df.columns = [c.strip() for c in df.columns]
+                # 1. FORZIAMO I NOMI DELLE COLONNE (per evitare "ESEZIONI" o errori strani)
+                # Assumiamo l'ordine standard: Plesso, Titolo, Materia, Editore, Agenzia, Quantità, Saggio
+                nuovi_nomi = ["Plesso", "Titolo", "Materia", "Editore", "Agenzia", "Quantità", "Saggio"]
+                if len(df.columns) >= len(nuovi_nomi):
+                    df.columns = nuovi_nomi[:len(df.columns)]
 
-                # Controllo se la colonna esiste davvero
-                colonna_qta = "Quantità" if "Quantità" in df.columns else (df.columns[5] if len(df.columns) > 5 else None)
+                # 2. PULIZIA FILTRI
+                if f_tit: df = df[df["Titolo"].isin(f_tit)]
+                if f_age: df = df[df["Agenzia"].isin(f_age)]
+                if f_sag != "TUTTI": df = df[df["Saggio"] == f_sag]
 
-                if colonna_qta:
-                    # Applicazione Filtri
-                    if f_tit: df = df[df["Titolo"].isin(f_tit)]
-                    if f_age: df = df[df["Agenzia"].isin(f_age)]
-                    if f_sag != "TUTTI": df = df[df["Saggio"] == f_sag]
+                if not df.empty:
+                    # 3. CONVERSIONE NUMERICA FORZATA (Risolve il problema del totale 0)
+                    # Trasformiamo tutto in stringa, togliamo eventuali spazi e poi in numero
+                    df["Quantità"] = pd.to_numeric(df["Quantità"].astype(str).str.replace(',', '.').str.strip(), errors='coerce').fillna(0)
+                    
+                    totale_copie = int(df["Quantità"].sum())
 
-                    if not df.empty:
-                        # CALCOLO TOTALE SICURO
-                        df[colonna_qta] = pd.to_numeric(df[colonna_qta], errors='coerce').fillna(0)
-                        totale_copie = int(df[colonna_qta].sum())
-
-                        # Visualizzazione Metriche
-                        st.markdown(f"""
-                        <div class="totale-box">
-                            <h3 style='margin:0; color:#004a99;'>Riepilogo Risultati</h3>
-                            <p style='font-size:20px;'>Righe trovate: <b>{len(df)}</b> | 
-                            Totale Copie: <b style='color:#d9534f;'>{totale_copie}</b></p>
+                    # 4. VISUALIZZAZIONE RISULTATI
+                    st.markdown(f"""
+                        <div style="padding:20px; background-color:#f0f7ff; border-radius:10px; border-left:5px solid #004a99; margin-bottom:20px;">
+                            <h3 style='margin:0; color:#004a99;'>📊 Riepilogo Trovato</h3>
+                            <p style='font-size:22px; margin:10px 0 0 0;'>
+                                Totale Copie: <b style='color:#e63946;'>{totale_copie}</b> 
+                                <span style='font-size:16px; color:#666;'>(su {len(df)} righe)</span>
+                            </p>
                         </div>
-                        """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
-                        st.markdown("---")
-                        st.dataframe(df, use_container_width=True, hide_index=True)
-                    else:
-                        st.warning("⚠️ Nessun dato trovato con i filtri selezionati.")
+                    st.dataframe(df, use_container_width=True, hide_index=True)
                 else:
-                    st.error("❌ Colonna 'Quantità' non trovata nel database. Controlla l'intestazione su Google Sheets.")
+                    st.warning("⚠️ Nessun dato trovato con i filtri selezionati.")
             
             except Exception as e:
-                st.error(f"Errore tecnico: {e}")
+                st.error(f"Errore tecnico durante il calcolo: {e}")
 # --- BLOCCO 14: PAGINA MODIFICA ---
 # INIZIO BLOCCO
 # =========================================================
@@ -707,6 +707,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
