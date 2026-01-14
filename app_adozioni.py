@@ -774,7 +774,6 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 # FINE BLOCCO 14
 # =========================================================
-
 # =========================================================
 # --- BLOCCO 15: TABELLONE GENERALE (SINCRO FUNZIONE MADRE) ---
 # INIZIO BLOCCO
@@ -782,18 +781,17 @@ elif st.session_state.pagina == "Modifica":
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # Mappatura Sigle
+    # Mappatura Sigle (Aggiornata con R1\4)
     mappa_sigle = {
         "LETTURE CLASSE PRIMA": "L1",
         "LETTURE CLASSE QUARTA": "L4",
         "SUSSIDIARI DISCIPLINE": "S4",
-        "RELIGIONE": "R1/A",
+        "RELIGIONE": "R1\\4",
         "INGLESE CLASSE PRIMA": "E1",
         "INGLESE CLASSE QUARTA": "E4"
     }
 
-    # 1. RECUPERO LISTA DALLA FUNZIONE MADRE (Sincronizzazione Totale)
-    # Usiamo la funzione che abbiamo definito nel Blocco 6
+    # 1. RECUPERO LISTA DALLA FUNZIONE MADRE
     elenco_totale = get_lista_plessi()
     
     consegnati = st.session_state.get("storico_consegne", {})
@@ -804,7 +802,6 @@ elif st.session_state.pagina == "Tabellone Stato":
     else:
         # 2. CONTATORI STATISTICI
         n_tot = len(elenco_totale)
-        # Un plesso è completato solo se è in ritirati e NON ha più nulla in consegna
         n_ritirati = len([p for p in elenco_totale if p in ritirati and not consegnati.get(p)])
         n_consegnati = len([p for p in elenco_totale if p in consegnati])
         n_bianchi = n_tot - (len(set(consegnati.keys()) | set(ritirati.keys())))
@@ -876,6 +873,7 @@ elif st.session_state.pagina == "Tabellone Stato":
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
