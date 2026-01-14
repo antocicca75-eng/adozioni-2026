@@ -657,7 +657,7 @@ elif st.session_state.pagina == "Ricerca":
 
 
 # =========================================================
-# --- BLOCCO 14: REGISTRO STORICO (VERSIONE SEMPRE VISIBILE) ---
+# --- BLOCCO 14: REGISTRO STORICO CON FILTRI DI RICERCA ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Registro Storico":
@@ -666,33 +666,34 @@ elif st.session_state.pagina == "Registro Storico":
     # 1. RECUPERO DATI
     storico = st.session_state.get("storico_consegne", {})
 
-    # 2. PANNELLO DI RICERCA (Spostato fuori dall'IF per essere sempre visibile)
-    with st.container(border=True):
-        st.subheader("🔍 Filtri di Ricerca")
-        f_col1, f_col2 = st.columns(2)
-        with f_col1:
-            cerca_plesso = st.text_input("🏢 Nome Plesso:", placeholder="Cerca...").upper()
-        with f_col2:
-            # Creiamo la lista delle collane esistenti per il filtro
-            tutte_collane = set()
-            for p in storico:
-                for c in storico[p]:
-                    tutte_collane.add(c)
-            opzioni_collane = ["TUTTE"] + sorted(list(tutte_collane))
-            cerca_collana = st.selectbox("📘 Tipo Collana:", opzioni_collane)
-
-    st.markdown("---")
-
-    # 3. LOGICA DI VISUALIZZAZIONE
     if not storico:
-        st.info("ℹ️ Nessuna consegna registrata in memoria.")
+        st.info("⚠️ Il registro è vuoto. Non sono ancora state effettuate consegne.")
+        if st.button("⬅️ Torna alle Consegne"):
+            st.session_state.pagina = "Consegne"; st.rerun()
     else:
+        # 2. PANNELLO DI RICERCA AVANZATA
+        with st.expander("🔍 FILTRA E CERCA NEL REGISTRO", expanded=True):
+            f_col1, f_col2 = st.columns(2)
+            with f_col1:
+                cerca_plesso = st.text_input("🏢 Cerca per Plesso:", placeholder="Es: Manzoni...").upper()
+            with f_col2:
+                # Creiamo la lista delle collane presenti per il filtro
+                tutte_collane = set()
+                for p in storico:
+                    for c in storico[p]:
+                        tutte_collane.add(c)
+                opzioni_collane = ["TUTTE"] + sorted(list(tutte_collane))
+                cerca_collana = st.selectbox("📘 Filtra per Collana:", opzioni_collane)
+
+        # 3. ELABORAZIONE DATI FILTRATI
         dati_tabella = []
         for plesso, collane in storico.items():
+            # Filtro Plesso
             if cerca_plesso and cerca_plesso not in plesso.upper():
                 continue
             
             for collana, info in collane.items():
+                # Filtro Collana
                 if cerca_collana != "TUTTE" and cerca_collana != collana:
                     continue
                 
@@ -703,14 +704,20 @@ elif st.session_state.pagina == "Registro Storico":
                     "Data/Ora": info['data']
                 })
 
+        # 4. VISUALIZZAZIONE RISULTATI
         if dati_tabella:
-            # Ordiniamo per data decrescente
+            # Ordiniamo per data decrescente (le più recenti in alto)
             dati_tabella.sort(key=lambda x: x['Data/Ora'], reverse=True)
+            
             st.table(dati_tabella)
+            
+            # Bottone per scaricare i dati filtrati (opzionale)
+            st.caption(f"Trovate {len(dati_tabella)} voci corrispondenti ai filtri.")
         else:
-            st.warning("⚠️ Nessun risultato trovato con questi filtri.")
+            st.warning("❌ Nessun dato corrisponde ai criteri di ricerca impostati.")
 
-    if st.button("⬅️ Torna al Modulo Consegne"):
+    st.markdown("---")
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_reg"):
         st.session_state.pagina = "Consegne"; st.rerun()
 
 # =========================================================
@@ -861,6 +868,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
