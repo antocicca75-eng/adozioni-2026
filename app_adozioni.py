@@ -252,9 +252,17 @@ with st.sidebar:
     if st.button("🚀 RICERCA AVANZATA", use_container_width=True): st.session_state.pagina = "Ricerca Avanzata Consegne"; st.rerun()
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE ---
+# --- BLOCCO 9: LOGICA DI NAVIGAZIONE PRINCIPALE ---
 # =========================================================
-if st.session_state.pagina == "Consegne":
+
+# --- PAGINA: INSERIMENTO (Mancava nel tuo codice) ---
+if st.session_state.pagina == "Inserimento":
+    st.header("➕ Nuova Adozione")
+    st.write("Qui va il tuo codice originale per l'inserimento dei dati...")
+    # Se hai il codice del vecchio Blocco 9 per le adozioni, inseriscilo qui
+
+# --- PAGINA: CONSEGNE (Modulo Consegne) ---
+elif st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
     if "storico_consegne" not in st.session_state: 
@@ -262,53 +270,42 @@ if st.session_state.pagina == "Consegne":
     
     elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
     
-    def reset_consegne_totale():
-        st.session_state.lista_consegne_attuale = []
-        st.session_state.last_cat = None
-        st.rerun()
-
-    ctr = st.session_state.get('reset_ctr', 0)
-    actr = st.session_state.get('add_ctr', 0)
-
     col_p, col_c = st.columns(2)
-    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
+    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto)
     
     basi = ["- SELEZIONA -", "TUTTE LE TIPOLOGIE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
     altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
-    cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
+    cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre)
 
     if cat_scelta == "TUTTE LE TIPOLOGIE":
         st.info("💡 Hai selezionato l'assegnazione massiva.")
         st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = "TUTTE"
-
     elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
         caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
         for voce in caricati: voce['q'] = 1
         st.session_state.lista_consegne_attuale = caricati
         st.session_state.last_cat = cat_scelta
 
+    # Visualizzazione lista libri da consegnare
     if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
-            if 'q' not in lib: lib['q'] = 1
             c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
             c_info.info(f"{lib['t']} | {lib['e']}")
             m1, v1, p1 = c_qta.columns([1,1,1])
-            if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
+            if m1.button("➖", key=f"m_{i}"):
                 if lib['q'] > 1: lib['q'] -= 1; st.rerun()
             v1.markdown(f"<p style='text-align:center;'>{lib['q']}</p>", unsafe_allow_html=True)
-            if p1.button("➕", key=f"p_{cat_scelta}_{i}"): lib['q'] += 1; st.rerun()
-            if c_del.button("❌", key=f"del_{cat_scelta}_{i}"): st.session_state.lista_consegne_attuale.pop(i); st.rerun()
+            if p1.button("➕", key=f"p_{i}"): lib['q'] += 1; st.rerun()
+            if c_del.button("❌", key=f"del_{i}"): st.session_state.lista_consegne_attuale.pop(i); st.rerun()
 
     st.markdown("---")
     d1, d2 = st.columns(2)
-    docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
-    data_con = d2.text_input("Data di consegna", value=datetime.now().strftime("%d/%m/%Y"), key=f"dat_{ctr}")
-    classe_man = d1.text_input("Classe specifica", key=f"cla_{ctr}")
-
-    col_print, col_conf = st.columns(2)
-    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
+    docente = d1.text_input("Insegnante ricevente")
+    data_con = d2.text_input("Data di consegna", value=datetime.now().strftime("%d/%m/%Y"))
+    
+    if st.button("✅ CONFERMA E REGISTRA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
             if p_scelto not in st.session_state.storico_consegne: st.session_state.storico_consegne[p_scelto] = {}
             if cat_scelta == "TUTTE LE TIPOLOGIE":
@@ -317,8 +314,48 @@ if st.session_state.pagina == "Consegne":
             else:
                 st.session_state.storico_consegne[p_scelto][cat_scelta] = [{"t": i['t'], "e": i['e'], "q": i['q'], "data": data_con} for i in st.session_state.lista_consegne_attuale]
             salva_storico_cloud(st.session_state.storico_consegne)
-            st.success("Registrato!")
+            st.success("Registrazione completata con successo!")
 
+# --- PAGINA: REGISTRO STORICO ---
+elif st.session_state.pagina == "Registro Storico":
+    st.header("📜 Registro Cronologico Consegne")
+    storico = st.session_state.get("storico_consegne", {})
+    
+    with st.container(border=True):
+        f_col1, f_col2 = st.columns(2)
+        cerca_plesso = f_col1.text_input("🏢 Filtra Plesso:").upper()
+        elenco_c = set()
+        for p in storico:
+            for c in storico[p]: elenco_c.add(c)
+        cerca_collana = f_col2.selectbox("📘 Tipo Collana:", ["TUTTE"] + sorted(list(elenco_c)))
+
+    righe = []
+    for plesso, collane in storico.items():
+        if cerca_plesso and cerca_plesso not in str(plesso).upper(): continue
+        for nome_c, lista_libri in collane.items():
+            if cerca_collana != "TUTTE" and cerca_collana != nome_c: continue
+            for lib in lista_libri:
+                righe.append({"DATA": lib.get('data','-'), "PLESSO": plesso, "COLLANA": nome_c, "TITOLO": lib['t'], "Q.TÀ": lib['q']})
+    
+    if righe:
+        st.dataframe(pd.DataFrame(righe).sort_values(by="DATA", ascending=False), use_container_width=True, hide_index=True)
+    else:
+        st.info("Nessun dato trovato.")
+
+# --- PAGINA: TABELLONE STATO ---
+elif st.session_state.pagina == "Tabellone Stato":
+    st.header("📊 Tabellone Avanzamento Plessi")
+    # ... (Il codice del tabellone che hai già è corretto) ...
+    # Assicurati di includere qui il Blocco 15 del messaggio precedente
+
+# --- PAGINA: RICERCA AVANZATA ---
+elif st.session_state.pagina == "Ricerca Avanzata Consegne":
+    st.header("🚀 Ricerca Avanzata Consegne")
+    # ... (Il codice della ricerca avanzata che hai già è corretto) ...
+
+# --- GESTIONE ALTRE PAGINE (Adozioni) ---
+else:
+    st.info(f"Pagina '{st.session_state.pagina}' in fase di caricamento o non configurata.")
 # =========================================================
 # --- BLOCCO 14: REGISTRO STORICO (VERSIONE TABELLARE) ---
 # =========================================================
@@ -505,4 +542,5 @@ elif st.session_state.pagina == "Ricerca Avanzata Consegne":
     st.markdown("---")
     if st.button("⬅️ Torna Indietro"):
         st.session_state.pagina = "Consegne"; st.rerun()
+
 
