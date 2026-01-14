@@ -297,7 +297,7 @@ with st.sidebar:
 # =========================================================
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE (SPAZIATURA OTTIMIZZATA) ---
+# --- BLOCCO 9: PAGINA CONSEGNE (CORNICE DOPPIO BORDO) ---
 # =========================================================
 if st.session_state.pagina == "Consegne":
     st.subheader("📄 Generazione Moduli Consegna")
@@ -359,29 +359,33 @@ if st.session_state.pagina == "Consegne":
                 pdf = PDF_CONSEGNA() 
                 pdf.add_page()
                 
-                def draw_centered_logo(x_start, x_end):
-                    w_logo = 65  
-                    h_logo = 27  
+                def draw_elegant_header(x_start, x_end):
+                    w_logo = 55
+                    h_logo = 23
                     x_mid = x_start + ((x_end - x_start) / 2) - (w_logo / 2)
-                    pdf.set_draw_color(180, 180, 180) # Grigio molto chiaro
-                    pdf.set_line_width(0.2)
-                    pdf.rect(x_mid - 3, 5, w_logo + 6, h_logo + 6) 
+                    
+                    # 1. Cornice Esterna (Grigio chiaro molto sottile)
+                    pdf.set_draw_color(200, 200, 200)
+                    pdf.set_line_width(0.1)
+                    pdf.rect(x_mid - 4, 4, w_logo + 8, h_logo + 8)
+                    
+                    # 2. Cornice Interna (Grigio medio)
+                    pdf.set_draw_color(150, 150, 150)
+                    pdf.set_line_width(0.3)
+                    pdf.rect(x_mid - 2.5, 5.5, w_logo + 5, h_logo + 5)
+                    
                     try:
                         pdf.image('logo.jpg', x_mid, 8, w_logo)
                     except:
                         pass
 
-                draw_centered_logo(0, 148.5)
-                draw_centered_logo(148.5, 297)
+                draw_elegant_header(0, 148.5)
+                draw_elegant_header(148.5, 297)
 
-                # --- NUOVA SPAZIATURA OTTIMIZZATA ---
-                # Portiamo a 55mm per distanziarlo bene dal logo grande
-                pdf.set_y(55)
+                pdf.set_y(48)
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-                
                 pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
-                
-                pdf.set_y(55)
+                pdf.set_y(48)
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
@@ -398,7 +402,6 @@ if st.session_state.pagina == "Consegne":
                 st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
             salva_storico_cloud(st.session_state.storico_consegne)
             st.success("Registrato!")
-# --- BLOCCO 10: PAGINA STORICO REGISTRO (PULITA) ---
 # =========================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
@@ -868,6 +871,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
