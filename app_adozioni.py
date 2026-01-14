@@ -657,66 +657,71 @@ elif st.session_state.pagina == "Ricerca":
 
 
 # =========================================================
-# --- BLOCCO 14: PAGINA MODIFICA ---
+# --- BLOCCO 14: REGISTRO STORICO CON FILTRI DI RICERCA ---
 # INIZIO BLOCCO
 # =========================================================
-elif st.session_state.pagina == "Modifica":
-    st.subheader("✏️ Modifica o Cancella Adozioni")
-    if os.path.exists(DB_FILE):
-        df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
-        c_ric1, c_ric2 = st.columns(2)
-        with c_ric1:
-            lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
-            p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db)
-        with c_ric2:
-            lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
-            t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db)
-        if p_cerca or t_cerca:
-            df_filtrato = df_mod.copy()
-            if p_cerca: df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
-            if t_cerca: df_filtrato = df_filtrato[df_filtrato["Titolo"] == t_cerca]
-            if not df_filtrato.empty:
-                for i in df_filtrato.index:
-                    with st.container(border=True):
-                        st.markdown(f"**Registrazione del {df_mod.at[i, 'Data']}**")
-                        col1, col2, col3 = st.columns([2, 1, 1])
-                        with col1:
-                            try: idx_p = elenco_plessi.index(df_mod.at[i, 'Plesso'])
-                            except: idx_p = 0
-                            nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=idx_p, key=f"mp_{i}")
-                            try: idx_t = elenco_titoli.index(df_mod.at[i, 'Titolo'])
-                            except: idx_t = 0
-                            nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=idx_t, key=f"mt_{i}")
-                            nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"mnot_{i}", height=70)
-                        with col2:
-                            val_sez = int(float(df_mod.at[i, 'N° sezioni'])) if df_mod.at[i, 'N° sezioni'] else 1
-                            nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=val_sez, key=f"mn_{i}")
-                            nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"ms_{i}")
-                        with col3:
-                            attuale_sag = df_mod.at[i, 'Saggio Consegna']
-                            idx_saggio = ["-", "NO", "SI"].index(attuale_sag) if attuale_sag in ["-", "NO", "SI"] else 0
-                            nuovo_saggio = st.selectbox("Saggio consegnato", ["-", "NO", "SI"], index=idx_saggio, key=f"msag_{i}")
-                        b1, b2 = st.columns(2)
-                        with b1:
-                            if st.button("💾 AGGIORNA", key=f"upd_{i}", use_container_width=True, type="primary"):
-                                if nuovo_saggio != "-":
-                                    df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
-                                    info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
-                                    df_full.at[i, 'Plesso'] = nuovo_plesso
-                                    df_full.at[i, 'Titolo'] = nuovo_titolo
-                                    if not info_new.empty:
-                                        df_full.at[i, 'Materia'] = info_new.iloc[0,1]; df_full.at[i, 'Editore'] = info_new.iloc[0,2]; df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
-                                    df_full.at[i, 'N° sezioni'] = nuovo_n_sez; df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
-                                    df_full.at[i, 'Saggio Consegna'] = nuovo_saggio; df_full.at[i, 'Note'] = nuove_note
-                                    df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full)
-                                    st.success("Aggiornato!"); st.rerun()
-                        with b2:
-                            if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
-                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str); df_full = df_full.drop(int(i))
-                                df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full); st.rerun()
+elif st.session_state.pagina == "Registro Storico":
+    st.header("📜 Registro Cronologico Consegne")
+
+    # 1. RECUPERO DATI
+    storico = st.session_state.get("storico_consegne", {})
+
+    if not storico:
+        st.info("⚠️ Il registro è vuoto. Non sono ancora state effettuate consegne.")
+        if st.button("⬅️ Torna alle Consegne"):
+            st.session_state.pagina = "Consegne"; st.rerun()
+    else:
+        # 2. PANNELLO DI RICERCA AVANZATA
+        with st.expander("🔍 FILTRA E CERCA NEL REGISTRO", expanded=True):
+            f_col1, f_col2 = st.columns(2)
+            with f_col1:
+                cerca_plesso = st.text_input("🏢 Cerca per Plesso:", placeholder="Es: Manzoni...").upper()
+            with f_col2:
+                # Creiamo la lista delle collane presenti per il filtro
+                tutte_collane = set()
+                for p in storico:
+                    for c in storico[p]:
+                        tutte_collane.add(c)
+                opzioni_collane = ["TUTTE"] + sorted(list(tutte_collane))
+                cerca_collana = st.selectbox("📘 Filtra per Collana:", opzioni_collane)
+
+        # 3. ELABORAZIONE DATI FILTRATI
+        dati_tabella = []
+        for plesso, collane in storico.items():
+            # Filtro Plesso
+            if cerca_plesso and cerca_plesso not in plesso.upper():
+                continue
+            
+            for collana, info in collane.items():
+                # Filtro Collana
+                if cerca_collana != "TUTTE" and cerca_collana != collana:
+                    continue
+                
+                dati_tabella.append({
+                    "Plesso": plesso,
+                    "Collana": collana,
+                    "Copie": info['copie'],
+                    "Data/Ora": info['data']
+                })
+
+        # 4. VISUALIZZAZIONE RISULTATI
+        if dati_tabella:
+            # Ordiniamo per data decrescente (le più recenti in alto)
+            dati_tabella.sort(key=lambda x: x['Data/Ora'], reverse=True)
+            
+            st.table(dati_tabella)
+            
+            # Bottone per scaricare i dati filtrati (opzionale)
+            st.caption(f"Trovate {len(dati_tabella)} voci corrispondenti ai filtri.")
+        else:
+            st.warning("❌ Nessun dato corrisponde ai criteri di ricerca impostati.")
+
+    st.markdown("---")
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_reg"):
+        st.session_state.pagina = "Consegne"; st.rerun()
+
 # =========================================================
 # FINE BLOCCO 14
-# =========================================================
 # =========================================================
 # --- BLOCCO 10: PAGINA STORICO (VERSIONE CORRETTA) ---
 # INIZIO BLOCCO
@@ -951,6 +956,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
