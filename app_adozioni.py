@@ -806,7 +806,7 @@ elif st.session_state.pagina == "Storico":
     if st.button("⬅️ Torna a Modulo Consegne"):
         st.session_state.pagina = "Consegne"; st.rerun()
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (VERSIONE BIG FONT) ---
+# --- BLOCCO 15: TABELLONE GENERALE (BIG FONT & BLACK BADGE) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
@@ -829,7 +829,7 @@ elif st.session_state.pagina == "Tabellone Stato":
     if not elenco_totale:
         st.warning("⚠️ Nessun plesso trovato.")
     else:
-        # Statistiche in alto
+        # Statistiche
         n_tot = len(elenco_totale)
         n_ritirati_count = len([p for p in elenco_totale if p in ritirati and not consegnati.get(p)])
         n_consegnati_count = len([p for p in elenco_totale if p in consegnati])
@@ -875,7 +875,6 @@ elif st.session_state.pagina == "Tabellone Stato":
                     categorie_attive = consegnati.get(plesso, {}).keys()
                     sigle_da_mostrare = [mappa_sigle.get(cat, cat[:2]) for cat in categorie_attive]
                     
-                    # Colori di base
                     bg, txt, lab, brd = ("#f8f9fa", "#333", "DA INIZIARE", "2px solid #dee2e6")
                     
                     if plesso in ritirati and not sigle_da_mostrare:
@@ -883,36 +882,36 @@ elif st.session_state.pagina == "Tabellone Stato":
                     elif sigle_da_mostrare:
                         bg, txt, lab, brd = ("#FF8C00", "#FFF", "🚚 IN CONSEGNA", "2px solid #e67e22")
 
-                    # --- COSTRUZIONE BOX SIGLE (PIÙ GRANDI) ---
+                    # --- COSTRUZIONE BOX SIGLE (TESTO NERO) ---
                     html_blocco_sigle = ""
                     if sigle_da_mostrare:
                         span_sigle = "".join([
                             f'''<span style="
                                 background: white; 
-                                color: #d35400; 
-                                padding: 4px 8px; 
-                                border-radius: 5px; 
-                                font-size: 14px; 
+                                color: black; 
+                                padding: 5px 10px; 
+                                border-radius: 6px; 
+                                font-size: 15px; 
                                 font-weight: 900; 
-                                margin: 3px; 
-                                border: 2px solid #333; 
+                                margin: 4px; 
+                                border: 2.5px solid #000; 
                                 display: inline-block;
-                                box-shadow: 1px 1px 0px #333;
+                                box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
                             ">{s}</span>''' 
                             for s in sigle_da_mostrare
                         ])
-                        html_blocco_sigle = f'<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 10px;">{span_sigle}</div>'
+                        html_blocco_sigle = f'<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: 12px;">{span_sigle}</div>'
 
                     with cols[j]:
                         st.markdown(f"""
                             <div style="
                                 background-color: {bg}; color: {txt}; border: {brd};
                                 border-radius: 12px; padding: 20px 10px; margin-bottom: 20px;
-                                text-align: center; min-height: 180px; display: flex;
+                                text-align: center; min-height: 190px; display: flex;
                                 flex-direction: column; justify-content: center; align-items: center;
                                 box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
                             ">
-                                <div style="font-size: 20px; font-weight: 900; line-height: 1.2; text-transform: uppercase; margin-bottom: 5px;">
+                                <div style="font-size: 20px; font-weight: 900; line-height: 1.2; text-transform: uppercase; margin-bottom: 8px;">
                                     {plesso}
                                 </div>
                                 <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">
@@ -925,12 +924,11 @@ elif st.session_state.pagina == "Tabellone Stato":
     st.markdown("---")
     if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final"):
         st.session_state.pagina = "Consegne"; st.rerun()
-# =========================================================
-# FINE BLOCCO 15
-# =========================================================      
+# =========================================================  
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
