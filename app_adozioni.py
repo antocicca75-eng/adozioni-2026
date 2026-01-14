@@ -297,7 +297,7 @@ with st.sidebar:
 # =========================================================
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE (VERSIONE COMPATIBILE) ---
+# --- BLOCCO 9: PAGINA CONSEGNE (LOGO GRANDE 65MM) ---
 # =========================================================
 if st.session_state.pagina == "Consegne":
     st.subheader("📄 Generazione Moduli Consegna")
@@ -313,8 +313,6 @@ if st.session_state.pagina == "Consegne":
         st.rerun()
 
     ctr = st.session_state.get('reset_ctr', 0)
-    actr = st.session_state.get('add_ctr', 0)
-
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
     
@@ -323,7 +321,7 @@ if st.session_state.pagina == "Consegne":
     cat_scelta = col_c.selectbox("Tipologia:", basi + altre, key=f"c_sel_{ctr}")
 
     if cat_scelta == "TUTTE LE TIPOLOGIE":
-        st.info("💡 Assegnazione massiva: clicca su 'CONFERMA CONSEGNA' per registrare tutto il database su questo plesso.")
+        st.info("💡 Assegnazione massiva: clicca su 'CONFERMA CONSEGNA'.")
         st.session_state.lista_consegne_attuale = [] 
         st.session_state.last_cat = "TUTTE"
     elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
@@ -361,16 +359,16 @@ if st.session_state.pagina == "Consegne":
                 pdf = PDF_CONSEGNA() 
                 pdf.add_page()
                 
-                # --- FUNZIONE LOGO CENTRATO (VERSIONE COMPATIBILE RECT) ---
+                # --- FUNZIONE LOGO GRANDE E CENTRATO ---
                 def draw_centered_logo(x_start, x_end):
-                    w_logo = 50
-                    h_logo = 21
+                    w_logo = 65  # Logo ingrandito a 65mm
+                    h_logo = 27  # Altezza proporzionale
                     x_mid = x_start + ((x_end - x_start) / 2) - (w_logo / 2)
                     
-                    # Usiamo 'rect' che è supportato da tutte le versioni di FPDF
-                    pdf.set_draw_color(100, 100, 100)
+                    # Bordo rettangolare intorno al logo grande
+                    pdf.set_draw_color(120, 120, 120)
                     pdf.set_line_width(0.2)
-                    pdf.rect(x_mid - 2, 6, w_logo + 4, h_logo + 4) 
+                    pdf.rect(x_mid - 3, 5, w_logo + 6, h_logo + 6) 
                     
                     try:
                         pdf.image('logo.jpg', x_mid, 8, w_logo)
@@ -380,10 +378,13 @@ if st.session_state.pagina == "Consegne":
                 draw_centered_logo(0, 148.5)
                 draw_centered_logo(148.5, 297)
 
-                pdf.set_y(35)
+                # Spostiamo il contenuto più in basso (40mm) per far spazio al logo grande
+                pdf.set_y(40)
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                
                 pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
-                pdf.set_y(35)
+                
+                pdf.set_y(40)
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
@@ -871,6 +872,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
