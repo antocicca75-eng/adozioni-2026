@@ -776,91 +776,89 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (SOLUZIONE DEFINITIVA) ---
+# --- BLOCCO 15: TABELLONE GENERALE (SINCRONIZZATO) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # 1. RECUPERO LISTA TOTALE PLESSI
-    # Cerchiamo i plessi nel database principale caricato all'avvio
-    elenco_totale = []
-    
-    if "df_adozioni" in st.session_state and not st.session_state.df_adozioni.empty:
-        # Estrae i nomi unici dalla colonna 'Plesso' del file Database_Adozioni
-        elenco_totale = sorted(st.session_state.df_adozioni['Plesso'].unique().tolist())
-    else:
-        # Se il database non è in session_state, prova a prenderli dallo storico
-        set_c = set(st.session_state.get("storico_consegne", {}).keys())
-        set_r = set(st.session_state.get("storico_ritiri", {}).keys())
-        elenco_totale = sorted(list(set_c | set_r))
+    # 1. RECUPERO LISTA PLESSI (Usa la tua funzione del Blocco 6)
+    # Questa funzione è quella che legge dal foglio "Plesso"
+    elenco_totale = get_lista_plessi()
 
-    # Recupero stati per i colori (stessa logica del Blocco 10)
+    # Recupero stati per i colori (stessa logica dei Blocchi 9, 10 e 11)
+    # Usiamo .get() per evitare errori se le liste sono ancora vuote
     consegnati = st.session_state.get("storico_consegne", {})
     ritirati = st.session_state.get("storico_ritiri", {})
 
     if not elenco_totale:
-        st.warning("⚠️ Nessun plesso trovato. Assicurati che il database sia stato caricato correttamente.")
+        st.error("⚠️ Lista plessi non trovata. Controlla il foglio 'Plesso' su Google Sheets o il file Excel.")
     else:
-        # 2. CONTATORI IN ALTO
+        # 2. CALCOLO STATISTICHE PER I METRIC
         n_tot = len(elenco_totale)
+        # Un plesso è "ritirato" se è presente nel dizionario storico_ritiri
         n_ritirati = len([p for p in elenco_totale if p in ritirati])
-        n_consegnati = len([p for p in elenco_totale if p in consegnati])
+        # Un plesso è "consegnato" se è in storico_consegne MA non ancora in ritirati
+        n_consegnati = len([p for p in elenco_totale if p in consegnati and p not in ritirati])
         n_bianchi = n_tot - (n_ritirati + n_consegnati)
 
         c1, c2, c3 = st.columns(3)
         c1.metric("⚪ DA INIZIARE", n_bianchi)
-        c2.metric("🟡 DA RITIRARE", n_consegnati)
-        c3.metric("🟢 COMPLETATI", n_ritirati)
+        c2.metric("🟡 IN CORSO / DA RITIRARE", n_consegnati)
+        c3.metric("🟢 COMPLETATI (RITIRATI)", n_ritirati)
         
         st.markdown("---")
 
-        # 3. BARRA DI RICERCA
-        cerca = st.text_input("🔍 Cerca Plesso (es. Accademia, Aiello...)", "").upper()
+        # 3. RICERCA RAPIDA
+        cerca = st.text_input("🔍 Cerca scuola nel database...", "").upper()
         mostra = [p for p in elenco_totale if cerca in str(p).upper()]
 
-        # 4. GRIGLIA A 4 COLONNE
+        # 4. GRIGLIA VISIVA
         n_col = 4 
         for i in range(0, len(mostra), n_col):
             cols = st.columns(n_col)
             for j, plesso in enumerate(mostra[i:i+n_col]):
                 
-                # Default: BIANCO (Da fare)
-                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #DDD")
+                # STILE DEFAULT (Bianco: Da fare)
+                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA INIZIARE", "2px solid #EEEEEE")
                 
-                # Se è già stato ritirato (Verde)
+                # Se il plesso è in RITIRI (Verde)
                 if plesso in ritirati:
-                    bg, txt, lab, brd = ("#28a745", "#FFF", "✅ RITIRATO", "2px solid #1e7e34")
-                # Se è stato solo consegnato (Giallo)
+                    bg, txt, lab, brd = ("#28a745", "#FFFFFF", "✅ COMPLETATO", "2px solid #1e7e34")
+                # Se il plesso è in CONSEGNE (Giallo)
                 elif plesso in consegnati:
-                    bg, txt, lab, brd = ("#FFD700", "#000", "🚚 CONSEGNATO", "2px solid #d39e00")
+                    bg, txt, lab, brd = ("#FFD700", "#000000", "🚚 DA RITIRARE", "2px solid #d39e00")
 
                 with cols[j]:
                     st.markdown(f"""
                         <div style="
                             background-color: {bg}; color: {txt}; border: {brd};
-                            border-radius: 8px; padding: 12px 5px; margin-bottom: 12px;
-                            text-align: center; height: 115px; display: flex;
+                            border-radius: 12px; padding: 15px 5px; margin-bottom: 15px;
+                            text-align: center; height: 120px; display: flex;
                             flex-direction: column; justify-content: center; align-items: center;
-                            box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+                            box-shadow: 2px 2px 8px rgba(0,0,0,0.08);
                         ">
-                            <div style="font-size: 16px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
+                            <div style="font-size: 15px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; opacity: 0.8;">
+                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; letter-spacing: 0.5px;">
                                 {lab}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
 
+    # 5. NAVIGAZIONE RAPIDA
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="back_final_v10"):
-        st.session_state.pagina = "Consegne"
-        st.rerun()
+    col_back1, col_back2 = st.columns(2)
+    if col_back1.button("⬅️ Torna al Modulo Consegne", use_container_width=True):
+        st.session_state.pagina = "Consegne"; st.rerun()
+    if col_back2.button("📚 Vai al Registro Storico", use_container_width=True):
+        st.session_state.pagina = "Storico"; st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
