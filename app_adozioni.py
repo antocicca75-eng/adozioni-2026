@@ -656,71 +656,67 @@ elif st.session_state.pagina == "Ricerca":
 # =========================================================
 
 # =========================================================
-# --- BLOCCO 14: REGISTRO STORICO CON FILTRI DI RICERCA ---
+# --- BLOCCO 14: REGISTRO STORICO (VERSIONE TABELLARE) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Registro Storico":
-    st.header("📜 Registro Cronologico Consegne")
+    st.header("📚 Registro Collane Consegnate")
 
-    # 1. RECUPERO DATI (Dallo storico consegne)
+    # 1. RECUPERO DATI
     storico = st.session_state.get("storico_consegne", {})
 
-    # 2. PANNELLO FILTRI (Sempre visibile in questa pagina)
+    # 2. PANNELLO FILTRI (Questo è quello che ti mancava!)
     with st.container(border=True):
-        st.subheader("🔍 Ricerca nel Registro")
+        st.subheader("🔍 Ricerca Rapida")
         f_col1, f_col2 = st.columns(2)
         
         with f_col1:
-            cerca_plesso = st.text_input("🏢 Nome Plesso:", placeholder="Scrivi il nome...").upper()
+            cerca_plesso = st.text_input("🏢 Nome Plesso:", placeholder="Es: Accademia...").upper()
         
         with f_col2:
-            # Creiamo dinamicamente la lista delle collane consegnate presenti in memoria
-            elenco_collane = set()
+            # Raccogliamo tutte le collane effettivamente consegnate
+            lista_c = set()
             for p in storico:
                 for c in storico[p]:
-                    elenco_collane.add(c)
-            
-            opzioni_filtro = ["TUTTE"] + sorted(list(elenco_collane))
-            cerca_collana = st.selectbox("📘 Tipo Collana:", opzioni_filtro)
+                    lista_c.add(c)
+            opzioni_c = ["TUTTE"] + sorted(list(lista_c))
+            cerca_collana = st.selectbox("📘 Filtra per Collana:", opzioni_c)
 
     st.markdown("---")
 
-    # 3. LOGICA DI FILTRAGGIO E TABELLA
+    # 3. LOGICA DI FILTRAGGIO
     if not storico:
-        st.info("ℹ️ Il registro è vuoto. Non ci sono ancora consegne da visualizzare.")
+        st.info("ℹ️ Il registro è vuoto. Non ci sono ancora consegne.")
     else:
-        righe_filtrate = []
+        righe = []
         for plesso, collane in storico.items():
-            # Filtro per nome plesso (se l'utente scrive qualcosa)
+            # Filtro Plesso
             if cerca_plesso and cerca_plesso not in str(plesso).upper():
                 continue
             
-            for nome_collana, info in collane.items():
-                # Filtro per tipo collana (se l'utente seleziona una specifica)
-                if cerca_collana != "TUTTE" and cerca_collana != nome_collana:
+            for nome_c, info in collane.items():
+                # Filtro Collana
+                if cerca_collana != "TUTTE" and cerca_collana != nome_c:
                     continue
                 
-                righe_filtrate.append({
+                righe.append({
                     "DATA": info['data'],
                     "PLESSO": plesso,
-                    "COLLANA": nome_collana,
+                    "COLLANA": nome_c,
                     "QUANTITÀ": info['copie']
                 })
 
         # 4. VISUALIZZAZIONE RISULTATI
-        if righe_filtrate:
-            # Ordiniamo per data decrescente (le ultime consegne in alto)
-            righe_filtrate.sort(key=lambda x: x['DATA'], reverse=True)
-            
-            # Mostriamo la tabella
-            st.table(righe_filtrate)
-            
-            st.caption(f"Trovate {len(righe_filtrate)} registrazioni.")
+        if righe:
+            # Ordina per data più recente
+            righe.sort(key=lambda x: x['DATA'], reverse=True)
+            # Mostra tabella professionale invece degli expander
+            st.table(righe)
         else:
-            st.warning("⚠️ Nessuna corrispondenza trovata per i filtri selezionati.")
+            st.warning("⚠️ Nessun dato trovato con questi filtri.")
 
-    # Bottone di ritorno
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_reg_final"):
+    # Pulsante per tornare indietro
+    if st.button("⬅️ Torna al Modulo Consegne"):
         st.session_state.pagina = "Consegne"
         st.rerun()
 
@@ -872,6 +868,7 @@ elif st.session_state.pagina == "Tabellone Stato":
 # =========================================================
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
