@@ -364,4 +364,68 @@ elif st.session_state.pagina == "Tabellone Stato":
             bg = "#FF8C00" if sigle else "#f8f9fa"
             txt = "#FFF" if sigle else "#333"
             with cols[j]:
-                st.markdown(f"""<div style="background:{bg}; color:{txt}; border-radius:10px; padding:15px; text-align:center; min-height:120px; border:1px solid #ddd;">
+              <div style="font-weight:bold;">{plesso}</div>
+                    <div style="margin-top:10px;">{' '.join([f'<span style="background:white; color:black; padding:2px 5px; border-radius:4px; font-size:12px; font-weight:bold; border:1px solid black; margin:2px;">{s}</span>' for s in sigle])}</div>
+                </div>""", unsafe_allow_html=True)
+
+    st.markdown("---")
+    if st.button("⬅️ Torna Indietro", key="btn_back_tab"):
+        st.session_state.pagina = "Consegne"; st.rerun()
+
+# =========================================================
+# --- BLOCCO 16: RICERCA AVANZATA CONSEGNE ---
+# =========================================================
+elif st.session_state.pagina == "Ricerca Avanzata Consegne":
+    st.header("🚀 Ricerca Avanzata Consegne")
+    
+    storico = st.session_state.get("storico_consegne", {})
+    
+    # Prepariamo i dati in formato tabella per la ricerca
+    tutte_righe = []
+    for p, collane in storico.items():
+        for nome_c, libri in collane.items():
+            for lib in libri:
+                tutte_righe.append({
+                    "DATA": lib.get('data', '-'),
+                    "PLESSO": p,
+                    "COLLANA": nome_c,
+                    "TITOLO": lib.get('t', ''),
+                    "EDITORE": lib.get('e', ''),
+                    "Q.TÀ": lib.get('q', 0)
+                })
+    df_storico = pd.DataFrame(tutte_righe)
+
+    # 1. Pannello Filtri stile Adozioni
+    with st.container(border=True):
+        st.subheader("🔍 Parametri di Ricerca")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            f_plesso = st.multiselect("🏫 Plesso", options=sorted(df_storico["PLESSO"].unique()) if not df_storico.empty else [])
+        with col2:
+            f_collana = st.multiselect("📘 Collana", options=sorted(df_storico["COLLANA"].unique()) if not df_storico.empty else [])
+        with col3:
+            f_editore = st.multiselect("🏢 Editore", options=sorted(df_storico["EDITORE"].unique()) if not df_storico.empty else [])
+
+        btn_c1, btn_c2, _ = st.columns([1,1,2])
+        avvia = btn_c1.button("🔍 AVVIA RICERCA", type="primary", use_container_width=True)
+        if btn_c2.button("🧹 RESET", use_container_width=True):
+            st.rerun()
+
+    # 2. Visualizzazione Risultati
+    if avvia:
+        if not df_storico.empty:
+            df_filtro = df_storico.copy()
+            if f_plesso: df_filtro = df_filtro[df_filtro["PLESSO"].isin(f_plesso)]
+            if f_collana: df_filtro = df_filtro[df_filtro["COLLANA"].isin(f_collana)]
+            if f_editore: df_filtro = df_filtro[df_filtro["EDITORE"].isin(f_editore)]
+            
+            st.subheader("📊 Risultati")
+            st.dataframe(df_filtro, use_container_width=True, hide_index=True)
+            st.info(f"Trovate {len(df_filtro)} righe corrispondenti.")
+        else:
+            st.warning("Il registro storico è vuoto.")
+
+    st.markdown("---")
+    if st.button("⬅️ Torna Indietro"):
+        st.session_state.pagina = "Consegne"; st.rerun()
