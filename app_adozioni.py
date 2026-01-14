@@ -776,7 +776,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 # =========================================================
-# --- BLOCCO 15: TABELLONE AVANZATO CON SIGLE E ARANCIONE ---
+# --- BLOCCO 15: TABELLONE GENERALE (LOGICA SIGLE NERE) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
@@ -792,64 +792,78 @@ elif st.session_state.pagina == "Tabellone Stato":
         "INGLESE CLASSE QUARTA": "E4"
     }
 
-    elenco_totale = get_lista_plessi()
+    # 1. RECUPERO LISTA COMPLETA
+    @st.cache_data(ttl=300)
+    def get_lista_totale():
+        try:
+            df_nomi = st.session_state.conn.read(worksheet="Plesso")
+            lista = df_nomi.iloc[:, 0].dropna().unique().tolist()
+            return sorted([str(x).strip().upper() for x in lista if x])
+        except:
+            set_c = set(st.session_state.get("storico_consegne", {}).keys())
+            set_r = set(st.session_state.get("storico_ritiri", {}).keys())
+            return sorted(list(set_c | set_r))
+
+    elenco_totale = get_lista_totale()
     consegnati = st.session_state.get("storico_consegne", {})
     ritirati = st.session_state.get("storico_ritiri", {})
 
     if not elenco_totale:
-        st.error("⚠️ Lista plessi non trovata.")
+        st.warning("⚠️ Lista plessi non trovata nel foglio 'Plesso'.")
     else:
-        # Calcolo statistiche per i metric
+        # 2. CONTATORI STATISTICI
         n_tot = len(elenco_totale)
-        n_ritirati = len([p for p in elenco_totale if p in ritirati and p not in consegnati])
+        n_ritirati = len([p for p in elenco_totale if p in ritirati and not consegnati.get(p)])
         n_consegnati = len([p for p in elenco_totale if p in consegnati])
         n_bianchi = n_tot - len(set(list(consegnati.keys()) + list(ritirati.keys())))
 
         c1, c2, c3 = st.columns(3)
         c1.metric("⚪ DA INIZIARE", n_bianchi)
-        c2.metric("🟠 IN CONSEGNA / PARZIALE", n_consegnati)
+        c2.metric("🟠 DA RITIRARE", n_consegnati)
         c3.metric("🟢 COMPLETATI", n_ritirati)
         
         st.markdown("---")
-        cerca = st.text_input("🔍 Cerca scuola nel database...", "").upper()
-        mostra = [p for p in elenco_totale if cerca in str(p).upper()]
 
+        # 3. RICERCA RAPIDA
+        cerca = st.text_input("🔍 Cerca Plesso...", "").upper()
+        mostra = [p for p in elenco_totale if cerca in p]
+
+        # 4. GRIGLIA A 4 COLONNE
         n_col = 4 
         for i in range(0, len(mostra), n_col):
             cols = st.columns(n_col)
             for j, plesso in enumerate(mostra[i:i+n_col]):
                 
-                # --- LOGICA STATO E COLORI ---
-                # Recuperiamo cosa c'è attualmente in "consegna" (non ancora ritirato)
+                # Recupero sigle attive (consegnate ma non ancora ritirate)
                 categorie_attive = consegnati.get(plesso, {}).keys()
                 sigle_da_mostrare = [mappa_sigle.get(cat, cat[:2]) for cat in categorie_attive]
                 
-                # Default: BIANCO
-                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA INIZIARE", "2px solid #EEEEEE")
+                # COLORI DEFAULT (Bianco)
+                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #DDD")
                 
-                # Se il plesso è in RITIRI e non ha più nulla in consegna -> VERDE
+                # STATO COMPLETATO (Verde)
                 if plesso in ritirati and not sigle_da_mostrare:
-                    bg, txt, lab, brd = ("#28a745", "#FFFFFF", "✅ COMPLETATO", "2px solid #1e7e34")
+                    bg, txt, lab, brd = ("#28a745", "#FFF", "✅ RITIRATO", "2px solid #1e7e34")
                 
-                # Se ci sono sigle attive (consegna parziale o totale da ritirare) -> ARANCIONE
+                # STATO IN CONSEGNA / PARZIALE (Arancione)
                 elif sigle_da_mostrare:
-                    bg, txt, lab, brd = ("#FF8C00", "#FFFFFF", "🚚 DA RITIRARE", "2px solid #e67e22")
+                    bg, txt, lab, brd = ("#FF8C00", "#FFF", "🚚 DA RITIRARE", "2px solid #e67e22")
 
                 with cols[j]:
-                    # Creazione quadratini sigle HTML
+                    # Creazione sigle in NERO GRASSETTO su fondo bianco
                     html_sigle = ""
                     for s in sigle_da_mostrare:
-                        html_sigle += f'<span style="background:white; color:#FF8C00; padding:1px 4px; border-radius:3px; font-size:10px; font-weight:bold; margin:2px; border:1px solid white; display:inline-block;">{s}</span>'
+                        html_sigle += f'<span style="background:white; color:black; padding:2px 5px; border-radius:3px; font-size:11px; font-weight:900; margin:2px; border:1px solid #333; display:inline-block;">{s}</span>'
 
                     st.markdown(f"""
                         <div style="
                             background-color: {bg}; color: {txt}; border: {brd};
-                            border-radius: 12px; padding: 10px 5px; margin-bottom: 15px;
-                            text-align: center; min-height: 125px; display: flex;
+                            border-radius: 10px; padding: 10px 5px; margin-bottom: 15px;
+                            text-align: center; min-height: 130px; display: flex;
                             flex-direction: column; justify-content: center; align-items: center;
-                            box-shadow: 2px 2px 8px rgba(0,0,0,0.08);
+                            box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
                         ">
-                            <div style="font-size: 14px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
+                            <div style="font-size: 15px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
                             <div style="font-size: 9px; margin-top: 5px; margin-bottom: 8px; font-weight: bold; opacity: 0.9;">
@@ -862,15 +876,13 @@ elif st.session_state.pagina == "Tabellone Stato":
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    col_back1, col_back2 = st.columns(2)
-    if col_back1.button("⬅️ Torna al Modulo Consegne", use_container_width=True):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab"):
         st.session_state.pagina = "Consegne"; st.rerun()
-    if col_back2.button("📚 Vai al Registro Storico", use_container_width=True):
-        st.session_state.pagina = "Storico"; st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
