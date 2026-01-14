@@ -297,7 +297,7 @@ with st.sidebar:
 # =========================================================
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE (LOGO GRANDE 65MM) ---
+# --- BLOCCO 9: PAGINA CONSEGNE (LOGO GRANDE + SPAZIATURA) ---
 # =========================================================
 if st.session_state.pagina == "Consegne":
     st.subheader("📄 Generazione Moduli Consegna")
@@ -359,17 +359,13 @@ if st.session_state.pagina == "Consegne":
                 pdf = PDF_CONSEGNA() 
                 pdf.add_page()
                 
-                # --- FUNZIONE LOGO GRANDE E CENTRATO ---
                 def draw_centered_logo(x_start, x_end):
-                    w_logo = 65  # Logo ingrandito a 65mm
-                    h_logo = 27  # Altezza proporzionale
+                    w_logo = 65  
+                    h_logo = 27  
                     x_mid = x_start + ((x_end - x_start) / 2) - (w_logo / 2)
-                    
-                    # Bordo rettangolare intorno al logo grande
-                    pdf.set_draw_color(120, 120, 120)
+                    pdf.set_draw_color(150, 150, 150) # Grigio ancora più chiaro per il bordo
                     pdf.set_line_width(0.2)
                     pdf.rect(x_mid - 3, 5, w_logo + 6, h_logo + 6) 
-                    
                     try:
                         pdf.image('logo.jpg', x_mid, 8, w_logo)
                     except:
@@ -378,13 +374,14 @@ if st.session_state.pagina == "Consegne":
                 draw_centered_logo(0, 148.5)
                 draw_centered_logo(148.5, 297)
 
-                # Spostiamo il contenuto più in basso (40mm) per far spazio al logo grande
-                pdf.set_y(40)
+                # --- AUMENTO SPAZIO VERTICALE ---
+                # Portiamo a 48mm l'inizio del modulo per staccarlo bene dal logo
+                pdf.set_y(48)
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
                 pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
                 
-                pdf.set_y(40)
+                pdf.set_y(48)
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
@@ -401,7 +398,6 @@ if st.session_state.pagina == "Consegne":
                 st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
             salva_storico_cloud(st.session_state.storico_consegne)
             st.success("Registrato!")
-
 # --- BLOCCO 10: PAGINA STORICO REGISTRO (PULITA) ---
 # =========================================================
 elif st.session_state.pagina == "Storico":
@@ -872,6 +868,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
