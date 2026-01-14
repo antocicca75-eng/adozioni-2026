@@ -408,7 +408,7 @@ if st.session_state.pagina == "Consegne":
             # Reset automatico dopo la registrazione
             reset_totale()
 # =========================================================
-# --- BLOCCO 10: PAGINA STORICO (VERSIONE CORRETTA) ---
+# --- BLOCCO 10: PAGINA STORICO (VERSIONE ALLINEATA) ---
 # =========================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
@@ -422,10 +422,10 @@ elif st.session_state.pagina == "Storico":
             st.session_state.pagina = "Consegne"
             st.rerun()
     else:
+        # Tutto questo blocco è indentato di 4 spazi rispetto a "else"
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
         opzioni_ricerca = ["- MOSTRA TUTTI -"] + elenco_plessi_storico
         
-        # Aggiunta key dinamica per permettere il reset esterno
         scuola_selezionata = st.selectbox(
             "🔍 Filtra per Plesso:", 
             opzioni_ricerca, 
@@ -437,17 +437,14 @@ elif st.session_state.pagina == "Storico":
 
         for plesso in plessi_da_mostrare:
             with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
-                
-                # Bottone ritiro totale plesso
                 if st.button(f"🔄 SVUOTA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}", use_container_width=True):
                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                     st.session_state.storico_ritiri[plesso].update(st.session_state.storico_consegne[plesso])
                     del st.session_state.storico_consegne[plesso]
                     salva_storico_cloud(st.session_state.storico_consegne)
-                    st.success(f"Dati spostati nell'archivio ritiri!"); st.rerun()
+                    st.rerun()
 
                 per_tipo = st.session_state.storico_consegne[plesso]
-                
                 for tipo in sorted(list(per_tipo.keys())):
                     if st.button(f"📦 Ritira tutto: {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
                         if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
@@ -460,39 +457,32 @@ elif st.session_state.pagina == "Storico":
                     with st.expander(f"📘 {tipo.upper()}", expanded=True):
                         lista_libri = list(per_tipo[tipo])
                         for i, lib in enumerate(lista_libri):
-                            qta_salvata = int(lib.get('q', 1))
-                            if qta_salvata < 1: qta_salvata = 1 
-                            
-                            col_titolo, col_qta, col_ritiro, col_del = st.columns([0.45, 0.15, 0.30, 0.10])
-                            
-                            col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
-                            col_qta.write(f"Q.tà: {qta_salvata}")
-
-                            with col_ritiro:
-                                q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata), value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
-                                if st.button("OK", key=f"btn_rit_{plesso}_{tipo}_{i}"):
+                            qta_s = int(lib.get('q', 1))
+                            c_tit, c_q, c_rit, c_d = st.columns([0.45, 0.15, 0.30, 0.10])
+                            c_tit.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
+                            c_q.write(f"Q.tà: {qta_s}")
+                            with c_rit:
+                                q_rit = st.number_input("Rit", 1, max(1, qta_s), qta_s, key=f"qr_{plesso}_{tipo}_{i}", label_visibility="collapsed")
+                                if st.button("OK", key=f"b_rit_{plesso}_{tipo}_{i}"):
                                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                                     if tipo not in st.session_state.storico_ritiri[plesso]: st.session_state.storico_ritiri[plesso][tipo] = []
-                                    
-                                    ritiro_item = lib.copy(); ritiro_item['q'] = q_rit
-                                    st.session_state.storico_ritiri[plesso][tipo].append(ritiro_item)
-                                    lib['q'] = qta_salvata - q_rit
-                                    
+                                    rit_it = lib.copy(); rit_it['q'] = q_rit
+                                    st.session_state.storico_ritiri[plesso][tipo].append(rit_it)
+                                    lib['q'] = qta_s - q_rit
                                     if lib['q'] <= 0: per_tipo[tipo].pop(i)
                                     if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
                                     if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                                    
                                     salva_storico_cloud(st.session_state.storico_consegne)
                                     st.rerun()
-                            
-                            if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
+                            if c_d.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
                                 per_tipo[tipo].pop(i)
                                 if not per_tipo[tipo]: del per_tipo[tipo]
                                 if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                                 salva_storico_cloud(st.session_state.storico_consegne)
                                 st.rerun()
 
-        # --- PULSANTI DI NAVIGAZIONE (IDENTAZIONE CORRETTA) ---
+        # --- PULSANTI FINALI ---
+        # Nota: sono allineati esattamente con "elenco_plessi_storico" (8 spazi dal bordo)
         st.markdown("---")
         c_res, c_back = st.columns(2)
 
@@ -505,7 +495,6 @@ elif st.session_state.pagina == "Storico":
         if c_back.button("⬅️ TORNA A MODULO CONSEGNE", use_container_width=True):
             st.session_state.pagina = "Consegne"
             st.rerun()
-   
 # =========================================================
 # --- BLOCCO 11: PAGINA NUOVO LIBRO ---
 # INIZIO BLOCCO
@@ -908,6 +897,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
