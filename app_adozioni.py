@@ -309,11 +309,7 @@ with st.sidebar:
     if st.button("📊 TABELLONE STATO", use_container_width=True): 
         st.session_state.pagina = "Tabellone Stato"; st.rerun()
         
-    st.markdown("---")
-    # Pulsante per il Tabellone a tutto schermo
-    if st.button("📊 APRI TABELLONE STATO", use_container_width=True):
-        st.session_state.pagina = "Tabellone Stato"
-        st.rerun()
+   
 
 # =========================================================
 # FINE BLOCCO 8
@@ -967,6 +963,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne. Registra una consegna per iniziare.")  
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
