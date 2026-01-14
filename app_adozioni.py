@@ -441,7 +441,7 @@ if st.session_state.pagina == "Consegne":
             
             salva_storico_cloud(st.session_state.storico_consegne)
 # =========================================================
-# --- BLOCCO 10: PAGINA STORICO (VERSIONE CORRETTA) ---
+# --- BLOCCO 14: PAGINA STORICO (VERSIONE CORRETTA) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Storico":
@@ -920,6 +920,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
