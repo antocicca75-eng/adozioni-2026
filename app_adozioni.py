@@ -255,13 +255,13 @@ with st.sidebar:
 # --- BLOCCO 9: LOGICA DI NAVIGAZIONE PRINCIPALE ---
 # =========================================================
 
-# --- PAGINA: INSERIMENTO (Mancava nel tuo codice) ---
+# 1. PAGINA INSERIMENTO (Adozioni)
 if st.session_state.pagina == "Inserimento":
     st.header("➕ Nuova Adozione")
-    st.write("Qui va il tuo codice originale per l'inserimento dei dati...")
-    # Se hai il codice del vecchio Blocco 9 per le adozioni, inseriscilo qui
+    st.info("Qui inserisci i dati delle adozioni libri.")
+    # Inserisci qui il tuo codice originale per l'inserimento se lo hai
 
-# --- PAGINA: CONSEGNE (Modulo Consegne) ---
+# 2. PAGINA CONSEGNE (Modulo Consegne)
 elif st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
@@ -287,7 +287,6 @@ elif st.session_state.pagina == "Consegne":
         st.session_state.lista_consegne_attuale = caricati
         st.session_state.last_cat = cat_scelta
 
-    # Visualizzazione lista libri da consegnare
     if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
@@ -314,48 +313,48 @@ elif st.session_state.pagina == "Consegne":
             else:
                 st.session_state.storico_consegne[p_scelto][cat_scelta] = [{"t": i['t'], "e": i['e'], "q": i['q'], "data": data_con} for i in st.session_state.lista_consegne_attuale]
             salva_storico_cloud(st.session_state.storico_consegne)
-            st.success("Registrazione completata con successo!")
+            st.success("Registrazione completata!")
 
-# --- PAGINA: REGISTRO STORICO ---
+# 3. PAGINA REGISTRO STORICO
 elif st.session_state.pagina == "Registro Storico":
     st.header("📜 Registro Cronologico Consegne")
     storico = st.session_state.get("storico_consegne", {})
     
-    with st.container(border=True):
-        f_col1, f_col2 = st.columns(2)
-        cerca_plesso = f_col1.text_input("🏢 Filtra Plesso:").upper()
-        elenco_c = set()
-        for p in storico:
-            for c in storico[p]: elenco_c.add(c)
-        cerca_collana = f_col2.selectbox("📘 Tipo Collana:", ["TUTTE"] + sorted(list(elenco_c)))
-
     righe = []
     for plesso, collane in storico.items():
-        if cerca_plesso and cerca_plesso not in str(plesso).upper(): continue
         for nome_c, lista_libri in collane.items():
-            if cerca_collana != "TUTTE" and cerca_collana != nome_c: continue
             for lib in lista_libri:
                 righe.append({"DATA": lib.get('data','-'), "PLESSO": plesso, "COLLANA": nome_c, "TITOLO": lib['t'], "Q.TÀ": lib['q']})
     
     if righe:
         st.dataframe(pd.DataFrame(righe).sort_values(by="DATA", ascending=False), use_container_width=True, hide_index=True)
     else:
-        st.info("Nessun dato trovato.")
+        st.info("Nessuna consegna registrata.")
 
-# --- PAGINA: TABELLONE STATO ---
+# 4. PAGINA TABELLONE STATO
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
-    # ... (Il codice del tabellone che hai già è corretto) ...
-    # Assicurati di includere qui il Blocco 15 del messaggio precedente
+    # Qui viene visualizzata la griglia colorata dei plessi
+    storico = st.session_state.get("storico_consegne", {})
+    plessi = get_lista_plessi()
+    if plessi:
+        cols = st.columns(4)
+        for idx, p in enumerate(plessi):
+            ha_consegne = p in storico and storico[p]
+            color = "#FF8C00" if ha_consegne else "#f0f2f6"
+            with cols[idx % 4]:
+                st.markdown(f"""<div style="background:{color}; padding:15px; border-radius:10px; text-align:center; margin-bottom:10px; border:1px solid #ddd;">
+                <b style="color:{'white' if ha_consegne else 'black'}">{p}</b></div>""", unsafe_allow_html=True)
 
-# --- PAGINA: RICERCA AVANZATA ---
+# 5. PAGINA RICERCA AVANZATA
 elif st.session_state.pagina == "Ricerca Avanzata Consegne":
-    st.header("🚀 Ricerca Avanzata Consegne")
-    # ... (Il codice della ricerca avanzata che hai già è corretto) ...
+    st.header("🚀 Ricerca Avanzata")
+    st.write("Filtra i dati per plesso, editore o data.")
+    # Logica di filtro qui
 
-# --- GESTIONE ALTRE PAGINE (Adozioni) ---
+# Gestione fallback per altre pagine
 else:
-    st.info(f"Pagina '{st.session_state.pagina}' in fase di caricamento o non configurata.")
+    st.warning(f"La pagina '{st.session_state.pagina}' non è ancora stata configurata o è vuota.")
 # =========================================================
 # --- BLOCCO 14: REGISTRO STORICO (VERSIONE TABELLARE) ---
 # =========================================================
@@ -542,5 +541,6 @@ elif st.session_state.pagina == "Ricerca Avanzata Consegne":
     st.markdown("---")
     if st.button("⬅️ Torna Indietro"):
         st.session_state.pagina = "Consegne"; st.rerun()
+
 
 
