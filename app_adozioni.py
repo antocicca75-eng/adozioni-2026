@@ -662,51 +662,38 @@ elif st.session_state.pagina == "Ricerca":
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Stato Avanzamento Plessi")
 
-    # Recupero dati necessari
     lista_plessi_tab = get_lista_plessi() 
     
     if not lista_plessi_tab:
-        st.warning("⚠️ Nessun plesso trovato nell'anagrafica. Controlla il foglio 'Plesso' su Google Sheets.")
+        st.warning("⚠️ Nessun plesso trovato.")
     else:
-        col_sel, col_info = st.columns([1, 2])
-        plesso_target = col_sel.selectbox(
-            "🔍 Seleziona Plesso per il controllo:", 
+        plesso_target = st.selectbox(
+            "🔍 Seleziona Plesso:", 
             options=["- SELEZIONA -"] + lista_plessi_tab,
             key="sb_tabellone"
         )
 
         if plesso_target != "- SELEZIONA -":
-            st.markdown(f"### Stato attuale: **{plesso_target}**")
-            
             storico = carica_storico_cloud()
             consegnati_plesso = storico.get(plesso_target, {})
-            categorie_attese = st.session_state.db_consegne.keys()
+            categorie_attese = list(st.session_state.db_consegne.keys())
             
-            dati_tabella = []
+            # Barra progresso
+            tot = len(categorie_attese)
+            fatti = sum(1 for c in categorie_attese if c in consegnati_plesso)
+            percentuale = fatti / tot if tot > 0 else 0
+            st.write(f"Completamento: {int(percentuale*100)}%")
+            st.progress(percentuale)
+            
+            # Tabella
+            dati = []
             for cat in categorie_attese:
                 stato = "✅ COMPLETATO" if cat in consegnati_plesso else "❌ DA CONSEGNARE"
-                dettaglio = ""
-                if cat in consegnati_plesso:
-                    libri = consegnati_plesso[cat]
-                    dettaglio = f"{len(libri)} titoli registrati"
-                
-                dati_tabella.append({
-                    "Tipologia": cat,
-                    "Stato Consegna": stato,
-                    "Info": dettaglio
-                })
-
-            df_status = pd.DataFrame(dati_tabella)
+                dati.append({"Tipologia": cat, "Stato": stato})
             
-            # Applichiamo lo stile
-            def color_stato(val):
-                if val == "✅ COMPLETATO":
-                    return 'background-color: #d4edda; color: #155724; font-weight: bold;'
-                return 'background-color: #f8d7da; color: #721c24;'
+            st.table(pd.DataFrame(dati))
 
-            st.table(df_status.style.applymap(color_stato, subset=['Stato Consegna']))
-
-    if st.button("⬅️ Torna alla Home"):
+    if st.button("⬅️ Torna Home"):
         st.session_state.pagina = "Inserimento"
         st.rerun()
 # =========================================================
@@ -920,6 +907,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
