@@ -472,18 +472,9 @@ elif st.session_state.pagina == "Storico":
 
                 per_tipo = st.session_state.storico_consegne[plesso]
                 
-               # --- VERSIONE PULITA ---
-for tipo in sorted(list(per_tipo.keys())):
-    c_t, c_btn = st.columns([0.7, 0.3])
-    # La riga del markdown è stata rimossa!
-
-    if c_btn.button(f"🔄 Ritira Tutto {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
-        # ... (il tuo codice del bottone rimane uguale) ...
-        pass
-
-    # Ora mettiamo il nome della tipologia direttamente nell'expander
-    with st.expander(f"📘 {tipo.upper()}", expanded=True): 
-        # ... (tutto il resto del codice rimane uguale) ...
+                for tipo in sorted(list(per_tipo.keys())):
+                    c_t, c_btn = st.columns([0.7, 0.3])
+                    c_t.markdown(f"#### 📘 {tipo}")
                     
                     if c_btn.button(f"🔄 Ritira Tutto {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
                         if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
@@ -726,6 +717,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 # FINE BLOCCO 14
 # =========================================================
+# =========================================================
 # --- BLOCCO 10: PAGINA STORICO (VERSIONE CORRETTA) ---
 # INIZIO BLOCCO
 # =========================================================
@@ -758,10 +750,10 @@ elif st.session_state.pagina == "Storico":
                 per_tipo = st.session_state.storico_consegne[plesso]
                 
                 for tipo in sorted(list(per_tipo.keys())):
-                      c_t, c_btn = st.columns([0.7, 0.3])
-                        # La riga del markdown è stata rimossa!
-
-    if c_btn.button(f"🔄 Ritira Tutto {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
+                    c_t, c_btn = st.columns([0.7, 0.3])
+                    c_t.markdown(f"#### 📘 {tipo}")
+                    
+                    if c_btn.button(f"🔄 Ritira Tutto {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
                         if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                         st.session_state.storico_ritiri[plesso][tipo] = per_tipo[tipo]
                         del st.session_state.storico_consegne[plesso][tipo]
@@ -936,8 +928,6 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
-
-
 
 
 
