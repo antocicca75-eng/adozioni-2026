@@ -481,11 +481,26 @@ elif st.session_state.pagina == "Storico":
                             if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
                                 per_tipo[tipo].pop(i)
                                 if not per_tipo[tipo]: del per_tipo[tipo]
-                                salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
+                                if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
+                                salva_storico_cloud(st.session_state.storico_consegne)
+                                st.rerun()
 
-    st.markdown("---")
-    if st.button("⬅️ Torna al Menu"):
-        st.session_state.pagina = "Inserimento"; st.rerun()
+        # --- FINE DEL CICLO FOR: I PULSANTI VANNO QUI SOTTO ---
+        # Devono essere allineati con il comando "for plesso in..."
+        st.markdown("---")
+        c_res, c_back = st.columns(2)
+
+        if c_res.button("🔄 MOSTRA TUTTI I PLESSI", use_container_width=True):
+            if 'reset_ctr' not in st.session_state:
+                st.session_state.reset_ctr = 0
+            st.session_state.reset_ctr += 1
+            st.rerun()
+
+        if c_back.button("⬅️ TORNA A MODULO CONSEGNE", use_container_width=True):
+            st.session_state.pagina = "Consegne"
+            st.rerun()
+
+   
 # =========================================================
 # --- BLOCCO 11: PAGINA NUOVO LIBRO ---
 # INIZIO BLOCCO
@@ -888,6 +903,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
