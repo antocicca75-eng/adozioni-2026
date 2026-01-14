@@ -775,90 +775,130 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 # FINE BLOCCO 14
 # =========================================================
-
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (SINCRONIZZATO) ---
+# --- BLOCCO 15: TABELLONE GENERALE (FILTRI AVANZATI) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # 1. RECUPERO LISTA PLESSI (Usa la tua funzione del Blocco 6)
-    # Questa funzione è quella che legge dal foglio "Plesso"
-    elenco_totale = get_lista_plessi()
+    # Mappatura Sigle (Aggiornata con R1\4)
+    mappa_sigle = {
+        "LETTURE CLASSE PRIMA": "L1",
+        "LETTURE CLASSE QUARTA": "L4",
+        "SUSSIDIARI DISCIPLINE": "S4",
+        "RELIGIONE": "R1\\4",
+        "INGLESE CLASSE PRIMA": "E1",
+        "INGLESE CLASSE QUARTA": "E4"
+    }
 
-    # Recupero stati per i colori (stessa logica dei Blocchi 9, 10 e 11)
-    # Usiamo .get() per evitare errori se le liste sono ancora vuote
+    # 1. RECUPERO LISTA DALLA FUNZIONE MADRE
+    elenco_totale = get_lista_plessi()
+    
     consegnati = st.session_state.get("storico_consegne", {})
     ritirati = st.session_state.get("storico_ritiri", {})
 
     if not elenco_totale:
-        st.error("⚠️ Lista plessi non trovata. Controlla il foglio 'Plesso' su Google Sheets o il file Excel.")
+        st.warning("⚠️ Nessun plesso trovato. Verifica il foglio 'Plesso' nel database.")
     else:
-        # 2. CALCOLO STATISTICHE PER I METRIC
+        # 2. CONTATORI STATISTICI
         n_tot = len(elenco_totale)
-        # Un plesso è "ritirato" se è presente nel dizionario storico_ritiri
-        n_ritirati = len([p for p in elenco_totale if p in ritirati])
-        # Un plesso è "consegnato" se è in storico_consegne MA non ancora in ritirati
-        n_consegnati = len([p for p in elenco_totale if p in consegnati and p not in ritirati])
-        n_bianchi = n_tot - (n_ritirati + n_consegnati)
+        n_ritirati_count = len([p for p in elenco_totale if p in ritirati and not consegnati.get(p)])
+        n_consegnati_count = len([p for p in elenco_totale if p in consegnati])
+        n_bianchi_count = n_tot - (len(set(consegnati.keys()) | set(ritirati.keys())))
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("⚪ DA INIZIARE", n_bianchi)
-        c2.metric("🟡 IN CORSO / DA RITIRARE", n_consegnati)
-        c3.metric("🟢 COMPLETATI (RITIRATI)", n_ritirati)
+        c1.metric("⚪ DA INIZIARE", max(0, n_bianchi_count))
+        c2.metric("🟠 DA RITIRARE", n_consegnati_count)
+        c3.metric("🟢 COMPLETATI", n_ritirati_count)
         
         st.markdown("---")
 
-        # 3. RICERCA RAPIDA
-        cerca = st.text_input("🔍 Cerca scuola nel database...", "").upper()
-        mostra = [p for p in elenco_totale if cerca in str(p).upper()]
+        # 3. NUOVO SISTEMA DI FILTRI (Ricerca + Stato)
+        f1, f2 = st.columns([2, 1])
+        with f1:
+            cerca = st.text_input("🔍 Cerca Plesso...", "").upper()
+        with f2:
+            filtro_stato = st.selectbox("📂 Filtra per Stato", 
+                                       ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
 
-        # 4. GRIGLIA VISIVA
-        n_col = 4 
-        for i in range(0, len(mostra), n_col):
-            cols = st.columns(n_col)
-            for j, plesso in enumerate(mostra[i:i+n_col]):
+        # Logica di filtraggio
+        mostra = []
+        for p in elenco_totale:
+            # Controllo ricerca testuale
+            if cerca not in str(p).upper():
+                continue
                 
-                # STILE DEFAULT (Bianco: Da fare)
-                bg, txt, lab, brd = ("#FFFFFF", "#333", "DA INIZIARE", "2px solid #EEEEEE")
-                
-                # Se il plesso è in RITIRI (Verde)
-                if plesso in ritirati:
-                    bg, txt, lab, brd = ("#28a745", "#FFFFFF", "✅ COMPLETATO", "2px solid #1e7e34")
-                # Se il plesso è in CONSEGNE (Giallo)
-                elif plesso in consegnati:
-                    bg, txt, lab, brd = ("#FFD700", "#000000", "🚚 DA RITIRARE", "2px solid #d39e00")
+            # Recupero sigle per determinare lo stato
+            cat_attive = consegnati.get(p, {}).keys()
+            ha_sigle = len(cat_attive) > 0
+            e_ritirato = p in ritirati and not ha_sigle
+            e_bianco = p not in consegnati and p not in ritirati
 
-                with cols[j]:
-                    st.markdown(f"""
-                        <div style="
-                            background-color: {bg}; color: {txt}; border: {brd};
-                            border-radius: 12px; padding: 15px 5px; margin-bottom: 15px;
-                            text-align: center; height: 120px; display: flex;
-                            flex-direction: column; justify-content: center; align-items: center;
-                            box-shadow: 2px 2px 8px rgba(0,0,0,0.08);
-                        ">
-                            <div style="font-size: 15px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
-                                {plesso}
-                            </div>
-                            <div style="font-size: 9px; margin-top: 10px; font-weight: bold; letter-spacing: 0.5px;">
-                                {lab}
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
+            # Controllo filtro stato
+            if filtro_stato == "TUTTI":
+                mostra.append(p)
+            elif filtro_stato == "DA INIZIARE" and e_bianco:
+                mostra.append(p)
+            elif filtro_stato == "DA RITIRARE" and ha_sigle:
+                mostra.append(p)
+            elif filtro_stato == "RITIRATI" and e_ritirato:
+                mostra.append(p)
 
-    # 5. NAVIGAZIONE RAPIDA
+        # 4. GRIGLIA A 4 COLONNE
+        if not mostra:
+            st.info("ℹ️ Nessun plesso corrisponde ai criteri di ricerca.")
+        else:
+            n_col = 4 
+            for i in range(0, len(mostra), n_col):
+                cols = st.columns(n_col)
+                for j, plesso in enumerate(mostra[i:i+n_col]):
+                    
+                    categorie_attive = consegnati.get(plesso, {}).keys()
+                    sigle_da_mostrare = [mappa_sigle.get(cat, cat[:2]) for cat in categorie_attive]
+                    
+                    bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #DDD")
+                    
+                    if plesso in ritirati and not sigle_da_mostrare:
+                        bg, txt, lab, brd = ("#28a745", "#FFF", "✅ RITIRATO", "2px solid #1e7e34")
+                    elif sigle_da_mostrare:
+                        bg, txt, lab, brd = ("#FF8C00", "#FFF", "🚚 DA RITIRARE", "2px solid #e67e22")
+
+                    html_blocco_sigle = ""
+                    if sigle_da_mostrare:
+                        span_sigle = "".join([
+                            f'<span style="background:white; color:black; padding:2px 5px; border-radius:3px; font-size:10px; font-weight:900; margin:2px; border:1px solid #333; display:inline-block;">{s}</span>' 
+                            for s in sigle_da_mostrare
+                        ])
+                        html_blocco_sigle = f'<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: 5px;">{span_sigle}</div>'
+
+                    with cols[j]:
+                        st.markdown(f"""
+                            <div style="
+                                background-color: {bg}; color: {txt}; border: {brd};
+                                border-radius: 10px; padding: 10px 5px; margin-bottom: 15px;
+                                text-align: center; min-height: 135px; display: flex;
+                                flex-direction: column; justify-content: center; align-items: center;
+                                box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+                            ">
+                                <div style="font-size: 14px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
+                                    {plesso}
+                                </div>
+                                <div style="font-size: 9px; margin-top: 5px; font-weight: bold; opacity: 0.9;">
+                                    {lab}
+                                </div>
+                                {html_blocco_sigle}
+                            </div>
+                        """, unsafe_allow_html=True)
+
     st.markdown("---")
-    col_back1, col_back2 = st.columns(2)
-    if col_back1.button("⬅️ Torna al Modulo Consegne", use_container_width=True):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final"):
         st.session_state.pagina = "Consegne"; st.rerun()
-    if col_back2.button("📚 Vai al Registro Storico", use_container_width=True):
-        st.session_state.pagina = "Storico"; st.rerun()
 # =========================================================
 # FINE BLOCCO 15
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
