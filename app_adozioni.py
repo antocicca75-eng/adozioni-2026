@@ -297,7 +297,7 @@ with st.sidebar:
 # =========================================================
 
 
-# =========================================================
+## =========================================================
 # --- BLOCCO 9: PAGINA CONSEGNE (GESTIONE MASSIVA E COPIE) ---
 # =========================================================
 if st.session_state.pagina == "Consegne":
@@ -387,19 +387,29 @@ if st.session_state.pagina == "Consegne":
     if cat_scelta != "TUTTE LE TIPOLOGIE":
         if col_print.button("🖨️ GENERA PDF", use_container_width=True):
             if st.session_state.lista_consegne_attuale:
-                pdf = PDF_CONSEGNA() # Assicurati che la classe non richieda argomenti extra
+                pdf = PDF_CONSEGNA() 
                 pdf.add_page()
                 
-                # Inserimento Logo nel PDF
+                # --- INSERIMENTO LOGO IRPINIA LIBRI ---
                 try:
-                    pdf.image('logo.png', 10, 8, 25) # Logo a sinistra, larghezza 25mm
-                    pdf.image('logo.png', 158, 8, 25) # Logo sulla copia di destra
+                    # COPIA SINISTRA: x=10, y=8, larghezza=50
+                    pdf.image('logo.jpg', 10, 8, 50) 
+                    # COPIA DESTRA: x=158.5 (148.5 della metà + 10), y=8, larghezza=50
+                    pdf.image('logo.jpg', 158.5, 8, 50) 
                 except:
-                    pass 
+                    st.warning("⚠️ File 'logo.jpg' non trovato. Caricalo su GitHub.")
 
+                # POSIZIONAMENTO TESTO SOTTO IL LOGO (Margine Y = 35)
+                pdf.set_y(35)
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                
+                # Linea tratteggiata centrale
                 pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
+                
+                # POSIZIONAMENTO SECONDA COPIA SOTTO IL LOGO
+                pdf.set_y(35)
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
     if col_conf.button("✅ CONFERMA E REGISTRA", use_container_width=True):
@@ -417,7 +427,6 @@ if st.session_state.pagina == "Consegne":
                 st.success(f"Consegna registrata!")
             
             salva_storico_cloud(st.session_state.storico_consegne)
-# =========================================================
 # --- BLOCCO 10: PAGINA STORICO REGISTRO (PULITA) ---
 # =========================================================
 elif st.session_state.pagina == "Storico":
@@ -888,6 +897,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
