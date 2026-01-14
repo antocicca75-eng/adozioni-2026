@@ -408,7 +408,7 @@ if st.session_state.pagina == "Consegne":
             # Reset automatico dopo la registrazione
             reset_totale()
 # =========================================================
-# --- BLOCCO 10: PAGINA STORICO (SISTEMATO) ---
+# --- BLOCCO 10: PAGINA STORICO (RISOLUZIONE DEFINITIVA) ---
 # =========================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
@@ -422,7 +422,7 @@ elif st.session_state.pagina == "Storico":
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
         opzioni_ricerca = ["- MOSTRA TUTTI -"] + elenco_plessi_storico
         
-        # Uso reset_ctr per resettare la selectbox se premuto il tasto "MOSTRA TUTTI"
+        # Uso reset_ctr per resettare la selectbox
         scuola_selezionata = st.selectbox(
             "🔍 Filtra per Plesso:", 
             opzioni_ricerca, 
@@ -434,7 +434,6 @@ elif st.session_state.pagina == "Storico":
 
         for plesso in plessi_da_mostrare:
             with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
-                
                 if st.button(f"🔄 SVUOTA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}", use_container_width=True):
                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                     st.session_state.storico_ritiri[plesso].update(st.session_state.storico_consegne[plesso])
@@ -443,7 +442,6 @@ elif st.session_state.pagina == "Storico":
                     st.success(f"Dati spostati nell'archivio ritiri!"); st.rerun()
 
                 per_tipo = st.session_state.storico_consegne[plesso]
-                
                 for tipo in sorted(list(per_tipo.keys())):
                     if st.button(f"📦 Ritira tutto: {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
                         if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
@@ -464,7 +462,7 @@ elif st.session_state.pagina == "Storico":
                             col_qta.write(f"Q.tà: {qta_salvata}")
 
                             with col_ritiro:
-                                q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata), value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
+                                q_rit = st.number_input("Ritira", 1, max(1, qta_salvata), qta_salvata, key=f"qr_{plesso}_{tipo}_{i}", label_visibility="collapsed")
                                 if st.button("OK", key=f"btn_rit_{plesso}_{tipo}_{i}"):
                                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                                     if tipo not in st.session_state.storico_ritiri[plesso]: st.session_state.storico_ritiri[plesso][tipo] = []
@@ -484,17 +482,16 @@ elif st.session_state.pagina == "Storico":
                                 salva_storico_cloud(st.session_state.storico_consegne)
                                 st.rerun()
 
-    # --- NUOVI PULSANTI DI NAVIGAZIONE ---
-    st.markdown("---")
-    c_res, c_back = st.columns(2)
-    if c_res.button("🔄 MOSTRA TUTTI I PLESSI", use_container_width=True):
-        if 'reset_ctr' not in st.session_state: st.session_state.reset_ctr = 0
-        st.session_state.reset_ctr += 1
-        st.rerun()
-
-    if c_back.button("⬅️ TORNA A MODULO CONSEGNE", use_container_width=True):
-        st.session_state.pagina = "Consegne"
-        st.rerun()
+        # --- SEZIONE FINALE (FUORI DAL CICLO FOR) ---
+        st.markdown("---")
+        c_res, c_back = st.columns(2)
+        if c_res.button("🔄 MOSTRA TUTTI I PLESSI", use_container_width=True):
+            if 'reset_ctr' not in st.session_state: st.session_state.reset_ctr = 0
+            st.session_state.reset_ctr += 1
+            st.rerun()
+        if c_back.button("⬅️ TORNA A MODULO CONSEGNE", use_container_width=True):
+            st.session_state.pagina = "Consegne"
+            st.rerun()
 # --- BLOCCO 11: PAGINA NUOVO LIBRO ---
 # INIZIO BLOCCO
 # =========================================================
@@ -896,6 +893,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
