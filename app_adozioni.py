@@ -776,7 +776,7 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (FIX ERRORE </div>) ---
+# --- BLOCCO 15: TABELLONE GENERALE (FIX LOGICA SIGLE) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
@@ -809,9 +809,9 @@ elif st.session_state.pagina == "Tabellone Stato":
     ritirati = st.session_state.get("storico_ritiri", {})
 
     if not elenco_totale:
-        st.warning("⚠️ Lista plessi non trovata.")
+        st.warning("⚠️ Lista plessi non trovata nel foglio 'Plesso'.")
     else:
-        # 2. CONTATORI
+        # 2. CONTATORI STATISTICI
         n_tot = len(elenco_totale)
         n_ritirati = len([p for p in elenco_totale if p in ritirati and not consegnati.get(p)])
         n_consegnati = len([p for p in elenco_totale if p in consegnati])
@@ -823,10 +823,12 @@ elif st.session_state.pagina == "Tabellone Stato":
         c3.metric("🟢 COMPLETATI", n_ritirati)
         
         st.markdown("---")
+
+        # 3. RICERCA RAPIDA
         cerca = st.text_input("🔍 Cerca Plesso...", "").upper()
         mostra = [p for p in elenco_totale if cerca in p]
 
-        # 4. GRIGLIA
+        # 4. GRIGLIA A 4 COLONNE
         n_col = 4 
         for i in range(0, len(mostra), n_col):
             cols = st.columns(n_col)
@@ -836,18 +838,24 @@ elif st.session_state.pagina == "Tabellone Stato":
                 categorie_attive = consegnati.get(plesso, {}).keys()
                 sigle_da_mostrare = [mappa_sigle.get(cat, cat[:2]) for cat in categorie_attive]
                 
+                # COLORI DEFAULT (Bianco)
                 bg, txt, lab, brd = ("#FFFFFF", "#333", "DA FARE", "2px solid #DDD")
                 
+                # STATO COMPLETATO (Verde)
                 if plesso in ritirati and not sigle_da_mostrare:
                     bg, txt, lab, brd = ("#28a745", "#FFF", "✅ RITIRATO", "2px solid #1e7e34")
+                
+                # STATO IN CONSEGNA / PARZIALE (Arancione)
                 elif sigle_da_mostrare:
                     bg, txt, lab, brd = ("#FF8C00", "#FFF", "🚚 DA RITIRARE", "2px solid #e67e22")
 
-                # COSTRUZIONE BLOCCO SIGLE (Solo se esistono sigle)
-                html_sigle_container = ""
+                # COSTRUZIONE HTML SIGLE (Solo se ci sono sigle)
+                html_blocco_sigle = ""
                 if sigle_da_mostrare:
-                    sigle_items = "".join([f'<span style="background:white; color:black; padding:2px 5px; border-radius:3px; font-size:11px; font-weight:900; margin:2px; border:1px solid #333; display:inline-block;">{s}</span>' for s in sigle_da_mostrare])
-                    html_sigle_container = f'<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: 8px;">{sigle_items}</div>'
+                    span_sigle = ""
+                    for s in sigle_da_mostrare:
+                        span_sigle += f'<span style="background:white; color:black; padding:2px 5px; border-radius:3px; font-size:11px; font-weight:900; margin:2px; border:1px solid #333; display:inline-block;">{s}</span>'
+                    html_blocco_sigle = f'<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2px;">{span_sigle}</div>'
 
                 with cols[j]:
                     st.markdown(f"""
@@ -861,20 +869,21 @@ elif st.session_state.pagina == "Tabellone Stato":
                             <div style="font-size: 15px; font-weight: 900; line-height: 1.1; text-transform: uppercase;">
                                 {plesso}
                             </div>
-                            <div style="font-size: 9px; margin-top: 5px; font-weight: bold; opacity: 0.9;">
+                            <div style="font-size: 9px; margin-top: 5px; margin-bottom: 8px; font-weight: bold; opacity: 0.9;">
                                 {lab}
                             </div>
-                            {html_sigle_container}
+                            {html_blocco_sigle}
                         </div>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_tab_final"):
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab"):
         st.session_state.pagina = "Consegne"; st.rerun()
 # =========================================================
 # FINE BLOCCO 15
-# ==========================================================
+# =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
