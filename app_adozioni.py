@@ -477,51 +477,52 @@ elif st.session_state.pagina == "Ricerca":
         with r1c2: f_age = st.multiselect("🤝 Agenzia", elenco_agenzie, key="fa")
         with r1c3: f_sag = st.selectbox("📚 Saggio", ["TUTTI", "SI", "NO"], key="fsag")
         
-        # Aggiungiamo filtri extra per Plesso e Materia se necessario
-        r2c1, r2c2 = st.columns(2)
-        with r2c1: f_ple = st.multiselect("🏫 Plesso", elenco_plessi, key="fp")
-        with r2c2: f_mat = st.multiselect("📖 Materia", elenco_materie, key="fm")
-
         if st.button("🔍 AVVIA RICERCA", use_container_width=True, type="primary"): 
             st.session_state.r_attiva = True
 
     if st.session_state.r_attiva:
-        # Carichiamo i dati dal Cloud (o dal file locale se preferisci)
         sh = connetti_google_sheets()
         if sh:
             try:
-                df = pd.DataFrame(sh.worksheet("Adozioni_DB").get_all_records())
+                # Caricamento e pulizia nomi colonne
+                data = sh.worksheet("Adozioni_DB").get_all_records()
+                df = pd.DataFrame(data)
                 
-                # Applicazione Filtri
-                if f_tit: df = df[df["Titolo"].isin(f_tit)]
-                if f_age: df = df[df["Agenzia"].isin(f_age)]
-                if f_ple: df = df[df["Plesso"].isin(f_ple)]
-                if f_mat: df = df[df["Materia"].isin(f_mat)]
-                if f_sag != "TUTTI": df = df[df["Saggio"] == f_sag]
+                # PULIZIA: Rimuove spazi bianchi dai nomi delle colonne per evitare l'errore KeyError
+                df.columns = [c.strip() for c in df.columns]
 
-                if not df.empty:
-                    # --- CALCOLO TOTALE ---
-                    # Assicuriamoci che la colonna Quantità sia numerica
-                    df["Quantità"] = pd.to_numeric(df["Quantità"], errors='coerce').fillna(0)
-                    totale_copie = int(df["Quantità"].sum())
+                # Controllo se la colonna esiste davvero
+                colonna_qta = "Quantità" if "Quantità" in df.columns else (df.columns[5] if len(df.columns) > 5 else None)
 
-                    # Visualizzazione Metriche
-                    m1, m2 = st.columns(2)
-                    m1.metric("Libri Trovati (Righe)", len(df))
-                    m2.metric("TOTALE COPIE COMPLESSIVE", totale_copie)
+                if colonna_qta:
+                    # Applicazione Filtri
+                    if f_tit: df = df[df["Titolo"].isin(f_tit)]
+                    if f_age: df = df[df["Agenzia"].isin(f_age)]
+                    if f_sag != "TUTTI": df = df[df["Saggio"] == f_sag]
 
-                    st.markdown("---")
-                    st.dataframe(df, use_container_width=True, hide_index=True)
-                    
-                    # Bottone per esportare i risultati filtrati
-                    csv = df.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica Risultati CSV", csv, "ricerca_adozioni.csv", "text/csv")
+                    if not df.empty:
+                        # CALCOLO TOTALE SICURO
+                        df[colonna_qta] = pd.to_numeric(df[colonna_qta], errors='coerce').fillna(0)
+                        totale_copie = int(df[colonna_qta].sum())
+
+                        # Visualizzazione Metriche
+                        st.markdown(f"""
+                        <div class="totale-box">
+                            <h3 style='margin:0; color:#004a99;'>Riepilogo Risultati</h3>
+                            <p style='font-size:20px;'>Righe trovate: <b>{len(df)}</b> | 
+                            Totale Copie: <b style='color:#d9534f;'>{totale_copie}</b></p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        st.markdown("---")
+                        st.dataframe(df, use_container_width=True, hide_index=True)
+                    else:
+                        st.warning("⚠️ Nessun dato trovato con i filtri selezionati.")
                 else:
-                    st.warning("⚠️ Nessun risultato trovato con i filtri selezionati.")
+                    st.error("❌ Colonna 'Quantità' non trovata nel database. Controlla l'intestazione su Google Sheets.")
+            
             except Exception as e:
-                st.error(f"Errore durante la ricerca: {e}")
-
-# =========================================================
+                st.error(f"Errore tecnico: {e}")
 # --- BLOCCO 14: PAGINA MODIFICA ---
 # INIZIO BLOCCO
 # =========================================================
@@ -706,6 +707,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
