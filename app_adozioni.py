@@ -898,11 +898,10 @@ elif st.session_state.pagina == "Tabellone Stato":
 elif st.session_state.pagina == "Ricerca Collane":
     st.subheader("🔍 Motore di Ricerca Collane Consegnate")
 
-    # 1. Recupero dati dallo storico cloud (già esistente)
+    # 1. Recupero dati dallo storico
     if "storico_consegne" not in st.session_state:
         st.session_state.storico_consegne = carica_storico_cloud()
 
-    # 2. Trasformazione dello storico in formato Tabella (DataFrame)
     righe_storico = []
     if st.session_state.storico_consegne:
         for plesso, categorie in st.session_state.storico_consegne.items():
@@ -922,13 +921,18 @@ elif st.session_state.pagina == "Ricerca Collane":
         # --- AREA FILTRI ---
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
-            # Filtri dinamici basati sui dati presenti
+            # Usiamo parametri per poter resettare i filtri
             f_ple = c1.multiselect("🏫 Filtra Plesso", sorted(df_collane["Plesso"].unique()), key="f_coll_p")
             f_tip = c2.multiselect("📚 Filtra Tipologia", sorted(df_collane["Tipologia"].unique()), key="f_coll_t")
             f_edi = c3.multiselect("🏢 Filtra Editore", sorted(df_collane["Editore"].unique()), key="f_coll_e")
             
-            # Bottone di ricerca opzionale (Streamlit aggiorna già in tempo reale, ma questo aiuta l'utente)
-            st.info("💡 La tabella si aggiorna automaticamente selezionando i filtri sopra.")
+            # --- TASTO PULISCI ---
+            if st.button("🧹 PULISCI TUTTI I FILTRI", use_container_width=True):
+                # Reset delle chiavi dei widget multiselect
+                st.session_state.f_coll_p = []
+                st.session_state.f_coll_t = []
+                st.session_state.f_coll_e = []
+                st.rerun()
 
         # --- APPLICAZIONE FILTRI ---
         df_filtrato = df_collane.copy()
@@ -939,10 +943,8 @@ elif st.session_state.pagina == "Ricerca Collane":
         # --- RISULTATI E TOTALI ---
         st.markdown("---")
         
-        # Calcolo del totale delle copie filtrate
         totale_copie_collane = int(df_filtrato["Quantità"].sum())
 
-        # Box Totale Grafico
         st.markdown(f"""
             <div style="padding:20px; background-color:#e8f0fe; border-radius:10px; border-left:8px solid #004a99; margin-bottom:20px;">
                 <h3 style='margin:0; color:#004a99;'>Riepilogo Consegne</h3>
@@ -952,42 +954,10 @@ elif st.session_state.pagina == "Ricerca Collane":
             </div>
         """, unsafe_allow_html=True)
 
-        # Tabella dati
         st.dataframe(df_filtrato, use_container_width=True, hide_index=True)
         
-        # Esportazione CSV dei risultati filtrati
-        csv_collane = df_filtrato.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica Report Ricerca", csv_collane, "ricerca_collane.csv", "text/csv")
-
     else:
-        st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne. Registra una consegna per iniziare.")  
-        
-st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
 
 
 
