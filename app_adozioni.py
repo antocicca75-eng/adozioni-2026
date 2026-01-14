@@ -657,7 +657,7 @@ elif st.session_state.pagina == "Ricerca":
 
 
 # =========================================================
-# --- BLOCCO 14: REGISTRO STORICO CON FILTRI DI RICERCA ---
+# --- BLOCCO 14: REGISTRO STORICO (VERSIONE SEMPRE VISIBILE) ---
 # INIZIO BLOCCO
 # =========================================================
 elif st.session_state.pagina == "Registro Storico":
@@ -666,34 +666,33 @@ elif st.session_state.pagina == "Registro Storico":
     # 1. RECUPERO DATI
     storico = st.session_state.get("storico_consegne", {})
 
-    if not storico:
-        st.info("⚠️ Il registro è vuoto. Non sono ancora state effettuate consegne.")
-        if st.button("⬅️ Torna alle Consegne"):
-            st.session_state.pagina = "Consegne"; st.rerun()
-    else:
-        # 2. PANNELLO DI RICERCA AVANZATA
-        with st.expander("🔍 FILTRA E CERCA NEL REGISTRO", expanded=True):
-            f_col1, f_col2 = st.columns(2)
-            with f_col1:
-                cerca_plesso = st.text_input("🏢 Cerca per Plesso:", placeholder="Es: Manzoni...").upper()
-            with f_col2:
-                # Creiamo la lista delle collane presenti per il filtro
-                tutte_collane = set()
-                for p in storico:
-                    for c in storico[p]:
-                        tutte_collane.add(c)
-                opzioni_collane = ["TUTTE"] + sorted(list(tutte_collane))
-                cerca_collana = st.selectbox("📘 Filtra per Collana:", opzioni_collane)
+    # 2. PANNELLO DI RICERCA (Spostato fuori dall'IF per essere sempre visibile)
+    with st.container(border=True):
+        st.subheader("🔍 Filtri di Ricerca")
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            cerca_plesso = st.text_input("🏢 Nome Plesso:", placeholder="Cerca...").upper()
+        with f_col2:
+            # Creiamo la lista delle collane esistenti per il filtro
+            tutte_collane = set()
+            for p in storico:
+                for c in storico[p]:
+                    tutte_collane.add(c)
+            opzioni_collane = ["TUTTE"] + sorted(list(tutte_collane))
+            cerca_collana = st.selectbox("📘 Tipo Collana:", opzioni_collane)
 
-        # 3. ELABORAZIONE DATI FILTRATI
+    st.markdown("---")
+
+    # 3. LOGICA DI VISUALIZZAZIONE
+    if not storico:
+        st.info("ℹ️ Nessuna consegna registrata in memoria.")
+    else:
         dati_tabella = []
         for plesso, collane in storico.items():
-            # Filtro Plesso
             if cerca_plesso and cerca_plesso not in plesso.upper():
                 continue
             
             for collana, info in collane.items():
-                # Filtro Collana
                 if cerca_collana != "TUTTE" and cerca_collana != collana:
                     continue
                 
@@ -704,112 +703,18 @@ elif st.session_state.pagina == "Registro Storico":
                     "Data/Ora": info['data']
                 })
 
-        # 4. VISUALIZZAZIONE RISULTATI
         if dati_tabella:
-            # Ordiniamo per data decrescente (le più recenti in alto)
+            # Ordiniamo per data decrescente
             dati_tabella.sort(key=lambda x: x['Data/Ora'], reverse=True)
-            
             st.table(dati_tabella)
-            
-            # Bottone per scaricare i dati filtrati (opzionale)
-            st.caption(f"Trovate {len(dati_tabella)} voci corrispondenti ai filtri.")
         else:
-            st.warning("❌ Nessun dato corrisponde ai criteri di ricerca impostati.")
+            st.warning("⚠️ Nessun risultato trovato con questi filtri.")
 
-    st.markdown("---")
-    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_reg"):
+    if st.button("⬅️ Torna al Modulo Consegne"):
         st.session_state.pagina = "Consegne"; st.rerun()
 
 # =========================================================
 # FINE BLOCCO 14
-# =========================================================
-# --- BLOCCO 10: PAGINA STORICO (VERSIONE CORRETTA) ---
-# INIZIO BLOCCO
-# =========================================================
-elif st.session_state.pagina == "Storico":
-    st.header("📚 Registro Collane Consegnate")
-    
-    if "storico_ritiri" not in st.session_state:
-        st.session_state.storico_ritiri = {}
-
-    if not st.session_state.get("storico_consegne"):
-        st.info("Nessuna consegna registrata.")
-    else:
-        elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
-        opzioni_ricerca = ["- MOSTRA TUTTI -"] + elenco_plessi_storico
-        scuola_selezionata = st.selectbox("🔍 Seleziona Plesso:", opzioni_ricerca)
-        
-        st.markdown("---")
-        plessi_da_mostrare = [scuola_selezionata] if scuola_selezionata != "- MOSTRA TUTTI -" else elenco_plessi_storico
-
-        for plesso in plessi_da_mostrare:
-            with st.expander(f"🏫 {plesso}", expanded=False):
-                
-                if st.button(f"🔄 RITIRA TUTTO IL PLESSO: {plesso}", key=f"bulk_plesso_{plesso}"):
-                    if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
-                    st.session_state.storico_ritiri[plesso].update(st.session_state.storico_consegne[plesso])
-                    del st.session_state.storico_consegne[plesso]
-                    salva_storico_cloud(st.session_state.storico_consegne)
-                    st.success(f"Intero plesso {plesso} spostato nei Ritiri!"); st.rerun()
-
-                per_tipo = st.session_state.storico_consegne[plesso]
-                
-                for tipo in sorted(list(per_tipo.keys())):
-                    c_t, c_btn = st.columns([0.7, 0.3])
-                    c_t.markdown(f"#### 📘 {tipo}")
-                    
-                    if c_btn.button(f"🔄 Ritira Tutto {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
-                        if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
-                        st.session_state.storico_ritiri[plesso][tipo] = per_tipo[tipo]
-                        del st.session_state.storico_consegne[plesso][tipo]
-                        if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                        salva_storico_cloud(st.session_state.storico_consegne)
-                        st.rerun()
-
-                    with st.expander(f"Dettaglio {tipo}", expanded=True):
-                        # Usiamo una copia della lista per evitare errori durante la rimozione degli elementi
-                        lista_libri = list(per_tipo[tipo])
-                        for i, lib in enumerate(lista_libri):
-                            # PROTEZIONE: Se q è nullo o <= 0, lo impostiamo a 1 per evitare errori Streamlit
-                            qta_salvata = int(lib.get('q', 1))
-                            if qta_salvata < 1: qta_salvata = 1 
-                            
-                            col_titolo, col_qta, col_ritiro, col_del = st.columns([0.45, 0.20, 0.25, 0.10])
-                            
-                            col_titolo.markdown(f"<b style='font-size:15px; color:#1E3A8A;'>{lib['t']}</b><br><small>{lib['e']}</small>", unsafe_allow_html=True)
-                            col_qta.markdown(f"<p style='text-align:center; font-size:14px;'>In carico:<br><b>{qta_salvata}</b></p>", unsafe_allow_html=True)
-
-                            with col_ritiro:
-                                # Il min_value è 1, il value è qta_salvata (che ora è minimo 1)
-                                q_rit = st.number_input("Ritiro", min_value=1, max_value=max(1, qta_salvata), value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}")
-                                if st.button("🔄", key=f"btn_rit_{plesso}_{tipo}_{i}", help="Esegui ritiro parziale"):
-                                    if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
-                                    if tipo not in st.session_state.storico_ritiri[plesso]: st.session_state.storico_ritiri[plesso][tipo] = []
-                                    
-                                    ritiro_item = lib.copy()
-                                    ritiro_item['q'] = q_rit
-                                    st.session_state.storico_ritiri[plesso][tipo].append(ritiro_item)
-                                    
-                                    lib['q'] = qta_salvata - q_rit
-                                    
-                                    if lib['q'] <= 0:
-                                        per_tipo[tipo].pop(i)
-                                    
-                                    if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
-                                    if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                                    
-                                    salva_storico_cloud(st.session_state.storico_consegne)
-                                    st.rerun()
-                            
-                            if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
-                                per_tipo[tipo].pop(i)
-                                if not per_tipo[tipo]: del per_tipo[tipo]
-                                if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                                salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
-
-    st.markdown("---")
-    if st.button("⬅️ Torna a Modulo Consegne"):
-        st.session_state.pagina = "Consegne"; st.rerun()
 # =========================================================
 # --- BLOCCO 15: TABELLONE CON PANNELLO FILTRI IN PAGINA ---
 # INIZIO BLOCCO
@@ -956,6 +861,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         
         
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
