@@ -783,10 +783,9 @@ elif st.session_state.pagina == "Modifica":
 # =========================================================
 # FINE BLOCCO 14
 # =========================================================
-# =========================================================
 =========================================================
+# =========================================================
 # --- BLOCCO 15: TABELLONE GENERALE (CON NUOVO FILTRO) ---
-# INIZIO BLOCCO AGGIORNATO
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
@@ -823,7 +822,7 @@ elif st.session_state.pagina == "Tabellone Stato":
             elif filtro_stato == "DA RITIRARE" and p_consegnato: mostra.append(p)
             elif filtro_stato == "COMPLETATI" and p_completato: mostra.append(p)
 
-        # Griglia
+        # Griglia di visualizzazione
         n_col = 4 
         for i in range(0, len(mostra), n_col):
             cols = st.columns(n_col)
@@ -831,6 +830,7 @@ elif st.session_state.pagina == "Tabellone Stato":
                 cat_attive = consegnati.get(plesso, {}).keys()
                 sigle = [mappa_sigle.get(cat, cat[:2]) for cat in cat_attive]
                 
+                # Impostazione colori e bordi in base allo stato
                 bg, lab, brd = ("#FFFFFF", "DA FARE", "2px solid #DDD")
                 if plesso in ritirati and not sigle:
                     bg, lab, brd = ("#28a745", "✅ COMPLETATO", "2px solid #1e7e34")
@@ -839,7 +839,7 @@ elif st.session_state.pagina == "Tabellone Stato":
 
                 with cols[j]:
                     st.markdown(f"""
-                        <div style="background-color: {bg}; border: {brd}; border-radius: 10px; padding: 10px; text-align: center; min-height: 120px;">
+                        <div style="background-color: {bg}; border: {brd}; border-radius: 10px; padding: 10px; text-align: center; min-height: 120px; color: black;">
                             <div style="font-weight: 900; font-size: 13px;">{plesso}</div>
                             <div style="font-size: 10px; margin-top: 5px;">{lab}</div>
                             <div style="margin-top: 8px;">
@@ -848,12 +848,13 @@ elif st.session_state.pagina == "Tabellone Stato":
                         </div>
                     """, unsafe_allow_html=True)
 
+    st.markdown("---")
     if st.button("⬅️ Torna al Modulo Consegne"):
-        st.session_state.pagina = "Consegne"; st.rerun()
-# =========================================================
-# FINE BLOCCO 15
+        st.session_state.pagina = "Consegne"
+        st.rerun()
 # =========================================================
 st.markdown("<p style='text-align: center; color: gray;'>Created by Antonio Ciccarelli v13.4</p>", unsafe_allow_html=True)
+
 
 
 
