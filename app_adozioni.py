@@ -898,13 +898,14 @@ elif st.session_state.pagina == "Tabellone Stato":
 elif st.session_state.pagina == "Ricerca Collane":
     st.subheader("🔍 Motore di Ricerca Collane Consegnate")
 
-    # Inizializziamo un contatore per il reset dei filtri se non esiste
-    if "reset_search_collane" not in st.session_state:
-        st.session_state.reset_search_collane = 0
+    # 1. Inizializziamo il contatore di reset se non esiste
+    if "reset_collane" not in st.session_state:
+        st.session_state.reset_collane = 0
 
     if "storico_consegne" not in st.session_state:
         st.session_state.storico_consegne = carica_storico_cloud()
 
+    # 2. Trasformazione dati per la tabella
     righe_storico = []
     if st.session_state.storico_consegne:
         for plesso, categorie in st.session_state.storico_consegne.items():
@@ -921,39 +922,47 @@ elif st.session_state.pagina == "Ricerca Collane":
     df_collane = pd.DataFrame(righe_storico)
 
     if not df_collane.empty:
+        # --- AREA FILTRI ---
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
             
-            # Usiamo il contatore nella chiave per forzare il reset dei widget
-            suffix = str(st.session_state.reset_search_collane)
+            # Creiamo un suffisso dinamico basato sul contatore di reset
+            suff = str(st.session_state.reset_collane)
             
-            f_ple = c1.multiselect("🏫 Filtra Plesso", sorted(df_collane["Plesso"].unique()), key="f_ple_"+suffix)
-            f_tip = c2.multiselect("📚 Filtra Tipologia", sorted(df_collane["Tipologia"].unique()), key="f_tip_"+suffix)
-            f_edi = c3.multiselect("🏢 Filtra Editore", sorted(df_collane["Editore"].unique()), key="f_edi_"+suffix)
+            # Applichiamo il suffisso alle key (es: f_ple_0, f_ple_1...)
+            f_ple = c1.multiselect("🏫 Filtra Plesso", sorted(df_collane["Plesso"].unique()), key="f_ple_" + suff)
+            f_tip = c2.multiselect("📚 Filtra Tipologia", sorted(df_collane["Tipologia"].unique()), key="f_tip_" + suff)
+            f_edi = c3.multiselect("🏢 Filtra Editore", sorted(df_collane["Editore"].unique()), key="f_edi_" + suff)
             
-            # --- TASTO PULISCI (VERSIONE CORRETTA) ---
+            # --- TASTO PULISCI CORRETTO ---
             if st.button("🧹 PULISCI TUTTI I FILTRI", use_container_width=True):
-                st.session_state.reset_search_collane += 1 # Incrementando la chiave, i widget si resettano
+                # Invece di svuotare le liste, cambiamo il nome delle chiavi dei widget
+                st.session_state.reset_collane += 1 
                 st.rerun()
 
-        # Applicazione filtri
+        # 3. Applicazione filtri
         df_filtrato = df_collane.copy()
         if f_ple: df_filtrato = df_filtrato[df_filtrato["Plesso"].isin(f_ple)]
         if f_tip: df_filtrato = df_filtrato[df_filtrato["Tipologia"].isin(f_tip)]
         if f_edi: df_filtrato = df_filtrato[df_filtrato["Editore"].isin(f_edi)]
 
-        # Visualizzazione Totale
+        # 4. Risultati e Totale
         totale_copie_collane = int(df_filtrato["Quantità"].sum())
+
         st.markdown(f"""
             <div style="padding:20px; background-color:#e8f0fe; border-radius:10px; border-left:8px solid #004a99; margin-bottom:20px;">
                 <h3 style='margin:0; color:#004a99;'>Riepilogo Consegne</h3>
-                <p style='font-size:24px; margin:5px 0 0 0;'>Totale Libri Trovati: <b>{totale_copie_collane}</b></p>
+                <p style='font-size:24px; margin:5px 0 0 0;'>
+                    Totale Libri Trovati: <b>{totale_copie_collane}</b>
+                </p>
             </div>
         """, unsafe_allow_html=True)
 
         st.dataframe(df_filtrato, use_container_width=True, hide_index=True)
+        
     else:
-        st.warning("⚠️ Non ci sono ancora dati nello storico.")
+        st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
