@@ -113,22 +113,21 @@ class PDF_CONSEGNA(FPDF):
             # Posizionamento logo centrato rispetto alla metà foglio
             self.image("temp_logo.png", x=x_offset + 30, y=10, w=75)
         
-        # 2. INTESTAZIONE CATEGORIA
-        self.set_y(40)
-        self.set_x(x_offset + 10)
-        self.set_fill_color(230, 230, 230)
-        self.set_font('Arial', 'B', 10)
-        # Larghezza totale modulo impostata a 128mm per stare comodi nella metà A4
-        self.cell(128, 8, f"RICEVUTA DI CONSEGNA: {str(categoria).upper()}", border=1, ln=1, align='C', fill=True)
-        
-        # 3. TESTATA TABELLA
-        self.set_x(x_offset + 10)
-        self.set_fill_color(245, 245, 245)
-        self.set_font('Arial', 'B', 8)
-        self.cell(78, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
-        self.cell(20, 7, 'Q.TÀ', border=1, align='C', fill=True) # Semplificato per chiarezza
+       self.set_x(x_offset + 10); self.set_fill_color(245, 245, 245)
+        self.cell(75, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
+        self.cell(24, 7, 'CLASSE', border=1, align='C', fill=True) 
         self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
         
+        for i, lib in enumerate(libri):
+            fill = i % 2 == 1
+            self.set_x(x_offset + 10); self.set_fill_color(250, 250, 250) if fill else self.set_fill_color(255, 255, 255)
+            self.set_font('Arial', 'B', 7.5)
+            self.cell(75, 6, f" {str(lib['t'])[:45]}", border=1, align='L', fill=fill)
+            self.set_font('Arial', '', 8)
+            self.cell(8, 6, str(lib.get('c1','')), border=1, align='C', fill=fill)
+            self.cell(8, 6, str(lib.get('c2','')), border=1, align='C', fill=fill)
+            self.cell(8, 6, str(lib.get('c3','')), border=1, align='C', fill=fill)
+            self.cell(30, 6, str(lib.get('e',''))[:20], border=1, ln=1, align='C', fill=fill)
         # 4. ELENCO LIBRI
         self.set_font('Arial', '', 8)
         for i, lib in enumerate(libri):
@@ -991,6 +990,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
