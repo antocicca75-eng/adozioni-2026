@@ -441,27 +441,37 @@ if st.session_state.pagina == "Consegne":
     col_print, col_conf = st.columns(2)
     
     # Bottone PDF (disabilitato se massiva perché troppo grande)
+ # Bottone PDF (disabilitato se massiva perché troppo grande)
     if cat_scelta != "TUTTE LE TIPOLOGIE":
-        # Nel Blocco 9, prima del pulsante "GENERA PDF"
-    logo_caricato = st.file_uploader("Upload Logo Scuola (Opzionale)", type=["png", "jpg"])
-    
-    if col_print.button("🖨️ GENERA PDF", use_container_width=True):
-    if st.session_state.lista_consegne_attuale:
-        # PASSIAMO IL LOGO CARICATO ALLA CLASSE
-        pdf = PDF_CONSEGNA(logo_data=logo_caricato) 
-        pdf.add_page()
+        # Rientro di 4 spazi: questo codice appartiene all'if sopra
+        logo_caricato = st.file_uploader("Upload Logo Scuola (Opzionale)", type=["png", "jpg"])
         
-        # Copia Sinistra
-        pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-        
-        # Linea tratteggiata centrale di taglio
-        pdf.set_draw_color(150, 150, 150)
-        pdf.dashed_line(148.5, 0, 148.5, 210, 1, 1)
-        
-        # Copia Destra
-        pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-        
-        st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
+        if col_print.button("🖨️ GENERA PDF", use_container_width=True):
+            if st.session_state.lista_consegne_attuale:
+                # PASSIAMO IL LOGO CARICATO ALLA CLASSE
+                pdf = PDF_CONSEGNA(logo_data=logo_caricato) 
+                pdf.add_page()
+                
+                # --- COPIA SINISTRA ---
+                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                
+                # --- LINEA TRATTEGGIATA DI TAGLIO CENTRALE ---
+                pdf.set_draw_color(150, 150, 150)
+                pdf.dashed_line(148.5, 0, 148.5, 210, 1, 1)
+                
+                # --- COPIA DESTRA ---
+                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                
+                # Generazione finale per il download
+                st.download_button(
+                    label="📥 SCARICA PDF",
+                    data=bytes(pdf.output()),
+                    file_name=f"consegna_{p_scelto}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            else:
+                st.warning("⚠️ Aggiungi almeno un libro alla lista prima di generare il PDF.")
         if col_print.button("🖨️ GENERA PDF", use_container_width=True):
             if st.session_state.lista_consegne_attuale:
                 pdf = PDF_CONSEGNA(st.session_state.get('logo_scuola'))
@@ -493,7 +503,7 @@ if st.session_state.pagina == "Consegne":
                 st.success(f"Consegna registrata per {cat_scelta}!")
             
             salva_storico_cloud(st.session_state.storico_consegne)
-# =========================================================
+
 # =========================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
@@ -1030,6 +1040,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
