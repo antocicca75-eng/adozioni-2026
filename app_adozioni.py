@@ -87,31 +87,33 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
 
 # ==============================================================================
-# BLOCCO 4: CLASSE PDF (REPLICA ESATTA FIGURA 2 - LOGO AUTOMATICO)
+# BLOCCO 4: CLASSE PDF (REPLICA FIGURA 2 - LOGO JPG DA REPOSITORY)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
         super().__init__(orientation='L', unit='mm', format='A4')
-        # Puntiamo esclusivamente al file nel repository GitHub
-        self.logo_path = "logo.png" 
+        # CORREZIONE: Estensione .jpg come indicato
+        self.logo_path = "logo.jpg" 
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. CARICAMENTO LOGO (Direttamente da file)
+        # 1. CARICAMENTO LOGO (Cerca logo.jpg su GitHub)
         try:
-            # Posizione centrata come in Figura 2
+            # Centrato e senza cornice manuale
             self.image(self.logo_path, x=x_offset + 38, y=10, w=55)
         except:
-            # Se l'immagine non viene trovata, inserisce un rettangolo vuoto per non rompere il layout
-            self.rect(x_offset + 38, 10, 55, 20)
+            # Mostra la cornice solo se il file logo.jpg manca davvero
+            self.rect(x_offset + 38, 10, 55, 22)
+            self.set_font('Arial', 'I', 6)
+            self.text(x_offset + 40, 20, "Immagine logo.jpg non trovata")
         
-        # 2. TITOLO CATEGORIA (Sotto il logo)
+        # 2. TITOLO CATEGORIA
         self.set_y(45)
         self.set_x(x_offset + 10)
         self.set_fill_color(235, 235, 235)
         self.set_font('Arial', 'B', 10)
         self.cell(128, 8, f"{str(categoria).upper()}", border=1, ln=1, align='C', fill=True)
         
-        # 3. INTESTAZIONE TABELLA
+        # 3. TESTATA TABELLA
         self.set_x(x_offset + 10)
         self.set_fill_color(245, 245, 245)
         self.set_font('Arial', 'B', 8)
@@ -119,45 +121,32 @@ class PDF_CONSEGNA(FPDF):
         self.cell(23, 7, 'CLASSE', border=1, align='C', fill=True) 
         self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
         
-        # 4. RIGHE LIBRI CON I 3 QUADRATINI (Figura 2)
+        # 4. RIGHE CON I 3 QUADRATINI
         self.set_font('Arial', '', 8)
         for i, lib in enumerate(libri[:15]):
             self.set_x(x_offset + 10)
-            # Colonna Titolo
             self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
-            
-            # DISEGNO DEI 3 QUADRATINI (sotto la colonna CLASSE)
-            # Dividiamo i 23mm in 3 quadratini da circa 7.6mm
+            # I 3 QUADRATINI
             self.cell(7.6, 7, '', border=1, align='C')
             self.cell(7.6, 7, '', border=1, align='C')
             self.cell(7.8, 7, '', border=1, align='C')
-            
-            # Colonna Editore
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
-        # 5. DETTAGLI DI CONSEGNA (Fissi in basso)
+        # 5. DETTAGLI DI CONSEGNA
         self.set_y(150)
         self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
         self.set_font('Arial', 'B', 9)
         self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=1, ln=1, fill=True)
         
-        # Campi come da Figura 2
-        dati = [
-            ("PLESSO:", p), 
-            ("INSEGNANTE:", ins), 
-            ("CLASSE:", sez), 
-            ("DATA:", data_m)
-        ]
-        
-        for label, val in dati:
+        campi = [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]
+        for label, val in campi:
             self.set_x(x_offset + 10)
             self.set_font('Arial', 'B', 8)
             self.cell(35, 6.5, label, border=1, align='L')
             self.set_font('Arial', '', 8)
-            # Mostra il valore oppure lascia vuoto per scrittura manuale
-            testo_valore = str(val).upper() if val and val != "- SELEZIONA PLESSO -" else ""
-            self.cell(93, 6.5, testo_valore, border=1, ln=1, align='L')
+            testo_v = str(val).upper() if val and val != "- SELEZIONA PLESSO -" else ""
+            self.cell(93, 6.5, testo_v, border=1, ln=1, align='L')
 # ------------------------------------------------------------------------------
 
 
@@ -842,6 +831,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
