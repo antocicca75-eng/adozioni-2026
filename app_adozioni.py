@@ -177,76 +177,92 @@ def backup_su_google_sheets(df_da_salvare):
 
 
 # ==============================================================================
-# BLOCCO 4: CLASSE PDF (RIPRISTINO LAYOUT ORIGINALE E LOGO DA REPOSITORY)
+# BLOCCO 6: STILI CSS, CACHE E CATALOGO LIBRI
 # ==============================================================================
-class PDF_CONSEGNA(FPDF):
-    def __init__(self, logo_data=None):
-        super().__init__(orientation='L', unit='mm', format='A4')
-        # Puntiamo direttamente al file caricato nel tuo repository
-        self.logo_path = "logo.png"
+st.markdown("""
+    <style>
+    [data-testid="stDataEditor"] thead tr th { background-color: #004a99 !important; color: white !important; }
+    .stApp { background-color: #ffffff; }
+    .totale-box { padding: 20px; background-color: #e8f0fe; border-radius: 10px; border: 1px solid #004a99; margin-top: 15px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-    def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. GESTIONE LOGO (Puntamento al file nel repository GitHub)
+@st.cache_data(ttl=3600)
+def get_catalogo_libri():
+    sh = connetti_google_sheets()
+    if sh:
         try:
-            # X centrato rispetto alla colonna (offset + 40), Y=10, Larghezza=50
-            self.image(self.logo_path, x=x_offset + 40, y=10, w=50)
-        except:
-            # Se il file non viene trovato, non blocca il programma
-            pass
-        
-        # 2. INTESTAZIONE CATEGORIA (Posizionata sotto il logo)
-        self.set_y(45)
-        self.set_x(x_offset + 10)
-        self.set_fill_color(230, 230, 230)
-        self.set_font('Arial', 'B', 10)
-        self.cell(128, 8, f"RICEVUTA DI CONSEGNA: {str(categoria).upper()}", border=1, ln=1, align='C', fill=True)
-        
-        # 3. TESTATA TABELLA
-        self.set_x(x_offset + 10)
-        self.set_fill_color(245, 245, 245)
-        self.set_font('Arial', 'B', 8)
-        self.cell(78, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
-        self.cell(20, 7, 'Q.TÀ', border=1, align='C', fill=True)
-        self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
-        
-        # 4. ELENCO LIBRI
-        self.set_font('Arial', '', 8)
-        # Limita a 12 righe per non sovrapporsi ai dettagli in basso
-        for i, lib in enumerate(libri[:12]):
-            fill = i % 2 == 1
-            self.set_x(x_offset + 10)
-            self.set_fill_color(250, 250, 250) if fill else self.set_fill_color(255, 255, 255)
-            self.cell(78, 7, f" {str(lib['t'])[:45]}", border=1, align='L', fill=fill)
-            self.cell(20, 7, str(lib.get('q', '1')), border=1, align='C', fill=fill)
-            self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C', fill=fill)
+            df = pd.DataFrame(sh.worksheet("Catalogo").get_all_records())
+            return df.fillna("")
+        except: pass
+    if os.path.exists(CONFIG_FILE):
+        try:
+            df = pd.read_excel(CONFIG_FILE, sheet_name="ListaLibri")
+            df.columns = [c.strip() for c in df.columns]
+            return df.fillna("")
+        except: return pd.DataFrame()
+    return pd.DataFrame()
 
-        # 5. DETTAGLI DI CONSEGNA (Bloccati in fondo al foglio)
-        self.set_y(145)
-        self.set_x(x_offset + 10)
-        self.set_fill_color(240, 240, 240)
-        self.set_font('Arial', 'B', 9)
-        self.cell(128, 7, ' DETTAGLI RICEVUTA', border=1, ln=1, fill=True)
-        
-        dati_consegna = [
-            ("PLESSO:", p), 
-            ("INSEGNANTE:", ins), 
-            ("CLASSE/SEZ:", sez), 
-            ("DATA:", data_m)
-        ]
-        
-        for label, val in dati_consegna:
-            self.set_x(x_offset + 10)
-            self.set_font('Arial', 'B', 8)
-            self.cell(35, 6.5, label, border=1, align='L')
-            self.set_font('Arial', '', 8)
-            self.cell(93, 6.5, str(val).upper(), border=1, ln=1, align='L')
+@st.cache_data(ttl=3600)
+def get_lista_plessi():
+    sh = connetti_google_sheets()
+    if sh:
+        try:
+            df = pd.DataFrame(sh.worksheet("Plesso").get_all_records())
+            return sorted(df.iloc[:, 0].dropna().unique().tolist())
+        except: pass
+    if os.path.exists(CONFIG_FILE):
+        try:
+            df = pd.read_excel(CONFIG_FILE, sheet_name="Plesso")
+            return sorted(df.iloc[:, 0].dropna().unique().tolist())
+        except: return []
+    return []
 
-        # 6. SPAZIO FIRMA
-        self.set_y(180)
-        self.set_x(x_offset + 10)
-        self.set_font('Arial', 'I', 8)
-        self.cell(128, 10, "Firma per ricevuta: __________________________________________", border=0, align='R')
+def aggiungi_libro_a_excel(t, m, e, a):
+    try:
+        wb = load_workbook(CONFIG_FILE)
+        ws = wb["ListaLibri"]
+        ws.append([t, m, e, a])
+        wb.save(CONFIG_FILE)
+        st.cache_data.clear() 
+        return True
+    except: return False
 # ------------------------------------------------------------------------------
+
+
+# ==============================================================================
+# BLOCCO 7: STATO SESSIONE E INIZIALIZZAZIONE
+# ==============================================================================
+catalogo = get_catalogo_libri()
+if not catalogo.empty:
+    elenco_titoli = sorted([str(x) for x in catalogo.iloc[:, 0].unique() if str(x).strip() != ""])
+    elenco_materie = sorted([str(x) for x in catalogo.iloc[:, 1].unique() if str(x).strip() != ""])
+    elenco_editori = sorted([str(x) for x in catalogo.iloc[:, 2].unique() if str(x).strip() != ""])
+    elenco_agenzie = sorted([str(x) for x in catalogo.iloc[:, 3].unique() if str(x).strip() != ""])
+else:
+    elenco_titoli = elenco_materie = elenco_editori = elenco_agenzie = []
+
+elenco_plessi = get_lista_plessi()
+
+if "pagina" not in st.session_state:
+    st.session_state.pagina = "Inserimento"
+
+if 'db_consegne' not in st.session_state:
+    st.session_state.db_consegne = carica_config_consegne()
+if 'lista_consegne_attuale' not in st.session_state:
+    st.session_state.lista_consegne_attuale = []
+
+def reset_ricerca():
+    st.session_state.r_attiva = False
+    st.session_state.ft = []
+    st.session_state.fa = []
+    st.session_state.fp = []
+    st.session_state.fm = []
+    st.session_state.fe = []
+    st.session_state.fsag = "TUTTI"
+# ------------------------------------------------------------------------------
+
+
 # ==============================================================================
 # BLOCCO 8: SIDEBAR (NAVIGAZIONE MENU)
 # ==============================================================================
