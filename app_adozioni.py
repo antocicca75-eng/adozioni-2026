@@ -402,13 +402,14 @@ if st.session_state.pagina == "Consegne":
     data_con = d2.text_input("Data di consegna", key=f"dat_{ctr}")
     classe_man = d1.text_input("Classe specifica", key=f"cla_{ctr}")
 
-    col_print, col_conf = st.columns(2)
+   # --- NUOVA SEZIONE PULSANTI: PDF, CONSEGNA E RITIRO ---
+    col_print, col_conf, col_ritiro = st.columns(3) # Tre colonne per i tre tasti
     
+    # 1. TASTO PDF (Logo rimosso, ora è automatico nel Blocco 4)
     if cat_scelta != "TUTTE LE TIPOLOGIE":
-        logo_up = st.file_uploader("Upload Logo Scuola", type=["png", "jpg"], key="up_logo_consegne")
         if col_print.button("🖨️ GENERA PDF", use_container_width=True, key="btn_pdf_landscape"):
             if st.session_state.lista_consegne_attuale:
-                pdf = PDF_CONSEGNA(logo_data=logo_up)
+                pdf = PDF_CONSEGNA() # Non serve più passare logo_up
                 pdf.add_page()
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 pdf.set_draw_color(150, 150, 150)
@@ -416,22 +417,72 @@ if st.session_state.pagina == "Consegne":
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
+    # 2. TASTO CONFERMA CONSEGNA (Carico alla scuola)
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
-            if p_scelto not in st.session_state.storico_consegne: st.session_state.storico_consegne[p_scelto] = {}
+            if p_scelto not in st.session_state.storico_consegne: 
+                st.session_state.storico_consegne[p_scelto] = {}
+            
             if cat_scelta == "TUTTE LE TIPOLOGIE":
                 for k, v in st.session_state.db_consegne.items():
                     lista_clean = []
                     for item in v:
-                        nuovo = item.copy(); nuovo['q'] = 1; lista_clean.append(nuovo)
+                        nuovo = item.copy()
+                        nuovo['q'] = 1
+                        nuovo['stato'] = "IN VISIONE"
+                        lista_clean.append(nuovo)
                     st.session_state.storico_consegne[p_scelto][k] = lista_clean
                 st.success(f"REGISTRAZIONE MASSIVA COMPLETATA!")
             else:
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
+                # Aggiunge lo stato "IN VISIONE" ai libri consegnati
+                lista_da_salvare = []
+                for lib in st.session_state.lista_consegne_attuale:
+                    n_lib = lib.copy()
+                    n_lib['stato'] = "IN VISIONE"
+                    lista_da_salvare.append(n_lib)
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_da_salvare
                 st.success(f"Consegna registrata!")
+            
             salva_storico_cloud(st.session_state.storico_consegne)
-# ------------------------------------------------------------------------------
 
+    # 3. TASTO CONFERMA RITIRO (Logica per scarico totale o parziale)
+    if col_ritiro.button("📦 CONFERMA RITIRO", use_container_width=True):
+        if p_scelto != "- SELEZIONA PLESSO -" and cat_scelta != "- SELEZIONA -":
+            if p_scelto in st.session_state.storico_consegne and cat_scelta in st.session_state.storico_consegne[p_scelto]:
+                
+                # Prendiamo la lista dei libri che la scuola HA ATTUALMENTE
+                libri_scuola = st.session_state.storico_consegne[p_scelto][cat_scelta]
+                # Prendiamo la lista di quelli che STIAMO RITIRANDO (dalla schermata attuale)
+                libri_ritirati_ora = st.session_state.lista_consegne_attuale
+                
+                nuova_lista_scuola = []
+                
+                # Per ogni libro che la scuola ha, verifichiamo se lo stiamo ritirando
+                for l_scuola in libri_scuola:
+                    ritirato = False
+                    for l_rit in libri_ritirati_ora:
+                        if l_scuola['t'] == l_rit['t']: # Se il titolo coincide
+                            differenza = int(l_scuola.get('q', 0)) - int(l_rit.get('q', 0))
+                            
+                            if differenza > 0:
+                                # RITIRO PARZIALE: ne restano alcuni alla scuola
+                                l_scuola['q'] = differenza
+                                nuova_lista_scuola.append(l_scuola)
+                            # Se differenza <= 0, il libro è rimosso del tutto (ritiro totale)
+                            ritirato = True
+                            break
+                    
+                    if not ritirato:
+                        # Se questo libro non era nella lista dei ritiri, resta alla scuola
+                        nuova_lista_scuola.append(l_scuola)
+                
+                # Aggiorniamo lo storico con quello che RESTA alla scuola
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = nuova_lista_scuola
+                salva_storico_cloud(st.session_state.storico_consegne)
+                st.warning(f"Ritiro completato. Lo storico di {p_scelto} è stato aggiornato con i restanti.")
+                st.rerun()
+            else:
+                st.error("Nessun libro in carico a questa scuola per questa tipologia.")
 
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI)
@@ -839,6 +890,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
