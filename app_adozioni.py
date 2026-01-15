@@ -404,11 +404,14 @@ if st.session_state.pagina == "Consegne":
 # --- NUOVA SEZIONE PULSANTI: PDF, CONSEGNA E RITIRO PERSISTENTE ---
     col_print, col_conf, col_ritiro = st.columns(3)
 
-    # 1. TASTO PDF (Invariato, usa logo automatico)
+  # --- NUOVA SEZIONE PULSANTI: PDF, CONSEGNA E ARCHIVIO STORICO PERSISTENTE ---
+    col_print, col_conf, col_ritiro = st.columns(3) 
+    
+    # 1. TASTO PDF (Sempre disponibile per la tipologia selezionata)
     if cat_scelta != "TUTTE LE TIPOLOGIE":
         if col_print.button("🖨️ GENERA PDF", use_container_width=True, key="btn_pdf_landscape"):
             if st.session_state.lista_consegne_attuale:
-                pdf = PDF_CONSEGNA()
+                pdf = PDF_CONSEGNA() 
                 pdf.add_page()
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 pdf.set_draw_color(150, 150, 150)
@@ -416,45 +419,84 @@ if st.session_state.pagina == "Consegne":
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
-    # 2. TASTO CONFERMA CONSEGNA (Salva come "IN VISIONE")
+    # 2. TASTO CONFERMA CONSEGNA (Carica i libri come 'IN VISIONE')
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
             if p_scelto not in st.session_state.storico_consegne: 
                 st.session_state.storico_consegne[p_scelto] = {}
             
-            # Prepariamo la lista aggiungendo lo stato
-            nuova_consegna = []
-            for item in st.session_state.lista_consegne_attuale:
-                libro = item.copy()
-                libro['stato'] = "IN VISIONE" # Stato iniziale
-                libro['data_movimento'] = data_con
-                nuova_consegna.append(libro)
-            
-            # Salviamo nello storico (senza cancellare quello che c'era già)
-            if cat_scelta in st.session_state.storico_consegne[p_scelto]:
-                st.session_state.storico_consegne[p_scelto][cat_scelta].extend(nuova_consegna)
+            # Gestione Massiva
+            if cat_scelta == "TUTTE LE TIPOLOGIE":
+                for k, v in st.session_state.db_consegne.items():
+                    lista_clean = []
+                    for item in v:
+                        nuovo = item.copy()
+                        nuovo['q'] = 1
+                        nuovo['stato'] = "IN VISIONE"
+                        nuovo['data_c'] = data_con
+                        lista_clean.append(nuovo)
+                    st.session_state.storico_consegne[p_scelto][k] = lista_clean
+                st.success(f"REGISTRAZIONE MASSIVA COMPLETATA!")
             else:
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = nuova_consegna
+                # Registrazione Singola: Aggiungiamo i nuovi libri a quelli già esistenti
+                nuovi_libri = []
+                for lib in st.session_state.lista_consegne_attuale:
+                    n_lib = lib.copy()
+                    n_lib['stato'] = "IN VISIONE"
+                    n_lib['data_c'] = data_con
+                    nuovi_libri.append(n_lib)
+                
+                # Se la tipologia esisteva già, aggiungiamo i nuovi record senza sovrascrivere
+                if cat_scelta in st.session_state.storico_consegne[p_scelto]:
+                    st.session_state.storico_consegne[p_scelto][cat_scelta].extend(nuovi_libri)
+                else:
+                    st.session_state.storico_consegne[p_scelto][cat_scelta] = nuovi_libri
+                
+                st.success(f"Libri registrati come 'IN VISIONE' per {p_scelto}")
             
             salva_storico_cloud(st.session_state.storico_consegne)
-            st.success(f"Consegna registrata e salvata in memoria!")
 
-    # 3. TASTO CONFERMA RITIRO (Cambia lo stato in "RITIRATO" senza cancellare)
+    # 3. TASTO CONFERMA RITIRO (Cambia stato in 'RITIRATO' senza cancellare)
     if col_ritiro.button("📦 CONFERMA RITIRO", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -" and cat_scelta != "- SELEZIONA -":
             if p_scelto in st.session_state.storico_consegne and cat_scelta in st.session_state.storico_consegne[p_scelto]:
                 
-                # Cerchiamo i libri correnti nello storico e cambiamo lo stato
-                for libro_storico in st.session_state.storico_consegne[p_scelto][cat_scelta]:
-                    for libro_attuale in st.session_state.lista_consegne_attuale:
-                        if libro_storico['t'] == libro_attuale['t']:
-                            libro_storico['stato'] = "RITIRATO"
-                            libro_storico['data_ritiro'] = data_con
+                libri_in_archivio = st.session_state.storico_consegne[p_scelto][cat_scelta]
+                libri_da_ritirare = st.session_state.lista_consegne_attuale
+                
+                for da_rit in libri_da_ritirare:
+                    titolo = da_rit['t']
+                    q_rit = int(da_rit.get('q', 0))
+                    
+                    # Cerchiamo il libro corrispondente "IN VISIONE" nell'archivio
+                    for record in libri_in_archivio:
+                        if record['t'] == titolo and record['stato'] == "IN VISIONE":
+                            q_disponibile = int(record.get('q', 0))
+                            
+                            if q_rit >= q_disponibile:
+                                # Ritiro totale della riga
+                                record['stato'] = "RITIRATO"
+                                record['data_r'] = data_con
+                                q_rit -= q_disponibile # Se avevamo più righe dello stesso libro
+                            else:
+                                # RITIRO PARZIALE: Sdoppiamo il record
+                                # 1. Creiamo una riga per la parte ritirata
+                                record_ritirato = record.copy()
+                                record_ritirato['q'] = q_rit
+                                record_ritirato['stato'] = "RITIRATO"
+                                record_ritirato['data_r'] = data_con
+                                libri_in_archivio.append(record_ritirato)
+                                
+                                # 2. Aggiorniamo la riga originale con la rimanenza
+                                record['q'] = q_disponibile - q_rit
+                                q_rit = 0
+                                break
                 
                 salva_storico_cloud(st.session_state.storico_consegne)
-                st.info(f"Stato aggiornato: i libri selezionati sono ora segnati come RITIRATI.")
+                st.warning(f"Operazione completata: i libri sono stati spostati in stato 'RITIRATO' nell'archivio.")
+                st.rerun()
             else:
-                st.error("Nessun record trovato da segnare come ritirato.")
+                st.error("Nessun libro in visione trovato per questo plesso/tipologia.")
 
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI)
@@ -862,6 +904,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
