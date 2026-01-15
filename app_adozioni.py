@@ -87,24 +87,32 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
 
 # ==============================================================================
-# BLOCCO 4: CLASSE PDF (REPLICA FIGURA 2 - LOGO JPG DA REPOSITORY)
+# BLOCCO 4: CLASSE PDF (REPLICA FIGURA 2 - LOGO JPG CON CORNICE)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
         super().__init__(orientation='L', unit='mm', format='A4')
-        # CORREZIONE: Estensione .jpg come indicato
         self.logo_path = "logo.jpg" 
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. CARICAMENTO LOGO (Cerca logo.jpg su GitHub)
+        # 1. CARICAMENTO LOGO CON CORNICE
+        # Definiamo le coordinate del logo
+        img_x = x_offset + 40
+        img_y = 10
+        img_w = 52
+        img_h = 22 # Altezza stimata per mantenere le proporzioni
+
         try:
-            # Centrato e senza cornice manuale
-            self.image(self.logo_path, x=x_offset + 38, y=10, w=55)
+            # Disegna l'immagine
+            self.image(self.logo_path, x=img_x, y=img_y, w=img_w)
+            # Disegna la cornice (rettangolo) attorno all'immagine
+            self.set_line_width(0.3)
+            self.rect(img_x - 2, img_y - 2, img_w + 4, img_h + 4) 
         except:
-            # Mostra la cornice solo se il file logo.jpg manca davvero
-            self.rect(x_offset + 38, 10, 55, 22)
-            self.set_font('Arial', 'I', 6)
-            self.text(x_offset + 40, 20, "Immagine logo.jpg non trovata")
+            # Cornice vuota di sicurezza se il file manca
+            self.rect(img_x, img_y, img_w, img_h)
+            self.set_font('Arial', 'I', 7)
+            self.text(img_x + 5, img_y + 10, "Logo non trovato")
         
         # 2. TITOLO CATEGORIA
         self.set_y(45)
@@ -126,7 +134,7 @@ class PDF_CONSEGNA(FPDF):
         for i, lib in enumerate(libri[:15]):
             self.set_x(x_offset + 10)
             self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
-            # I 3 QUADRATINI
+            # I 3 QUADRATINI (CLASSE)
             self.cell(7.6, 7, '', border=1, align='C')
             self.cell(7.6, 7, '', border=1, align='C')
             self.cell(7.8, 7, '', border=1, align='C')
@@ -831,6 +839,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
