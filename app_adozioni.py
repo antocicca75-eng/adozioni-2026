@@ -589,3 +589,186 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 # ------------------------------------------------------------------------------
+# =========================================================
+# --- BLOCCO 14: PAGINA MODIFICA ---
+# INIZIO BLOCCO
+# =========================================================
+elif st.session_state.pagina == "Modifica":
+    st.subheader("✏️ Modifica o Cancella Adozioni")
+    if os.path.exists(DB_FILE):
+        df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
+        c_ric1, c_ric2 = st.columns(2)
+        with c_ric1:
+            lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
+            p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db)
+        with c_ric2:
+            lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
+            t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db)
+        if p_cerca or t_cerca:
+            df_filtrato = df_mod.copy()
+            if p_cerca: df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
+            if t_cerca: df_filtrato = df_filtrato[df_filtrato["Titolo"] == t_cerca]
+            if not df_filtrato.empty:
+                for i in df_filtrato.index:
+                    with st.container(border=True):
+                        st.markdown(f"**Registrazione del {df_mod.at[i, 'Data']}**")
+                        col1, col2, col3 = st.columns([2, 1, 1])
+                        with col1:
+                            try: idx_p = elenco_plessi.index(df_mod.at[i, 'Plesso'])
+                            except: idx_p = 0
+                            nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=idx_p, key=f"mp_{i}")
+                            try: idx_t = elenco_titoli.index(df_mod.at[i, 'Titolo'])
+                            except: idx_t = 0
+                            nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=idx_t, key=f"mt_{i}")
+                            nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"mnot_{i}", height=70)
+                        with col2:
+                            val_sez = int(float(df_mod.at[i, 'N° sezioni'])) if df_mod.at[i, 'N° sezioni'] else 1
+                            nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=val_sez, key=f"mn_{i}")
+                            nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"ms_{i}")
+                        with col3:
+                            attuale_sag = df_mod.at[i, 'Saggio Consegna']
+                            idx_saggio = ["-", "NO", "SI"].index(attuale_sag) if attuale_sag in ["-", "NO", "SI"] else 0
+                            nuovo_saggio = st.selectbox("Saggio consegnato", ["-", "NO", "SI"], index=idx_saggio, key=f"msag_{i}")
+                        b1, b2 = st.columns(2)
+                        with b1:
+                            if st.button("💾 AGGIORNA", key=f"upd_{i}", use_container_width=True, type="primary"):
+                                if nuovo_saggio != "-":
+                                    df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
+                                    info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
+                                    df_full.at[i, 'Plesso'] = nuovo_plesso
+                                    df_full.at[i, 'Titolo'] = nuovo_titolo
+                                    if not info_new.empty:
+                                        df_full.at[i, 'Materia'] = info_new.iloc[0,1]; df_full.at[i, 'Editore'] = info_new.iloc[0,2]; df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
+                                    df_full.at[i, 'N° sezioni'] = nuovo_n_sez; df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
+                                    df_full.at[i, 'Saggio Consegna'] = nuovo_saggio; df_full.at[i, 'Note'] = nuove_note
+                                    df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full)
+                                    st.success("Aggiornato!"); st.rerun()
+                        with b2:
+                            if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
+                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str); df_full = df_full.drop(int(i))
+                                df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full); st.rerun()
+# =========================================================
+# FINE BLOCCO 14
+# =========================================================
+# =========================================================
+# --- BLOCCO 15: TABELLONE GENERALE (BIG FONT & BLACK BADGE) ---
+# INIZIO BLOCCO
+# =========================================================
+elif st.session_state.pagina == "Tabellone Stato":
+    st.header("📊 Tabellone Avanzamento Plessi")
+
+    # Mappatura Sigle
+    mappa_sigle = {
+        "LETTURE CLASSE PRIMA": "L1",
+        "LETTURE CLASSE QUARTA": "L4",
+        "SUSSIDIARI DISCIPLINE": "S4",
+        "RELIGIONE": "R1\\4",
+        "INGLESE CLASSE PRIMA": "E1",
+        "INGLESE CLASSE QUARTA": "E4"
+    }
+
+    elenco_totale = get_lista_plessi()
+    consegnati = st.session_state.get("storico_consegne", {})
+    ritirati = st.session_state.get("storico_ritiri", {})
+
+    if not elenco_totale:
+        st.warning("⚠️ Nessun plesso trovato.")
+    else:
+        # Statistiche
+        n_tot = len(elenco_totale)
+        n_ritirati_count = len([p for p in elenco_totale if p in ritirati and not consegnati.get(p)])
+        n_consegnati_count = len([p for p in elenco_totale if p in consegnati])
+        n_bianchi_count = n_tot - (len(set(consegnati.keys()) | set(ritirati.keys())))
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("⚪ DA INIZIARE", max(0, n_bianchi_count))
+        c2.metric("🟠 DA RITIRARE", n_consegnati_count)
+        c3.metric("🟢 COMPLETATI", n_ritirati_count)
+        
+        st.markdown("---")
+
+        # Filtri
+        f1, f2 = st.columns([2, 1])
+        with f1:
+            cerca = st.text_input("🔍 Cerca Plesso...", "").upper()
+        with f2:
+            filtro_stato = st.selectbox("📂 Filtra per Stato", 
+                                       ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
+
+        mostra = []
+        for p in elenco_totale:
+            if cerca not in str(p).upper(): continue
+            cat_attive = consegnati.get(p, {}).keys()
+            ha_sigle = len(cat_attive) > 0
+            e_ritirato = p in ritirati and not ha_sigle
+            e_bianco = p not in consegnati and p not in ritirati
+
+            if filtro_stato == "TUTTI": mostra.append(p)
+            elif filtro_stato == "DA INIZIARE" and e_bianco: mostra.append(p)
+            elif filtro_stato == "DA RITIRARE" and ha_sigle: mostra.append(p)
+            elif filtro_stato == "RITIRATI" and e_ritirato: mostra.append(p)
+
+        # Griglia Plessi
+        if not mostra:
+            st.info("ℹ️ Nessun plesso trovato.")
+        else:
+            n_col = 4 
+            for i in range(0, len(mostra), n_col):
+                cols = st.columns(n_col)
+                for j, plesso in enumerate(mostra[i:i+n_col]):
+                    
+                    categorie_attive = consegnati.get(plesso, {}).keys()
+                    sigle_da_mostrare = [mappa_sigle.get(cat, cat[:2]) for cat in categorie_attive]
+                    
+                    bg, txt, lab, brd = ("#f8f9fa", "#333", "DA INIZIARE", "2px solid #dee2e6")
+                    
+                    if plesso in ritirati and not sigle_da_mostrare:
+                        bg, txt, lab, brd = ("#28a745", "#FFF", "✅ COMPLETATO", "2px solid #1e7e34")
+                    elif sigle_da_mostrare:
+                        bg, txt, lab, brd = ("#FF8C00", "#FFF", "🚚 IN CONSEGNA", "2px solid #e67e22")
+
+                    # --- COSTRUZIONE BOX SIGLE (TESTO NERO) ---
+                    html_blocco_sigle = ""
+                    if sigle_da_mostrare:
+                        span_sigle = "".join([
+                            f'''<span style="
+                                background: white; 
+                                color: black; 
+                                padding: 5px 10px; 
+                                border-radius: 6px; 
+                                font-size: 15px; 
+                                font-weight: 900; 
+                                margin: 4px; 
+                                border: 2.5px solid #000; 
+                                display: inline-block;
+                                box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+                            ">{s}</span>''' 
+                            for s in sigle_da_mostrare
+                        ])
+                        html_blocco_sigle = f'<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: 12px;">{span_sigle}</div>'
+
+                    with cols[j]:
+                        st.markdown(f"""
+                            <div style="
+                                background-color: {bg}; color: {txt}; border: {brd};
+                                border-radius: 12px; padding: 20px 10px; margin-bottom: 20px;
+                                text-align: center; min-height: 190px; display: flex;
+                                flex-direction: column; justify-content: center; align-items: center;
+                                box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+                            ">
+                                <div style="font-size: 20px; font-weight: 900; line-height: 1.2; text-transform: uppercase; margin-bottom: 8px;">
+                                    {plesso}
+                                </div>
+                                <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">
+                                    {lab}
+                                </div>
+                                {html_blocco_sigle}
+                            </div>
+                        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final"):
+        st.session_state.pagina = "Consegne"; st.rerun()
+# =========================================================  
+
+
