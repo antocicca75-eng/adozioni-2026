@@ -292,7 +292,7 @@ with st.sidebar:
     if st.button("📊 REGISTRO COMPLETO", use_container_width=True): 
         st.session_state.pagina = "Registro"; st.rerun()
     
-    if st.button("🔍 FILTRA E RICERCA", use_container_width=True): 
+    if st.button("🔍 PIVOT ADOZIONI", use_container_width=True): 
         st.session_state.pagina = "Ricerca"; st.rerun()
     
     if st.button("📄 MODULO CONSEGNE", use_container_width=True): 
@@ -962,6 +962,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
