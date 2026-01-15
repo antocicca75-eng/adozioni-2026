@@ -311,107 +311,76 @@ with st.sidebar:
     if st.button("📊 TABELLONE STATO", use_container_width=True): 
         st.session_state.pagina = "Tabellone Stato"; st.rerun()
 # ------------------------------------------------------------------------------
-
-
 # ==============================================================================
-# BLOCCO 9: PAGINA CONSEGNE (STAMPA DOPPIA E PDF)
+# BLOCCO 9: PAGINA CONSEGNE E RITIRI (LOGICA PERSISTENTE)
 # ==============================================================================
 if st.session_state.pagina == "Consegne":
-    st.header("📄 Generazione Moduli Consegna")
+    st.header("📄 Gestione Moduli e Registro Storico")
     
     if "storico_consegne" not in st.session_state: 
         st.session_state.storico_consegne = carica_storico_cloud()
     
-    elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
-    
-    def reset_consegne_totale():
-        st.session_state.lista_consegne_attuale = []
-        st.session_state.last_cat = None
-        st.rerun()
+    # Creiamo due Tab per tenere separate le operazioni
+    tab_nuova, tab_archivio = st.tabs(["📤 NUOVA CONSEGNA", "📦 COLLANE RITIRATE"])
 
-    ctr = st.session_state.get('reset_ctr', 0)
-    actr = st.session_state.get('add_ctr', 0)
-
-    col_p, col_c = st.columns(2)
-    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
-    
-    basi = ["- SELEZIONA -", "TUTTE LE TIPOLOGIE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
-    altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
-    cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
-
-    if cat_scelta == "TUTTE LE TIPOLOGIE":
-        st.info("💡 Assegnazione massiva selezionata.")
-        st.session_state.lista_consegne_attuale = []
-        st.session_state.last_cat = "TUTTE"
-
-    elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
-        caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
-        for voce in caricati: voce['q'] = 1
-        st.session_state.lista_consegne_attuale = caricati
-        st.session_state.last_cat = cat_scelta
-
-    if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
-        st.markdown("---")
-        for i, lib in enumerate(st.session_state.lista_consegne_attuale):
-            if 'q' not in lib: lib['q'] = 1
-            c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
-            c_info.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
-            m1, v1, p1 = c_qta.columns([1,1,1])
-            if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
-                if lib['q'] > 1: lib['q'] -= 1; st.rerun()
-            v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px;'>{lib['q']}</p>", unsafe_allow_html=True)
-            if p1.button("➕", key=f"p_{cat_scelta}_{i}"):
-                lib['q'] += 1; st.rerun()
-            if c_del.button("❌", key=f"del_{cat_scelta}_{i}"):
-                st.session_state.lista_consegne_attuale.pop(i); st.rerun()
-
-        col_btns = st.columns(2)
-        if col_btns[0].button("💾 REGISTRA LISTA BASE", use_container_width=True):
-            lista_da_salvare = []
-            for item in st.session_state.lista_consegne_attuale:
-                nuovo_item = item.copy(); nuovo_item['q'] = 1; lista_da_salvare.append(nuovo_item)
-            st.session_state.db_consegne[cat_scelta] = lista_da_salvare
-            salva_config_consegne(st.session_state.db_consegne)
-            st.success("Configurazione salvata!")
+    # --------------------------------------------------------------------------
+    # SEZIONE 1: NUOVA CONSEGNA (Tab 1)
+    # --------------------------------------------------------------------------
+    with tab_nuova:
+        elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
         
-        if col_btns[1].button("🗑️ SVUOTA SCHERMATA", use_container_width=True):
-            st.session_state.reset_ctr = st.session_state.get('reset_ctr', 0) + 1
-            reset_consegne_totale()
+        def reset_consegne_totale():
+            st.session_state.lista_consegne_attuale = []
+            st.session_state.last_cat = None
+            st.rerun()
 
-        with st.expander("➕ Cerca e Aggiungi Libro"):
-            df_cat = get_catalogo_libri()
-            if not df_cat.empty:
-                scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + sorted(df_cat.iloc[:, 0].astype(str).unique().tolist()), key=f"sk_{actr}")
-                if scelta_libro != "- CERCA TITOLO -":
-                    dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
-                    c_sez, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
-                    sez_in = c_sez.text_input("Sezione", key=f"sez_{actr}")
-                    c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
-                    c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
-                    c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
-                    if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
-                        st.session_state.lista_consegne_attuale.append({
-                            "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(), 
-                            "q": 1, "c1": c1in, "c2": c2in, "c3": c3in, "sez": sez_in
-                        })
-                        st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1; st.rerun()
+        ctr = st.session_state.get('reset_ctr', 0)
+        actr = st.session_state.get('add_ctr', 0)
 
-    st.markdown("---")
-    d1, d2 = st.columns(2)
-    docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
-    data_con = d2.text_input("Data di consegna", key=f"dat_{ctr}")
-    classe_man = d1.text_input("Classe specifica", key=f"cla_{ctr}")
-# --- NUOVA SEZIONE PULSANTI: PDF, CONSEGNA E RITIRO PERSISTENTE ---
-    col_print, col_conf, col_ritiro = st.columns(3)
+        col_p, col_c = st.columns(2)
+        p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
+        
+        basi = ["- SELEZIONA -", "TUTTE LE TIPOLOGIE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
+        altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
+        cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
 
-  # --- NUOVA SEZIONE PULSANTI: PDF, CONSEGNA E ARCHIVIO STORICO PERSISTENTE ---
-    col_print, col_conf, col_ritiro = st.columns(3) 
-    
-    # 1. TASTO PDF (Sempre disponibile per la tipologia selezionata)
-    if cat_scelta != "TUTTE LE TIPOLOGIE":
-        if col_print.button("🖨️ GENERA PDF", use_container_width=True, key="btn_pdf_landscape"):
+        if cat_scelta == "TUTTE LE TIPOLOGIE":
+            st.info("💡 Assegnazione massiva selezionata.")
+            st.session_state.lista_consegne_attuale = []
+            st.session_state.last_cat = "TUTTE"
+        elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
+            caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
+            for voce in caricati: voce['q'] = 1
+            st.session_state.lista_consegne_attuale = caricati
+            st.session_state.last_cat = cat_scelta
+
+        if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
+            st.markdown("---")
+            for i, lib in enumerate(st.session_state.lista_consegne_attuale):
+                if 'q' not in lib: lib['q'] = 1
+                c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
+                c_info.info(f"{lib['t']} | {lib['e']}")
+                m1, v1, p1 = c_qta.columns([1,1,1])
+                if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
+                    if lib['q'] > 1: lib['q'] -= 1; st.rerun()
+                v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px;'>{lib['q']}</p>", unsafe_allow_html=True)
+                if p1.button("➕", key=f"p_{cat_scelta}_{i}"):
+                    lib['q'] += 1; st.rerun()
+                if c_del.button("❌", key=f"del_{cat_scelta}_{i}"):
+                    st.session_state.lista_consegne_attuale.pop(i); st.rerun()
+
+        st.markdown("---")
+        d1, d2 = st.columns(2)
+        docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
+        data_con = d2.text_input("Data di consegna", key=f"dat_{ctr}")
+        classe_man = d1.text_input("Classe specifica", key=f"cla_{ctr}")
+
+        # SOLO DUE COLONNE: PDF E CONFERMA (Ritiro rimosso come richiesto)
+        col_print, col_conf = st.columns(2)
+        
+        if cat_scelta != "TUTTE LE TIPOLOGIE" and col_print.button("🖨️ GENERA PDF", use_container_width=True):
             if st.session_state.lista_consegne_attuale:
-                pdf = PDF_CONSEGNA() 
+                pdf = PDF_CONSEGNA()
                 pdf.add_page()
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 pdf.set_draw_color(150, 150, 150)
@@ -419,84 +388,62 @@ if st.session_state.pagina == "Consegne":
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
-    # 2. TASTO CONFERMA CONSEGNA (Carica i libri come 'IN VISIONE')
-    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
-        if p_scelto != "- SELEZIONA PLESSO -":
-            if p_scelto not in st.session_state.storico_consegne: 
-                st.session_state.storico_consegne[p_scelto] = {}
-            
-            # Gestione Massiva
-            if cat_scelta == "TUTTE LE TIPOLOGIE":
-                for k, v in st.session_state.db_consegne.items():
-                    lista_clean = []
-                    for item in v:
-                        nuovo = item.copy()
-                        nuovo['q'] = 1
-                        nuovo['stato'] = "IN VISIONE"
-                        nuovo['data_c'] = data_con
-                        lista_clean.append(nuovo)
-                    st.session_state.storico_consegne[p_scelto][k] = lista_clean
-                st.success(f"REGISTRAZIONE MASSIVA COMPLETATA!")
-            else:
-                # Registrazione Singola: Aggiungiamo i nuovi libri a quelli già esistenti
-                nuovi_libri = []
-                for lib in st.session_state.lista_consegne_attuale:
-                    n_lib = lib.copy()
-                    n_lib['stato'] = "IN VISIONE"
-                    n_lib['data_c'] = data_con
-                    nuovi_libri.append(n_lib)
+        if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
+            if p_scelto != "- SELEZIONA PLESSO -":
+                if p_scelto not in st.session_state.storico_consegne: st.session_state.storico_consegne[p_scelto] = {}
                 
-                # Se la tipologia esisteva già, aggiungiamo i nuovi record senza sovrascrivere
-                if cat_scelta in st.session_state.storico_consegne[p_scelto]:
-                    st.session_state.storico_consegne[p_scelto][cat_scelta].extend(nuovi_libri)
-                else:
-                    st.session_state.storico_consegne[p_scelto][cat_scelta] = nuovi_libri
+                # Registrazione con stato IN VISIONE
+                nuovi = []
+                for item in st.session_state.lista_consegne_attuale:
+                    n = item.copy(); n['stato'] = "IN VISIONE"; n['data_c'] = data_con
+                    nuovi.append(n)
                 
-                st.success(f"Libri registrati come 'IN VISIONE' per {p_scelto}")
-            
-            salva_storico_cloud(st.session_state.storico_consegne)
-
-    # 3. TASTO CONFERMA RITIRO (Cambia stato in 'RITIRATO' senza cancellare)
-    if col_ritiro.button("📦 CONFERMA RITIRO", use_container_width=True):
-        if p_scelto != "- SELEZIONA PLESSO -" and cat_scelta != "- SELEZIONA -":
-            if p_scelto in st.session_state.storico_consegne and cat_scelta in st.session_state.storico_consegne[p_scelto]:
-                
-                libri_in_archivio = st.session_state.storico_consegne[p_scelto][cat_scelta]
-                libri_da_ritirare = st.session_state.lista_consegne_attuale
-                
-                for da_rit in libri_da_ritirare:
-                    titolo = da_rit['t']
-                    q_rit = int(da_rit.get('q', 0))
-                    
-                    # Cerchiamo il libro corrispondente "IN VISIONE" nell'archivio
-                    for record in libri_in_archivio:
-                        if record['t'] == titolo and record['stato'] == "IN VISIONE":
-                            q_disponibile = int(record.get('q', 0))
-                            
-                            if q_rit >= q_disponibile:
-                                # Ritiro totale della riga
-                                record['stato'] = "RITIRATO"
-                                record['data_r'] = data_con
-                                q_rit -= q_disponibile # Se avevamo più righe dello stesso libro
-                            else:
-                                # RITIRO PARZIALE: Sdoppiamo il record
-                                # 1. Creiamo una riga per la parte ritirata
-                                record_ritirato = record.copy()
-                                record_ritirato['q'] = q_rit
-                                record_ritirato['stato'] = "RITIRATO"
-                                record_ritirato['data_r'] = data_con
-                                libri_in_archivio.append(record_ritirato)
-                                
-                                # 2. Aggiorniamo la riga originale con la rimanenza
-                                record['q'] = q_disponibile - q_rit
-                                q_rit = 0
-                                break
-                
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = nuovi
                 salva_storico_cloud(st.session_state.storico_consegne)
-                st.warning(f"Operazione completata: i libri sono stati spostati in stato 'RITIRATO' nell'archivio.")
-                st.rerun()
-            else:
-                st.error("Nessun libro in visione trovato per questo plesso/tipologia.")
+                st.success("Consegna registrata nel registro storico!")
+
+    # --------------------------------------------------------------------------
+    # SEZIONE 2: COLLANE RITIRATE (Tab 2 - Logica Persistente)
+    # --------------------------------------------------------------------------
+    with tab_archivio:
+        p_rit = st.selectbox("Seleziona Plesso per controllo ritiri:", elenco_plessi_con_vuoto, key="p_rit_tab")
+        
+        if p_rit != "- SELEZIONA PLESSO -" and p_rit in st.session_state.storico_consegne:
+            tipologie = list(st.session_state.storico_consegne[p_rit].keys())
+            cat_rit = st.selectbox("Seleziona Tipologia:", ["- SELEZIONA -"] + tipologie, key="c_rit_tab")
+            
+            if cat_rit != "- SELEZIONA -":
+                st.write(f"### Registro: {cat_rit}")
+                
+                for i, lib in enumerate(st.session_state.storico_consegne[p_rit][cat_rit]):
+                    c_info, c_azione = st.columns([0.7, 0.3])
+                    c_info.warning(f"**{lib['t']}**")
+                    
+                    # Se il libro è già RITIRATO, mostriamo la scritta verde
+                    if lib.get('stato') == "RITIRATO":
+                        c_azione.markdown("<h4 style='color: green; margin:0;'>RITIRATO</h4>", unsafe_allow_html=True)
+                    else:
+                        # Se è IN VISIONE, mostriamo contatore e X
+                        c_qta, c_del = c_azione.columns([0.7, 0.3])
+                        q_input = c_qta.number_input("Q.tà", min_value=0, value=int(lib.get('q', 1)), key=f"q_reg_{i}")
+                        
+                        # LOGICA: Se contatore va a 0 o premo X -> RITIRATO
+                        if q_input == 0 or c_del.button("❌", key=f"x_reg_{i}"):
+                            lib['stato'] = "RITIRATO"
+                            salva_storico_cloud(st.session_state.storico_consegne)
+                            st.rerun()
+
+                st.markdown("---")
+                col_m1, col_m2 = st.columns(2)
+                if col_m1.button(f"📦 RITIRA TUTTA LA CATEGORIA", use_container_width=True):
+                    for l in st.session_state.storico_consegne[p_rit][cat_rit]: l['stato'] = "RITIRATO"
+                    salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
+
+                if col_m2.button(f"🔄 SVUOTA INTERO PLESSO (TUTTO RITIRATO)", use_container_width=True):
+                    for c in st.session_state.storico_consegne[p_rit]:
+                        for l in st.session_state.storico_consegne[p_rit][c]: l['stato'] = "RITIRATO"
+                    salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
+
 
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI)
@@ -904,6 +851,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
