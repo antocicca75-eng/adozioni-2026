@@ -108,10 +108,10 @@ class PDF_CONSEGNA(FPDF):
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
         # 1. GESTIONE LOGO
         if self.logo_data:
-            with open("temp_logo.png", "wb") as f: 
+            with open("temp_logo.jpg", "wb") as f: 
                 f.write(self.logo_data.getbuffer())
             # Posizionamento logo centrato rispetto alla metà foglio
-            self.image("temp_logo.png", x=x_offset + 30, y=10, w=75)
+            self.image("temp_logo.jpg", x=x_offset + 30, y=10, w=75)
         
         # 2. INTESTAZIONE CATEGORIA
         self.set_y(40)
@@ -1023,6 +1023,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
