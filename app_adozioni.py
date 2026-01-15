@@ -442,11 +442,12 @@ if st.session_state.pagina == "Consegne":
     
     # Bottone PDF (disabilitato se massiva perché troppo grande)
  # Bottone PDF (disabilitato se massiva perché troppo grande)
+   # Bottone PDF (disabilitato se massiva perché troppo grande)
     if cat_scelta != "TUTTE LE TIPOLOGIE":
-        # Rientro di 4 spazi: questo codice appartiene all'if sopra
-        logo_caricato = st.file_uploader("Upload Logo Scuola (Opzionale)", type=["png", "jpg"])
+        logo_caricato = st.file_uploader("Upload Logo Scuola (Opzionale)", type=["png", "jpg"], key="logo_up_consegne")
         
-        if col_print.button("🖨️ GENERA PDF", use_container_width=True):
+        # Aggiungiamo 'key="btn_genera_pdf_consegne"' per evitare il duplicato
+        if col_print.button("🖨️ GENERA PDF", use_container_width=True, key="btn_genera_pdf_consegne"):
             if st.session_state.lista_consegne_attuale:
                 # PASSIAMO IL LOGO CARICATO ALLA CLASSE
                 pdf = PDF_CONSEGNA(logo_data=logo_caricato) 
@@ -462,13 +463,14 @@ if st.session_state.pagina == "Consegne":
                 # --- COPIA DESTRA ---
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 
-                # Generazione finale per il download
+                # Generazione finale per il download (anche qui mettiamo una key univoca)
                 st.download_button(
                     label="📥 SCARICA PDF",
                     data=bytes(pdf.output()),
                     file_name=f"consegna_{p_scelto}.pdf",
                     mime="application/pdf",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="download_btn_pdf_consegne"
                 )
             else:
                 st.warning("⚠️ Aggiungi almeno un libro alla lista prima di generare il PDF.")
@@ -1040,6 +1042,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
