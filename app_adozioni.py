@@ -87,75 +87,67 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
 
 # ==============================================================================
-# BLOCCO 4: CLASSE PDF (RIPRISTINO LAYOUT ORIGINALE E LOGO AUTOMATICO)
+# BLOCCO 4: CLASSE PDF (REPLICA FIGURA 2 CON QUADRATINI E LOGO GITHUB)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
-        # 'L' sta per Landscape (Orizzontale)
         super().__init__(orientation='L', unit='mm', format='A4')
-        # Se non viene caricato un logo manualmente, cerchiamo 'logo.png' nel repository
+        # Il file deve chiamarsi esattamente logo.png nel repository
         self.logo_path = "logo.png" 
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. GESTIONE LOGO (Ripristino posizione centrata foto nnn.png)
+        # 1. LOGO DA REPOSITORY (Posizione centrata Figura 2)
         try:
-            # Posizionamento logo come nella tua versione originale perfetta
-            self.image(self.logo_path, x=x_offset + 45, y=10, w=55)
+            self.image(self.logo_path, x=x_offset + 40, y=10, w=52)
         except:
-            pass # Se il file non esiste, il PDF viene generato senza logo senza crashare
+            pass # Se il logo non c'è, il PDF continua senza logo
         
         # 2. INTESTAZIONE CATEGORIA
         self.set_y(45)
         self.set_x(x_offset + 10)
-        self.set_fill_color(230, 230, 230)
+        self.set_fill_color(235, 235, 235)
         self.set_font('Arial', 'B', 10)
-        self.cell(128, 8, f"RICEVUTA DI CONSEGNA: {str(categoria).upper()}", border=1, ln=1, align='C', fill=True)
+        self.cell(128, 8, f"{str(categoria).upper()}", border=1, ln=1, align='C', fill=True)
         
-        # 3. TESTATA TABELLA
+        # 3. TESTATA TABELLA (Con colonna CLASSE centrale)
         self.set_x(x_offset + 10)
         self.set_fill_color(245, 245, 245)
         self.set_font('Arial', 'B', 8)
-        self.cell(78, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
-        self.cell(20, 7, 'Q.TÀ', border=1, align='C', fill=True)
+        self.cell(75, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
+        self.cell(23, 7, 'CLASSE', border=1, align='C', fill=True) # Spazio per i 3 quadratini
         self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
         
-        # 4. ELENCO LIBRI
+        # 4. ELENCO LIBRI CON I 3 QUADRATINI (Replica Figura 2)
         self.set_font('Arial', '', 8)
-        for i, lib in enumerate(libri):
-            fill = i % 2 == 1
+        for i, lib in enumerate(libri[:15]): # Limite righe per stare nel foglio
             self.set_x(x_offset + 10)
-            self.set_fill_color(250, 250, 250) if fill else self.set_fill_color(255, 255, 255)
+            # Titolo
+            self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
             
-            self.cell(78, 7, f" {str(lib['t'])[:45]}", border=1, align='L', fill=fill)
-            self.cell(20, 7, str(lib.get('q', '1')), border=1, align='C', fill=fill)
-            self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C', fill=fill)
+            # I 3 QUADRATINI (sotto la colonna CLASSE)
+            # Dividiamo i 23mm della colonna Classe in 3 piccoli spazi da ~7.6mm
+            curr_x = self.get_x()
+            self.cell(7.6, 7, '', border=1, align='C')
+            self.cell(7.6, 7, '', border=1, align='C')
+            self.cell(7.8, 7, '', border=1, align='C')
+            
+            # Editore
+            self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
-        # 5. DETTAGLI DI CONSEGNA (Ripristino posizione bassa)
-        self.set_y(145)
+        # 5. DETTAGLI DI CONSEGNA (Bloccati in fondo come Figura 2)
+        self.set_y(150)
         self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
         self.set_font('Arial', 'B', 9)
-        self.cell(128, 7, ' DETTAGLI RICEVUTA', border=1, ln=1, fill=True)
+        self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=1, ln=1, fill=True)
         
-        dati_consegna = [
-            ("PLESSO:", p), 
-            ("INSEGNANTE:", ins), 
-            ("CLASSE/SEZ:", sez), 
-            ("DATA:", data_m)
-        ]
-        
-        for label, val in dati_consegna:
+        dati = [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]
+        for label, val in dati:
             self.set_x(x_offset + 10)
             self.set_font('Arial', 'B', 8)
             self.cell(35, 6.5, label, border=1, align='L')
             self.set_font('Arial', '', 8)
             self.cell(93, 6.5, str(val).upper(), border=1, ln=1, align='L')
-
-        # 6. SPAZIO FIRMA
-        self.set_y(180)
-        self.set_x(x_offset + 10)
-        self.set_font('Arial', 'I', 8)
-        self.cell(128, 10, "Firma per ricevuta: __________________________________________", border=0, align='R')
 # ------------------------------------------------------------------------------
 
 
@@ -840,6 +832,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
