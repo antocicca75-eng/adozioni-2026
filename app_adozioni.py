@@ -108,7 +108,7 @@ class PDF_CONSEGNA(FPDF):
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
         if self.logo_data:
             with open("temp_logo.jpg", "wb") as f: f.write(self.logo_data.getbuffer())
-            self.image("temp_logo.png", x=x_offset + 34, y=8, w=80)
+            self.image("temp_logo.jpg", x=x_offset + 34, y=8, w=80)
         
         self.set_y(38); self.set_x(x_offset + 10)
         self.set_fill_color(230, 230, 230); self.set_font('Arial', 'B', 9)
@@ -994,6 +994,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
