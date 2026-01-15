@@ -97,81 +97,50 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
 
 # =========================================================
-# --- BLOCCO 4: CLASSE PDF (OTTIMIZZATO LANDSCAPE) ---
+# --- BLOCCO 4: CLASSE PDF ---
+# INIZIO BLOCCO
 # =========================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
-        # 'L' sta per Landscape (Orizzontale)
         super().__init__(orientation='L', unit='mm', format='A4')
         self.logo_data = logo_data
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. GESTIONE LOGO
         if self.logo_data:
-            with open("temp_logo.jpg", "wb") as f: 
-                f.write(self.logo_data.getbuffer())
-            # Posizionamento logo centrato rispetto alla metà foglio
-            self.image("temp_logo.jpg", x=x_offset + 30, y=10, w=75)
+            with open("temp_logo.png", "wb") as f: f.write(self.logo_data.getbuffer())
+            self.image("temp_logo.png", x=x_offset + 34, y=8, w=80)
         
-        # 2. INTESTAZIONE CATEGORIA
-        self.set_y(40)
-        self.set_x(x_offset + 10)
-        self.set_fill_color(230, 230, 230)
-        self.set_font('Arial', 'B', 10)
-        # Larghezza totale modulo impostata a 128mm per stare comodi nella metà A4
-        self.cell(128, 8, f"RICEVUTA DI CONSEGNA: {str(categoria).upper()}", border=1, ln=1, align='C', fill=True)
+        self.set_y(38); self.set_x(x_offset + 10)
+        self.set_fill_color(230, 230, 230); self.set_font('Arial', 'B', 9)
+        self.cell(129, 8, str(categoria).upper(), border=1, ln=1, align='C', fill=True)
         
-        # 3. TESTATA TABELLA
-        self.set_x(x_offset + 10)
-        self.set_fill_color(245, 245, 245)
-        self.set_font('Arial', 'B', 8)
-        self.cell(78, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
-        self.cell(20, 7, 'Q.TÀ', border=1, align='C', fill=True) # Semplificato per chiarezza
+        self.set_x(x_offset + 10); self.set_fill_color(245, 245, 245)
+        self.cell(75, 7, 'TITOLO', border=1, align='C', fill=True)
+        self.cell(24, 7, 'CLASSE', border=1, align='C', fill=True) 
         self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
         
-        # 4. ELENCO LIBRI
-        self.set_font('Arial', '', 8)
         for i, lib in enumerate(libri):
             fill = i % 2 == 1
-            self.set_x(x_offset + 10)
-            self.set_fill_color(250, 250, 250) if fill else self.set_fill_color(255, 255, 255)
-            
-            # Titolo (troncato a 45 caratteri per non rompere la riga)
-            self.cell(78, 7, f" {str(lib['t'])[:45]}", border=1, align='L', fill=fill)
-            # Quantità (prende il valore 'q' dalla lista)
-            self.cell(20, 7, str(lib.get('q', '1')), border=1, align='C', fill=fill)
-            # Editore
-            self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C', fill=fill)
-
-        # 5. DETTAGLI DI CONSEGNA (Spostati in basso nel modulo)
-        self.set_y(140)
-        self.set_x(x_offset + 10)
-        self.set_fill_color(240, 240, 240)
-        self.set_font('Arial', 'B', 9)
-        self.cell(128, 7, ' DETTAGLI RICEVUTA', border=1, ln=1, fill=True)
-        
-        dati_consegna = [
-            ("PLESSO:", p), 
-            ("INSEGNANTE:", ins), 
-            ("CLASSE/SEZ:", sez), 
-            ("DATA:", data_m)
-        ]
-        
-        for label, val in dati_consegna:
-            self.set_x(x_offset + 10)
-            self.set_font('Arial', 'B', 8)
-            self.cell(35, 6.5, label, border=1, align='L')
+            self.set_x(x_offset + 10); self.set_fill_color(250, 250, 250) if fill else self.set_fill_color(255, 255, 255)
+            self.set_font('Arial', 'B', 7.5)
+            self.cell(75, 6, f" {str(lib['t'])[:45]}", border=1, align='L', fill=fill)
             self.set_font('Arial', '', 8)
-            self.cell(93, 6.5, str(val).upper(), border=1, ln=1, align='L')
+            self.cell(8, 6, str(lib.get('c1','')), border=1, align='C', fill=fill)
+            self.cell(8, 6, str(lib.get('c2','')), border=1, align='C', fill=fill)
+            self.cell(8, 6, str(lib.get('c3','')), border=1, align='C', fill=fill)
+            self.cell(30, 6, str(lib.get('e',''))[:20], border=1, ln=1, align='C', fill=fill)
 
-        # 6. SPAZIO FIRMA
-        self.set_y(175)
-        self.set_x(x_offset + 10)
-        self.set_font('Arial', 'I', 8)
-        self.cell(128, 10, "Firma per ricevuta: __________________________________________", border=0, align='R')
-
-
+        self.set_y(145); self.set_x(x_offset + 10); self.set_fill_color(240, 240, 240); self.set_font('Arial', 'B', 8)
+        self.cell(129, 7, ' DETTAGLI DI CONSEGNA', border=1, ln=1, fill=True)
+        for label, val in [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]:
+            self.set_x(x_offset + 10); self.set_font('Arial', 'B', 7.5)
+            self.cell(35, 6.2, label, border=1, align='L')
+            self.set_font('Arial', '', 7.5)
+            self.cell(94, 6.2, str(val).upper(), border=1, ln=1, align='L')
 # =========================================================
+# FINE BLOCCO 4
+# =========================================================
+
 # --- BLOCCO 5: CONNESSIONE GOOGLE E BACKUP ---
 # INIZIO BLOCCO
 # =========================================================
@@ -1023,6 +992,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
