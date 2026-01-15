@@ -101,25 +101,24 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 # =========================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
+        # 'L' sta per Landscape (Orizzontale)
         super().__init__(orientation='L', unit='mm', format='A4')
         self.logo_data = logo_data
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. GESTIONE LOGO (Corretta)
+        # 1. GESTIONE LOGO
         if self.logo_data:
-            try:
-                # Salvataggio temporaneo per FPDF
-                with open("temp_logo.png", "wb") as f:
-                    f.write(self.logo_data.getvalue()) # Usiamo getvalue() per sicurezza
-                self.image("temp_logo.png", x=x_offset + 35, y=10, w=75)
-            except:
-                pass # Se il logo fallisce, il PDF viene generato senza logo
+            with open("temp_logo.png", "wb") as f: 
+                f.write(self.logo_data.getbuffer())
+            # Posizionamento logo centrato rispetto alla metà foglio
+            self.image("temp_logo.png", x=x_offset + 30, y=10, w=75)
         
         # 2. INTESTAZIONE CATEGORIA
         self.set_y(40)
         self.set_x(x_offset + 10)
         self.set_fill_color(230, 230, 230)
         self.set_font('Arial', 'B', 10)
+        # Larghezza totale modulo impostata a 128mm per stare comodi nella metà A4
         self.cell(128, 8, f"RICEVUTA DI CONSEGNA: {str(categoria).upper()}", border=1, ln=1, align='C', fill=True)
         
         # 3. TESTATA TABELLA
@@ -127,7 +126,7 @@ class PDF_CONSEGNA(FPDF):
         self.set_fill_color(245, 245, 245)
         self.set_font('Arial', 'B', 8)
         self.cell(78, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
-        self.cell(20, 7, 'Q.TÀ', border=1, align='C', fill=True)
+        self.cell(20, 7, 'Q.TÀ', border=1, align='C', fill=True) # Semplificato per chiarezza
         self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
         
         # 4. ELENCO LIBRI
@@ -136,29 +135,41 @@ class PDF_CONSEGNA(FPDF):
             fill = i % 2 == 1
             self.set_x(x_offset + 10)
             self.set_fill_color(250, 250, 250) if fill else self.set_fill_color(255, 255, 255)
+            
+            # Titolo (troncato a 45 caratteri per non rompere la riga)
             self.cell(78, 7, f" {str(lib['t'])[:45]}", border=1, align='L', fill=fill)
+            # Quantità (prende il valore 'q' dalla lista)
             self.cell(20, 7, str(lib.get('q', '1')), border=1, align='C', fill=fill)
+            # Editore
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C', fill=fill)
 
-        # 5. DETTAGLI DI CONSEGNA
+        # 5. DETTAGLI DI CONSEGNA (Spostati in basso nel modulo)
         self.set_y(140)
         self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
         self.set_font('Arial', 'B', 9)
         self.cell(128, 7, ' DETTAGLI RICEVUTA', border=1, ln=1, fill=True)
         
-        for label, val in [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE/SEZ:", sez), ("DATA:", data_m)]:
+        dati_consegna = [
+            ("PLESSO:", p), 
+            ("INSEGNANTE:", ins), 
+            ("CLASSE/SEZ:", sez), 
+            ("DATA:", data_m)
+        ]
+        
+        for label, val in dati_consegna:
             self.set_x(x_offset + 10)
             self.set_font('Arial', 'B', 8)
             self.cell(35, 6.5, label, border=1, align='L')
             self.set_font('Arial', '', 8)
             self.cell(93, 6.5, str(val).upper(), border=1, ln=1, align='L')
 
-        # 6. FIRMA
+        # 6. SPAZIO FIRMA
         self.set_y(175)
         self.set_x(x_offset + 10)
         self.set_font('Arial', 'I', 8)
         self.cell(128, 10, "Firma per ricevuta: __________________________________________", border=0, align='R')
+
 # --- BLOCCO 5: CONNESSIONE GOOGLE E BACKUP ---
 # INIZIO BLOCCO
 # =========================================================
@@ -441,39 +452,7 @@ if st.session_state.pagina == "Consegne":
     col_print, col_conf = st.columns(2)
     
     # Bottone PDF (disabilitato se massiva perché troppo grande)
- # Bottone PDF (disabilitato se massiva perché troppo grande)
-   # Bottone PDF (disabilitato se massiva perché troppo grande)
     if cat_scelta != "TUTTE LE TIPOLOGIE":
-        logo_caricato = st.file_uploader("Upload Logo Scuola (Opzionale)", type=["png", "jpg"], key="logo_up_consegne")
-        
-        # Aggiungiamo 'key="btn_genera_pdf_consegne"' per evitare il duplicato
-        if col_print.button("🖨️ GENERA PDF", use_container_width=True, key="btn_genera_pdf_consegne"):
-            if st.session_state.lista_consegne_attuale:
-                # PASSIAMO IL LOGO CARICATO ALLA CLASSE
-                pdf = PDF_CONSEGNA(logo_data=logo_caricato) 
-                pdf.add_page()
-                
-                # --- COPIA SINISTRA ---
-                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-                
-                # --- LINEA TRATTEGGIATA DI TAGLIO CENTRALE ---
-                pdf.set_draw_color(150, 150, 150)
-                pdf.dashed_line(148.5, 0, 148.5, 210, 1, 1)
-                
-                # --- COPIA DESTRA ---
-                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-                
-                # Generazione finale per il download (anche qui mettiamo una key univoca)
-                st.download_button(
-                    label="📥 SCARICA PDF",
-                    data=bytes(pdf.output()),
-                    file_name=f"consegna_{p_scelto}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                    key="download_btn_pdf_consegne"
-                )
-            else:
-                st.warning("⚠️ Aggiungi almeno un libro alla lista prima di generare il PDF.")
         if col_print.button("🖨️ GENERA PDF", use_container_width=True):
             if st.session_state.lista_consegne_attuale:
                 pdf = PDF_CONSEGNA(st.session_state.get('logo_scuola'))
@@ -505,7 +484,7 @@ if st.session_state.pagina == "Consegne":
                 st.success(f"Consegna registrata per {cat_scelta}!")
             
             salva_storico_cloud(st.session_state.storico_consegne)
-
+# =========================================================
 # =========================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
@@ -1042,11 +1021,6 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
-
-
-
-
-
 
 
 
