@@ -312,8 +312,7 @@ with st.sidebar:
 # ------------------------------------------------------------------------------
 
 
-# ==============================================================================
-# BLOCCO 9: PAGINA CONSEGNE (STAMPA DOPPIA E PDF)
+BLOCCO 9: PAGINA CONSEGNE (STAMPA DOPPIA E PDF)
 # ==============================================================================
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
@@ -429,8 +428,6 @@ if st.session_state.pagina == "Consegne":
                 st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
                 st.success(f"Consegna registrata!")
             salva_storico_cloud(st.session_state.storico_consegne)
-# ------------------------------------------------------------------------------
-
 
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI)
@@ -587,4 +584,5 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 # ------------------------------------------------------------------------------
+
 
