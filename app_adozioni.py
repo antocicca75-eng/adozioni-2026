@@ -443,9 +443,9 @@ if st.session_state.pagina == "Consegne":
     # Bottone PDF (disabilitato se massiva perché troppo grande)
     if cat_scelta != "TUTTE LE TIPOLOGIE":
         # Nel Blocco 9, prima del pulsante "GENERA PDF"
-logo_caricato = st.file_uploader("Upload Logo Scuola (Opzionale)", type=["png", "jpg"])
-
-if col_print.button("🖨️ GENERA PDF", use_container_width=True):
+    logo_caricato = st.file_uploader("Upload Logo Scuola (Opzionale)", type=["png", "jpg"])
+    
+    if col_print.button("🖨️ GENERA PDF", use_container_width=True):
     if st.session_state.lista_consegne_attuale:
         # PASSIAMO IL LOGO CARICATO ALLA CLASSE
         pdf = PDF_CONSEGNA(logo_data=logo_caricato) 
@@ -1030,6 +1030,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
