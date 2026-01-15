@@ -312,123 +312,150 @@ with st.sidebar:
 # ------------------------------------------------------------------------------
 
 
-BLOCCO 9: PAGINA CONSEGNE (STAMPA DOPPIA E PDF)
-# ==============================================================================
+controlla il blocco # =========================================================
+# --- BLOCCO 9: PAGINA CONSEGNE (GESTIONE MASSIVA E COPIE) ---
+# INIZIO BLOCCO
+# =========================================================
 if st.session_state.pagina == "Consegne":
-    st.header("📄 Generazione Moduli Consegna")
-    
-    if "storico_consegne" not in st.session_state: 
-        st.session_state.storico_consegne = carica_storico_cloud()
-    
-    elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
-    
-    def reset_consegne_totale():
-        st.session_state.lista_consegne_attuale = []
-        st.session_state.last_cat = None
-        st.rerun()
+    st.header("📄 Generazione Moduli Consegna")
+    
+    if "storico_consegne" not in st.session_state: 
+        st.session_state.storico_consegne = carica_storico_cloud()
+    
+    elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
+    
+    def reset_consegne_totale():
+        st.session_state.lista_consegne_attuale = []
+        st.session_state.last_cat = None
+        st.rerun()
 
-    ctr = st.session_state.get('reset_ctr', 0)
-    actr = st.session_state.get('add_ctr', 0)
+    ctr = st.session_state.get('reset_ctr', 0)
+    actr = st.session_state.get('add_ctr', 0)
 
-    col_p, col_c = st.columns(2)
-    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
-    
-    basi = ["- SELEZIONA -", "TUTTE LE TIPOLOGIE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
-    altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
-    cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
+    col_p, col_c = st.columns(2)
+    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
+    
+    # Aggiunta opzione "TUTTE LE TIPOLOGIE"
+    basi = ["- SELEZIONA -", "TUTTE LE TIPOLOGIE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
+    altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
+    cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
 
-    if cat_scelta == "TUTTE LE TIPOLOGIE":
-        st.info("💡 Assegnazione massiva selezionata.")
-        st.session_state.lista_consegne_attuale = []
-        st.session_state.last_cat = "TUTTE"
+    # --- LOGICA CARICAMENTO ---
+    if cat_scelta == "TUTTE LE TIPOLOGIE":
+        st.info("💡 Hai selezionato l'assegnazione massiva. Clicca su 'CONFERMA CONSEGNA' in basso per registrare tutti i libri del database per questo plesso.")
+        st.session_state.lista_consegne_attuale = [] # Svuota la lista singola per evitare confusioni
+        st.session_state.last_cat = "TUTTE"
 
-    elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
-        caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
-        for voce in caricati: voce['q'] = 1
-        st.session_state.lista_consegne_attuale = caricati
-        st.session_state.last_cat = cat_scelta
+    elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
+        caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
+        # Forza ogni libro caricato ad avere quantità 1 di default
+        for voce in caricati:
+            voce['q'] = 1
+        st.session_state.lista_consegne_attuale = caricati
+        st.session_state.last_cat = cat_scelta
 
-    if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
-        st.markdown("---")
-        for i, lib in enumerate(st.session_state.lista_consegne_attuale):
-            if 'q' not in lib: lib['q'] = 1
-            c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
-            c_info.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
-            m1, v1, p1 = c_qta.columns([1,1,1])
-            if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
-                if lib['q'] > 1: lib['q'] -= 1; st.rerun()
-            v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px;'>{lib['q']}</p>", unsafe_allow_html=True)
-            if p1.button("➕", key=f"p_{cat_scelta}_{i}"):
-                lib['q'] += 1; st.rerun()
-            if c_del.button("❌", key=f"del_{cat_scelta}_{i}"):
-                st.session_state.lista_consegne_attuale.pop(i); st.rerun()
+    # --- VISUALIZZAZIONE LISTA (Solo se non è massiva) ---
+    if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
+        st.markdown("---")
+        for i, lib in enumerate(st.session_state.lista_consegne_attuale):
+            if 'q' not in lib: lib['q'] = 1
+            
+            c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
+            c_info.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
+            
+            m1, v1, p1 = c_qta.columns([1,1,1])
+            if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
+                if lib['q'] > 1:
+                    lib['q'] -= 1
+                    st.rerun()
+            v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px;'>{lib['q']}</p>", unsafe_allow_html=True)
+            if p1.button("➕", key=f"p_{cat_scelta}_{i}"):
+                lib['q'] += 1
+                st.rerun()
 
-        col_btns = st.columns(2)
-        if col_btns[0].button("💾 REGISTRA LISTA BASE", use_container_width=True):
-            lista_da_salvare = []
-            for item in st.session_state.lista_consegne_attuale:
-                nuovo_item = item.copy(); nuovo_item['q'] = 1; lista_da_salvare.append(nuovo_item)
-            st.session_state.db_consegne[cat_scelta] = lista_da_salvare
-            salva_config_consegne(st.session_state.db_consegne)
-            st.success("Configurazione salvata!")
-        
-        if col_btns[1].button("🗑️ SVUOTA SCHERMATA", use_container_width=True):
-            st.session_state.reset_ctr = st.session_state.get('reset_ctr', 0) + 1
-            reset_consegne_totale()
+            if c_del.button("❌", key=f"del_{cat_scelta}_{i}"):
+                st.session_state.lista_consegne_attuale.pop(i)
+                st.rerun()
 
-        with st.expander("➕ Cerca e Aggiungi Libro"):
-            df_cat = get_catalogo_libri()
-            if not df_cat.empty:
-                scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + sorted(df_cat.iloc[:, 0].astype(str).unique().tolist()), key=f"sk_{actr}")
-                if scelta_libro != "- CERCA TITOLO -":
-                    dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
-                    c_sez, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
-                    sez_in = c_sez.text_input("Sezione", key=f"sez_{actr}")
-                    c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
-                    c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
-                    c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
-                    if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
-                        st.session_state.lista_consegne_attuale.append({
-                            "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(), 
-                            "q": 1, "c1": c1in, "c2": c2in, "c3": c3in, "sez": sez_in
-                        })
-                        st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1; st.rerun()
+        col_btns = st.columns(2)
+        if col_btns[0].button("💾 REGISTRA LISTA BASE", use_container_width=True):
+            lista_da_salvare = []
+            for item in st.session_state.lista_consegne_attuale:
+                nuovo_item = item.copy()
+                nuovo_item['q'] = 1 
+                lista_da_salvare.append(nuovo_item)
+            st.session_state.db_consegne[cat_scelta] = lista_da_salvare
+            salva_config_consegne(st.session_state.db_consegne)
+            st.success("Configurazione salvata!")
+        
+        if col_btns[1].button("🗑️ SVUOTA SCHERMATA", use_container_width=True):
+            st.session_state.reset_ctr = st.session_state.get('reset_ctr', 0) + 1
+            reset_consegne_totale()
 
-    st.markdown("---")
-    d1, d2 = st.columns(2)
-    docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
-    data_con = d2.text_input("Data di consegna", key=f"dat_{ctr}")
-    classe_man = d1.text_input("Classe specifica", key=f"cla_{ctr}")
+        # --- CERCA E AGGIUNGI LIBRO ---
+        with st.expander("➕ Cerca e Aggiungi Libro"):
+            df_cat = get_catalogo_libri()
+            if not df_cat.empty:
+                scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + sorted(df_cat.iloc[:, 0].astype(str).unique().tolist()), key=f"sk_{actr}")
+                if scelta_libro != "- CERCA TITOLO -":
+                    dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
+                    c_sez, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
+                    sez_in = c_sez.text_input("Sezione", key=f"sez_{actr}")
+                    c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
+                    c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
+                    c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
+                    
+                    if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
+                        st.session_state.lista_consegne_attuale.append({
+                            "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(), 
+                            "q": 1, "c1": c1in, "c2": c2in, "c3": c3in, "sez": sez_in
+                        })
+                        st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1
+                        st.rerun()
 
-    col_print, col_conf = st.columns(2)
-    
-    if cat_scelta != "TUTTE LE TIPOLOGIE":
-        logo_up = st.file_uploader("Upload Logo Scuola", type=["png", "jpg"], key="up_logo_consegne")
-        if col_print.button("🖨️ GENERA PDF", use_container_width=True, key="btn_pdf_landscape"):
-            if st.session_state.lista_consegne_attuale:
-                pdf = PDF_CONSEGNA(logo_data=logo_up)
-                pdf.add_page()
-                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-                pdf.set_draw_color(150, 150, 150)
-                pdf.dashed_line(148.5, 0, 148.5, 210, 1, 1)
-                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-                st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
+    # --- DATI RICEVENTE E GENERAZIONE PDF ---
+    st.markdown("---")
+    d1, d2 = st.columns(2)
+    docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
+    data_con = d2.text_input("Data di consegna", key=f"dat_{ctr}")
+    classe_man = d1.text_input("Classe specifica", key=f"cla_{ctr}")
 
-    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
-        if p_scelto != "- SELEZIONA PLESSO -":
-            if p_scelto not in st.session_state.storico_consegne: st.session_state.storico_consegne[p_scelto] = {}
-            if cat_scelta == "TUTTE LE TIPOLOGIE":
-                for k, v in st.session_state.db_consegne.items():
-                    lista_clean = []
-                    for item in v:
-                        nuovo = item.copy(); nuovo['q'] = 1; lista_clean.append(nuovo)
-                    st.session_state.storico_consegne[p_scelto][k] = lista_clean
-                st.success(f"REGISTRAZIONE MASSIVA COMPLETATA!")
-            else:
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
-                st.success(f"Consegna registrata!")
-            salva_storico_cloud(st.session_state.storico_consegne)
+    col_print, col_conf = st.columns(2)
+    
+    # Bottone PDF (disabilitato se massiva perché troppo grande)
+    if cat_scelta != "TUTTE LE TIPOLOGIE":
+        if col_print.button("🖨️ GENERA PDF", use_container_width=True):
+            if st.session_state.lista_consegne_attuale:
+                pdf = PDF_CONSEGNA(st.session_state.get('logo_scuola'))
+                pdf.add_page()
+                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
+                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
+    # --- CONFERMA E REGISTRAZIONE (Gestisce anche il MASSIVO) ---
+    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
+        if p_scelto != "- SELEZIONA PLESSO -":
+            if p_scelto not in st.session_state.storico_consegne: 
+                st.session_state.storico_consegne[p_scelto] = {}
+            
+            if cat_scelta == "TUTTE LE TIPOLOGIE":
+                # Ciclo su tutto il database per assegnare ogni categoria al plesso
+                for k, v in st.session_state.db_consegne.items():
+                    lista_clean = []
+                    for item in v:
+                        nuovo = item.copy()
+                        nuovo['q'] = 1 # Forza sempre a 1 per il registro storico
+                        lista_clean.append(nuovo)
+                    st.session_state.storico_consegne[p_scelto][k] = lista_clean
+                st.success(f"REGISTRAZIONE MASSIVA COMPLETATA per {p_scelto}!")
+            else:
+                # Registrazione singola tipologia
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
+                st.success(f"Consegna registrata per {cat_scelta}!")
+            
+            salva_storico_cloud(st.session_state.storico_consegne)
+# =========================================================
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI)
 # ==============================================================================
@@ -584,5 +611,6 @@ elif st.session_state.pagina == "Ricerca":
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
 # ------------------------------------------------------------------------------
+
 
 
