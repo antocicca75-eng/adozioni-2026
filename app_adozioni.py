@@ -692,20 +692,28 @@ elif st.session_state.pagina == "NuovoLibro":
                     st.success("Libro aggiunto!"); st.rerun()
 # ------------------------------------------------------------------------------
 # =========================================================
-# --- BLOCCO 14: PAGINA MODIFICA (FIX CHIUSURA DOPO AGGIORNA) ---
+# --- BLOCCO 14: PAGINA MODIFICA (VERSIONE STABILE) ---
 # =========================================================
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
+    
+    # Inizializziamo un contatore per il reset se non esiste
+    if "reset_mod_ctr" not in st.session_state:
+        st.session_state.reset_mod_ctr = 0
+
     if os.path.exists(DB_FILE):
         df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
         c_ric1, c_ric2 = st.columns(2)
+        
+        # Usiamo il contatore nella KEY per resettare tutto quando vogliamo
         with c_ric1:
             lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
-            # Aggiunta key statica per permettere il reset
-            p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db, key="filtro_p_mod")
+            p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db, 
+                                 key=f"p_mod_{st.session_state.reset_mod_ctr}")
         with c_ric2:
             lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
-            t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db, key="filtro_t_mod")
+            t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db, 
+                                 key=f"t_mod_{st.session_state.reset_mod_ctr}")
         
         if p_cerca or t_cerca:
             df_filtrato = df_mod.copy()
@@ -754,20 +762,18 @@ elif st.session_state.pagina == "Modifica":
                                     df_full.to_csv(DB_FILE, index=False)
                                     backup_su_google_sheets(df_full)
                                     
-                                    # --- MODIFICA: Reset filtri per tornare allo stato iniziale ---
-                                    st.session_state.filtro_p_mod = ""
-                                    st.session_state.filtro_t_mod = ""
+                                    # --- TRUCCO PER IL RESET: Incrementiamo il contatore ---
+                                    st.session_state.reset_mod_ctr += 1
                                     
-                                    st.success("Aggiornato!")
-                                    st.rerun()
+                                    st.success("Aggiornato!"); st.rerun()
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
                                 df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
                                 df_full = df_full.drop(int(i))
                                 df_full.to_csv(DB_FILE, index=False)
                                 backup_su_google_sheets(df_full)
+                                st.session_state.reset_mod_ctr += 1 # Reset anche qui
                                 st.rerun()
-# =========================================================
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
@@ -966,6 +972,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
