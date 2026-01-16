@@ -88,7 +88,7 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
 
 # ==============================================================================
-# BLOCCO 4: CLASSE PDF (DEFINITIVO - LOGO CORRETTO NELLA CORNICE)
+# BLOCCO 4: CLASSE PDF (DEFINITIVO - SENZA ERRORI DI SINTASSI)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
@@ -96,7 +96,7 @@ class PDF_CONSEGNA(FPDF):
         self.logo_path = "logo.jpg" 
 
     def rounded_rect(self, x, y, w, h, r, style='', corners='1234'):
-        """Definizione manuale per evitare AttributeError e cerchi negli angoli"""
+        """Disegna un rettangolo con angoli arrotondati senza dipendenze esterne"""
         k = self.k
         hp = self.h
         if style == 'F': op = 'f'
@@ -135,34 +135,35 @@ class PDF_CONSEGNA(FPDF):
         self._out(op)
 
     def _arc(self, x1, y1, x2, y2, x3, y3):
+        """Funzione di supporto per gli archi degli angoli arrotondati"""
         h = self.h
-        self._out(f'{x1 * self.k:.2f} {(h - y1) * self.k:.2f} {x2 * self.self.k:.2f} {(h - y2) * self.k:.2f} {x3 * self.k:.2f} {(h - y3) * self.k:.2f} c')
+        # CORRETTO: self.k (non self.self.k)
+        self._out(f'{x1 * self.k:.2f} {(h - y1) * self.k:.2f} {x2 * self.k:.2f} {(h - y2) * self.k:.2f} {x3 * self.k:.2f} {(h - y3) * self.k:.2f} c')
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. LOGO E CORNICE (SISTEMATA PER EVITARE SBORDAMENTI)
+        # 1. LOGO E CORNICE (SISTEMATA)
         img_w = 70
         img_x = x_offset + (148.5 - img_w) / 2
-        img_y = 8  # Alzato leggermente per dare spazio
+        img_y = 8  
         
-        # Altezza cornice aumentata a 32 per contenere tutto
+        # Cornice generosa (32mm) per contenere il logo in orizzontale
         box_h = 32
         box_w = img_w + 6
 
         try:
-            # Posiziono il logo centrato nella cornice
-            self.image(self.logo_path, x=img_x, y=img_y + 3.5, w=img_w)
+            # Posizionamento logo con margine di sicurezza inferiore
+            self.image(self.logo_path, x=img_x, y=img_y + 2, w=img_w)
             self.set_line_width(0.3)
-            # Disegno la cornice
             self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3) 
         except:
             self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3)
             self.set_font('Arial', 'I', 7)
-            self.text(img_x + 10, img_y + 12, "Logo non trovato")
+            self.text(img_x + 10, img_y + 15, "Logo non trovato")
         
-        # 2. TITOLO CATEGORIA (Spostato a Y=45 per non sovrapporsi)
-        self.set_y(45); self.set_x(x_offset + 10)
+        # 2. TITOLO CATEGORIA (Spostato per non toccare il logo)
+        self.set_y(46); self.set_x(x_offset + 10)
         self.set_fill_color(235, 235, 235)
-        self.rounded_rect(x_offset + 10, 45, 128, 8, 2, 'DF')
+        self.rounded_rect(x_offset + 10, 46, 128, 8, 2, 'DF')
         self.set_font('Arial', 'B', 10)
         self.cell(128, 8, f"{str(categoria).upper()}", border=0, ln=1, align='C')
         
@@ -184,7 +185,7 @@ class PDF_CONSEGNA(FPDF):
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
         # 5. DETTAGLI DI CONSEGNA
-        self.set_y(155); self.set_x(x_offset + 10) # Spostato leggermente per equilibrio
+        self.set_y(155); self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
         self.rounded_rect(x_offset + 10, 155, 128, 7, 1.5, 'DF')
         self.set_font('Arial', 'B', 9)
@@ -202,7 +203,7 @@ class PDF_CONSEGNA(FPDF):
         self.set_y(190); self.set_x(x_offset + 10)
         self.set_font('Arial', 'I', 8)
         self.cell(128, 5, "www.irpinialibri.it - Distribuzione Editoriale Scolastica", border=0, align='C')
-
+# ------------------------------------------------------------------------------
 # ==============================================================================
 # BLOCCO 5: CONNESSIONE GOOGLE DRIVE E BACKUP
 # ==============================================================================
@@ -909,6 +910,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
