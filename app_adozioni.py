@@ -199,11 +199,7 @@ class PDF_CONSEGNA(FPDF):
             t_v = str(val).upper() if val and val != "- SELEZIONA PLESSO -" else ""
             self.cell(93, 6.5, t_v, border=1, ln=1, align='L')
 
-        # 6. SCRITTA SITO WEB
-        self.set_y(190); self.set_x(x_offset + 10)
-        self.set_font('Arial', 'I', 8)
-        self.cell(128, 5, "www.irpinialibri.it - Distribuzione Editoriale Scolastica", border=0, align='C')
-# ------------------------------------------------------------------------------
+       
 # ==============================================================================
 # BLOCCO 5: CONNESSIONE GOOGLE DRIVE E BACKUP
 # ==============================================================================
@@ -910,6 +906,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
