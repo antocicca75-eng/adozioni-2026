@@ -498,21 +498,52 @@ if st.session_state.pagina == "Consegne":
                 pdf.add_page()
                 # ... resto del codice per generare il pdf
 
+  # --- PARTE FINALE BLOCCO 9: PDF E CONFERMA ---
+    col_print, col_conf = st.columns(2)
+    
+    if cat_scelta != "TUTTE LE TIPOLOGIE" and cat_scelta != "- SELEZIONA -":
+        if col_print.button("🖨️ GENERA PDF", use_container_width=True):
+            if st.session_state.lista_consegne_attuale:
+                # Carichiamo il file fisico logo.jpg per evitare l'errore NameError
+                logo_per_pdf = None
+                if os.path.exists("logo.jpg"):
+                    with open("logo.jpg", "rb") as f:
+                        logo_per_pdf = f.read()
+                
+                # Creazione PDF con il logo corretto
+                pdf = PDF_CONSEGNA(logo_data=logo_per_pdf)
+                pdf.add_page()
+                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
+                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
+
+    # --- TASTO CONFERMA SISTEMATO ---
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
-            if p_scelto not in st.session_state.storico_consegne: st.session_state.storico_consegne[p_scelto] = {}
+            if p_scelto not in st.session_state.storico_consegne: 
+                st.session_state.storico_consegne[p_scelto] = {}
+            
             if cat_scelta == "TUTTE LE TIPOLOGIE":
                 for k, v in st.session_state.db_consegne.items():
+                    # Creiamo una copia pulita con quantità base 1 per il massivo
                     lista_clean = []
                     for item in v:
-                        nuovo = item.copy(); nuovo['q'] = 1; lista_clean.append(nuovo)
+                        nuovo = item.copy()
+                        nuovo['q'] = 1
+                        lista_clean.append(nuovo)
                     st.session_state.storico_consegne[p_scelto][k] = lista_clean
                 st.success(f"REGISTRAZIONE MASSIVA COMPLETATA!")
             else:
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
-                st.success(f"Consegna registrata!")
+                # SALVATAGGIO QUANTITÀ MODIFICATE:
+                # Usiamo item.copy() per essere sicuri di salvare i numeri scelti dall'utente
+                lista_con_quantita_esatte = [item.copy() for item in st.session_state.lista_consegne_attuale]
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_con_quantita_esatte
+                st.success(f"Consegna registrata con successo!")
+            
+            # Invio finale al cloud
             salva_storico_cloud(st.session_state.storico_consegne)
-# ---------------------------------------------------------------------
+            st.balloons()
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI) - MODIFICA TASTO AGGIORNA
 # ==============================================================================
@@ -975,6 +1006,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
