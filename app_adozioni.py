@@ -86,42 +86,50 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 # ------------------------------------------------------------------------------
 
 
-## ==============================================================================
-# BLOCCO 4: CLASSE PDF (REPLICA FIGURA 2 - ORIENTAMENTO ORIZZONTALE)
+# ==============================================================================
+# BLOCCO 4: CLASSE PDF (ANGOLI ARROTONDATI E ORIENTAMENTO ORIZZONTALE)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
-        # Modificato orientation='L' per stampa Orizzontale
         super().__init__(orientation='L', unit='mm', format='A4')
         self.logo_path = "logo.jpg" 
 
+    def rect_arrotondato(self, x, y, w, h, r=3, style=''):
+        """Funzione di supporto per disegnare rettangoli con angoli arrotondati"""
+        self.ellipse(x, y, r*2, r*2, style)
+        self.ellipse(x+w-r*2, y, r*2, r*2, style)
+        self.ellipse(x, y+h-r*2, r*2, r*2, style)
+        self.ellipse(x+w-r*2, y+h-r*2, r*2, r*2, style)
+        self.rect(x+r, y, w-r*2, h, style)
+        self.rect(x, y+r, w, h-r*2, style)
+
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. CARICAMENTO LOGO CON CORNICE
+        # 1. CARICAMENTO LOGO CON CORNICE ARROTONDATA
         img_x = x_offset + 40
         img_y = 10
         img_w = 52
         img_h = 22 
 
         try:
-            # Disegna l'immagine
             self.image(self.logo_path, x=img_x, y=img_y, w=img_w)
-            # Disegna la cornice attorno all'immagine
             self.set_line_width(0.3)
-            self.rect(img_x - 2, img_y - 2, img_w + 4, img_h + 4) 
+            # Cornice logo arrotondata
+            self.rect_arrotondato(img_x - 2, img_y - 2, img_w + 4, img_h + 4, r=2) 
         except:
-            # Cornice vuota di sicurezza se il file manca
-            self.rect(img_x, img_y, img_w, img_h)
+            self.rect_arrotondato(img_x, img_y, img_w, img_h, r=2)
             self.set_font('Arial', 'I', 7)
             self.text(img_x + 5, img_y + 10, "Logo non trovato")
         
-        # 2. TITOLO CATEGORIA
+        # 2. TITOLO CATEGORIA CON SFONDO ARROTONDATO
         self.set_y(45)
         self.set_x(x_offset + 10)
         self.set_fill_color(235, 235, 235)
+        # Disegno lo sfondo arrotondato prima del testo
+        self.rect_arrotondato(x_offset + 10, 45, 128, 8, r=2, style='DF')
         self.set_font('Arial', 'B', 10)
-        self.cell(128, 8, f"{str(categoria).upper()}", border=1, ln=1, align='C', fill=True)
+        self.cell(128, 8, f"{str(categoria).upper()}", border=0, ln=1, align='C')
         
-        # 3. TESTATA TABELLA
+        # 3. TESTATA TABELLA (Mantenuta standard per precisione righe)
         self.set_x(x_offset + 10)
         self.set_fill_color(245, 245, 245)
         self.set_font('Arial', 'B', 8)
@@ -129,23 +137,24 @@ class PDF_CONSEGNA(FPDF):
         self.cell(23, 7, 'CLASSE', border=1, align='C', fill=True) 
         self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
         
-        # 4. RIGHE CON I 3 QUADRATINI
+        # 4. RIGHE TABELLA
         self.set_font('Arial', '', 8)
         for i, lib in enumerate(libri[:15]):
             self.set_x(x_offset + 10)
             self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
-            # I 3 QUADRATINI (CLASSE)
             self.cell(7.6, 7, '', border=1, align='C')
             self.cell(7.6, 7, '', border=1, align='C')
             self.cell(7.8, 7, '', border=1, align='C')
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
-        # 5. DETTAGLI DI CONSEGNA
+        # 5. DETTAGLI DI CONSEGNA CON CORNICE ARROTONDATA
         self.set_y(150)
         self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
+        # Sfondo testata dettagli arrotondato
+        self.rect_arrotondato(x_offset + 10, 150, 128, 7, r=1.5, style='DF')
         self.set_font('Arial', 'B', 9)
-        self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=1, ln=1, fill=True)
+        self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=0, ln=1)
         
         campi = [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]
         for label, val in campi:
@@ -864,6 +873,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
