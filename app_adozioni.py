@@ -759,14 +759,20 @@ elif st.session_state.pagina == "Modifica":
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-    # Mappatura Sigle
+   # Mappatura Sigle Aggiornata
     mappa_sigle = {
         "LETTURE CLASSE PRIMA": "L1",
         "LETTURE CLASSE QUARTA": "L4",
         "SUSSIDIARI DISCIPLINE": "S4",
         "RELIGIONE": "R1\\4",
         "INGLESE CLASSE PRIMA": "E1",
-        "INGLESE CLASSE QUARTA": "E4"
+        "INGLESE CLASSE QUARTA": "E4",
+        "QUADERNI VACANZE CLASSE PRIMA": "V1",
+        "QUADERNI VACANZE CLASSE SECONDA": "V2",
+        "QUADERNI VACANZE CLASSE TERZA": "V3",
+        "QUADERNI VACANZE CLASSE QUARTA": "V4",
+        "QUADERNI VACANZE CLASSE QUINTA": "V5",
+        "QUADERNI VACANZE INGLESE": "VE"
     }
 
     elenco_totale = get_lista_plessi()
@@ -942,6 +948,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
