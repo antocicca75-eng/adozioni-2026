@@ -491,7 +491,7 @@ if st.session_state.pagina == "Consegne":
                         nuovo = item.copy()
                         nuovo['q'] = 1 # Forza sempre a 1 per il registro storico
                         lista_clean.append(nuovo)
-                  if tutte:
+                if tutte:
                 # Registrazione massiva
                 for k, v in st.session_state.consegne_per_tipo.items():
                     # Creiamo una copia profonda con le quantità esplicite
@@ -942,6 +942,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
