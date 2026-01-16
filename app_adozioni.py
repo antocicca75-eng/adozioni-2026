@@ -653,6 +653,22 @@ elif st.session_state.pagina == "Inserimento":
 # =========================================================
 # FINE BLOCCO 12
 # =========================================================
+# ==============================================================================
+# BLOCCO 11: PAGINA NUOVO LIBRO (CATALOGO)
+# ==============================================================================
+elif st.session_state.pagina == "NuovoLibro":
+    st.subheader("🆕 Aggiungi nuovo titolo")
+    with st.container(border=True):
+        nt = st.text_input("Titolo Libro")
+        col1, col2, col3 = st.columns(3)
+        m_val = col1.text_input("Materia")
+        e_val = col2.text_input("Editore")
+        a_val = col3.text_input("Agenzia")
+        if st.button("✅ SALVA", use_container_width=True, type="primary"):
+            if nt and m_val and e_val:
+                if aggiungi_libro_a_excel(nt, m_val, e_val, a_val):
+                    st.success("Libro aggiunto!"); st.rerun()
+# ------------------------------------------------------------------------------
 # =========================================================
 # --- BLOCCO 14: PAGINA MODIFICA ---
 # INIZIO BLOCCO
@@ -904,6 +920,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
