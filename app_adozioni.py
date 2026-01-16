@@ -44,6 +44,45 @@ def carica_config_consegne():
         except: pass 
     return db_caricato
 # ------------------------------------------------------------------------------
+==============================================================================
+# BLOCCO 12: PAGINA INSERIMENTO NUOVA ADOZIONE
+# ==============================================================================
+elif st.session_state.pagina == "Inserimento":
+    st.subheader("Nuova Registrazione Adozione")
+    if "form_id" not in st.session_state: st.session_state.form_id = 0
+    with st.container(border=True):
+        titolo_scelto = st.selectbox("📕 SELEZIONA TITOLO", [""] + elenco_titoli, key=f"tit_{st.session_state.form_id}")
+        if titolo_scelto:
+            info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
+            if not info.empty:
+                st.info(f"Materia: {info.iloc[0,1]} | Editore: {info.iloc[0,2]} | Agenzia: {info.iloc[0,3]}")
+        c1, c2, c3 = st.columns([2, 1, 1])
+        with c1:
+            plesso = st.selectbox("🏫 Plesso", [""] + elenco_plessi, key=f"ple_{st.session_state.form_id}")
+            note = st.text_area("📝 Note", key=f"not_{st.session_state.form_id}", height=70)
+        with c2:
+            n_sez = st.number_input("🔢 N° sezioni", min_value=1, value=1, key=f"n_{st.session_state.form_id}")
+            saggio = st.selectbox("📚 Saggio consegnato", ["-", "NO", "SI"], key=f"sag_{st.session_state.form_id}")
+        with c3:
+            sez_lett = st.text_input("🔡 Lettera Sezione", key=f"sez_{st.session_state.form_id}")
+        if st.button("💾 SALVA ADOZIONE", use_container_width=True, type="primary"):
+            if titolo_scelto and plesso and saggio != "-":
+                info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
+                nuova_riga = pd.DataFrame([{
+                    "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "Plesso": plesso, "Materia": info.iloc[0,1], "Titolo": titolo_scelto,
+                    "Editore": info.iloc[0,2], "Agenzia": info.iloc[0,3], "N° sezioni": n_sez,
+                    "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "Note": note
+                }])
+                df_attuale = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame()
+                df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
+                df_finale.to_csv(DB_FILE, index=False)
+                backup_su_google_sheets(df_finale)
+                st.session_state.form_id += 1; st.success("✅ Registrazione avvenuta!"); st.rerun()
+            elif saggio == "-": st.error("⚠️ Specifica SI/NO!")
+            else: st.error("⚠️ Compila i campi obbligatori!")
+# ------------------------------------------------------------------------------
+
 
 
 # ==============================================================================
@@ -860,6 +899,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
