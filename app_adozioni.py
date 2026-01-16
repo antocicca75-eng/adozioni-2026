@@ -692,8 +692,7 @@ elif st.session_state.pagina == "NuovoLibro":
                     st.success("Libro aggiunto!"); st.rerun()
 # ------------------------------------------------------------------------------
 # =========================================================
-# --- BLOCCO 14: PAGINA MODIFICA ---
-# INIZIO BLOCCO
+# --- BLOCCO 14: PAGINA MODIFICA (FIX CHIUSURA DOPO AGGIORNA) ---
 # =========================================================
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
@@ -702,14 +701,17 @@ elif st.session_state.pagina == "Modifica":
         c_ric1, c_ric2 = st.columns(2)
         with c_ric1:
             lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
-            p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db)
+            # Aggiunta key statica per permettere il reset
+            p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db, key="filtro_p_mod")
         with c_ric2:
             lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
-            t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db)
+            t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db, key="filtro_t_mod")
+        
         if p_cerca or t_cerca:
             df_filtrato = df_mod.copy()
             if p_cerca: df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
             if t_cerca: df_filtrato = df_filtrato[df_filtrato["Titolo"] == t_cerca]
+            
             if not df_filtrato.empty:
                 for i in df_filtrato.index:
                     with st.container(border=True):
@@ -731,6 +733,7 @@ elif st.session_state.pagina == "Modifica":
                             attuale_sag = df_mod.at[i, 'Saggio Consegna']
                             idx_saggio = ["-", "NO", "SI"].index(attuale_sag) if attuale_sag in ["-", "NO", "SI"] else 0
                             nuovo_saggio = st.selectbox("Saggio consegnato", ["-", "NO", "SI"], index=idx_saggio, key=f"msag_{i}")
+                        
                         b1, b2 = st.columns(2)
                         with b1:
                             if st.button("💾 AGGIORNA", key=f"upd_{i}", use_container_width=True, type="primary"):
@@ -740,15 +743,30 @@ elif st.session_state.pagina == "Modifica":
                                     df_full.at[i, 'Plesso'] = nuovo_plesso
                                     df_full.at[i, 'Titolo'] = nuovo_titolo
                                     if not info_new.empty:
-                                        df_full.at[i, 'Materia'] = info_new.iloc[0,1]; df_full.at[i, 'Editore'] = info_new.iloc[0,2]; df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
-                                    df_full.at[i, 'N° sezioni'] = nuovo_n_sez; df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
-                                    df_full.at[i, 'Saggio Consegna'] = nuovo_saggio; df_full.at[i, 'Note'] = nuove_note
-                                    df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full)
-                                    st.success("Aggiornato!"); st.rerun()
+                                        df_full.at[i, 'Materia'] = info_new.iloc[0,1]
+                                        df_full.at[i, 'Editore'] = info_new.iloc[0,2]
+                                        df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
+                                    df_full.at[i, 'N° sezioni'] = nuovo_n_sez
+                                    df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
+                                    df_full.at[i, 'Saggio Consegna'] = nuovo_saggio
+                                    df_full.at[i, 'Note'] = nuove_note
+                                    
+                                    df_full.to_csv(DB_FILE, index=False)
+                                    backup_su_google_sheets(df_full)
+                                    
+                                    # --- MODIFICA: Reset filtri per tornare allo stato iniziale ---
+                                    st.session_state.filtro_p_mod = ""
+                                    st.session_state.filtro_t_mod = ""
+                                    
+                                    st.success("Aggiornato!")
+                                    st.rerun()
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
-                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str); df_full = df_full.drop(int(i))
-                                df_full.to_csv(DB_FILE, index=False); backup_su_google_sheets(df_full); st.rerun()
+                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
+                                df_full = df_full.drop(int(i))
+                                df_full.to_csv(DB_FILE, index=False)
+                                backup_su_google_sheets(df_full)
+                                st.rerun()
 # =========================================================
 # FINE BLOCCO 14
 # =========================================================
@@ -948,6 +966,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
