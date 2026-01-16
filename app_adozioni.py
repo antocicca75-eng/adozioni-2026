@@ -485,15 +485,18 @@ if st.session_state.pagina == "Consegne":
     
     if cat_scelta != "TUTTE LE TIPOLOGIE":
     
-        if col_print.button("🖨️ GENERA PDF", use_container_width=True, key="btn_pdf_landscape"):
+       if col_print.button("🖨️ GENERA PDF", use_container_width=True):
             if st.session_state.lista_consegne_attuale:
-                pdf = PDF_CONSEGNA(logo_data=logo_up)
+                # Carichiamo il file fisico logo.jpg
+                logo_per_pdf = None
+                if os.path.exists("logo.jpg"):
+                    with open("logo.jpg", "rb") as f:
+                        logo_per_pdf = f.read()
+                
+                # Usiamo logo_per_pdf invece del vecchio logo_up
+                pdf = PDF_CONSEGNA(logo_data=logo_per_pdf)
                 pdf.add_page()
-                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-                pdf.set_draw_color(150, 150, 150)
-                pdf.dashed_line(148.5, 0, 148.5, 210, 1, 1)
-                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-                st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
+                # ... resto del codice per generare il pdf
 
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
@@ -972,6 +975,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
