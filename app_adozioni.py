@@ -524,7 +524,7 @@ if st.session_state.pagina == "Consegne":
                 st.success(f"Consegna registrata per {cat_scelta}!")
             
             # Salvataggio su Cloud
-            salva_storico_cloud(st.session_state.storico_consegne)storico_consegne)
+          salva_storico_cloud(st.session_state.storico_consegne)
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (LOGICA AGGIORNATA E LINK MENU CORRETTO)
 # ==============================================================================
@@ -952,6 +952,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
