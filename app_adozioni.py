@@ -87,7 +87,7 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
 
 # ==============================================================================
-# BLOCCO 4: CLASSE PDF (ANGOLI ARROTONDATI E ORIENTAMENTO ORIZZONTALE)
+# BLOCCO 4: CLASSE PDF (LOGO INGRANDITO E ANGOLI ARROTONDATI)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
@@ -104,32 +104,32 @@ class PDF_CONSEGNA(FPDF):
         self.rect(x, y+r, w, h-r*2, style)
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. CARICAMENTO LOGO CON CORNICE ARROTONDATA
-        img_x = x_offset + 40
+        # 1. CARICAMENTO LOGO INGRANDITO E POSIZIONATO
+        # Larghezza aumentata a 70 e posizione X ricalibrata per bilanciamento
+        img_w = 70 
+        img_h = 25 
+        img_x = x_offset + (148.5 - img_w) / 2 # Centratura dinamica nel semifoglio
         img_y = 10
-        img_w = 52
-        img_h = 22 
 
         try:
             self.image(self.logo_path, x=img_x, y=img_y, w=img_w)
             self.set_line_width(0.3)
-            # Cornice logo arrotondata
-            self.rect_arrotondato(img_x - 2, img_y - 2, img_w + 4, img_h + 4, r=2) 
+            # Cornice logo arrotondata che segue le nuove dimensioni
+            self.rect_arrotondato(img_x - 3, img_y - 2, img_w + 6, img_h + 4, r=3) 
         except:
-            self.rect_arrotondato(img_x, img_y, img_w, img_h, r=2)
+            self.rect_arrotondato(img_x, img_y, img_w, img_h, r=3)
             self.set_font('Arial', 'I', 7)
-            self.text(img_x + 5, img_y + 10, "Logo non trovato")
+            self.text(img_x + 10, img_y + 12, "Logo non trovato")
         
         # 2. TITOLO CATEGORIA CON SFONDO ARROTONDATO
         self.set_y(45)
         self.set_x(x_offset + 10)
         self.set_fill_color(235, 235, 235)
-        # Disegno lo sfondo arrotondato prima del testo
         self.rect_arrotondato(x_offset + 10, 45, 128, 8, r=2, style='DF')
         self.set_font('Arial', 'B', 10)
         self.cell(128, 8, f"{str(categoria).upper()}", border=0, ln=1, align='C')
         
-        # 3. TESTATA TABELLA (Mantenuta standard per precisione righe)
+        # 3. TESTATA TABELLA
         self.set_x(x_offset + 10)
         self.set_fill_color(245, 245, 245)
         self.set_font('Arial', 'B', 8)
@@ -151,7 +151,6 @@ class PDF_CONSEGNA(FPDF):
         self.set_y(150)
         self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
-        # Sfondo testata dettagli arrotondato
         self.rect_arrotondato(x_offset + 10, 150, 128, 7, r=1.5, style='DF')
         self.set_font('Arial', 'B', 9)
         self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=0, ln=1)
@@ -873,6 +872,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
