@@ -490,13 +490,12 @@ if st.session_state.pagina == "Consegne":
             salva_storico_cloud(st.session_state.storico_consegne)
 # ---------------------------------------------------------------------
 # ==============================================================================
-# BLOCCO 10: PAGINA STORICO (VERSIONE AGGIORNATA)
+# BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI)
 # ==============================================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
     
-    if "storico_ritiri" not in st.session_state: 
-        st.session_state.storico_ritiri = {}
+    if "storico_ritiri" not in st.session_state: st.session_state.storico_ritiri = {}
 
     if not st.session_state.get("storico_consegne"):
         st.info("Nessuna consegna registrata.")
@@ -524,48 +523,49 @@ elif st.session_state.pagina == "Storico":
                         salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
 
                     with st.expander(f"📘 {tipo.upper()}", expanded=True):
-                        lista_libri = per_tipo[tipo]
-                        for i in range(len(lista_libri) - 1, -1, -1):
-                            lib = lista_libri[i]
-                            # Legge la quantità 'q' salvata (ora correttamente inviata dal Blocco 9)
+                        lista_libri = list(per_tipo[tipo])
+                        for i, lib in enumerate(lista_libri):
                             qta_salvata = int(lib.get('q', 1))
-                            
-                            col_titolo, col_qta, col_ritiro, col_del = st.columns([0.40, 0.15, 0.35, 0.10])
+                            col_titolo, col_qta, col_ritiro, col_del = st.columns([0.45, 0.15, 0.30, 0.10])
                             col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
-                            col_qta.markdown(f"<br><b>Q.tà: {qta_salvata}</b>", unsafe_allow_html=True)
-                            
+                            col_qta.write(f"Q.tà: {qta_salvata}")
                             with col_ritiro:
-                                # Il max_value si adatta alla quantità reale presente
-                                q_rit = st.number_input("Da restituire", min_value=1, max_value=max(1, qta_salvata), value=1, key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
-                                if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
+                                q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata), value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
+                                if st.button("OK", key=f"btn_rit_{plesso}_{tipo}_{i}"):
                                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                                     if tipo not in st.session_state.storico_ritiri[plesso]: st.session_state.storico_ritiri[plesso][tipo] = []
-                                    
-                                    rit_item = lib.copy()
-                                    rit_item['q'] = q_rit
-                                    st.session_state.storico_ritiri[plesso][tipo].append(rit_item)
-                                    
-                                    # Aggiorna la memoria
+                                    rit_item = lib.copy(); rit_item['q'] = q_rit; st.session_state.storico_ritiri[plesso][tipo].append(rit_item)
                                     lib['q'] = qta_salvata - q_rit
-                                    
-                                    if lib['q'] <= 0:
-                                        lista_libri.pop(i)
-                                    
-                                    if not per_tipo[tipo]: del per_tipo[tipo]
+                                    if lib['q'] <= 0: per_tipo[tipo].pop(i)
+                                    if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
                                     if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                                    
-                                    salva_storico_cloud(st.session_state.storico_consegne)
-                                    st.rerun()
-
+                                    salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
                             if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
-                                lista_libri.pop(i)
+                                per_tipo[tipo].pop(i)
                                 if not per_tipo[tipo]: del per_tipo[tipo]
-                                if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                                 salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
 
-    if st.button("⬅️ Torna al Menu"): 
-        st.session_state.pagina = "Nuova Adozione"
-        st.rerun()# ------------------------------------------------------------------------------
+    if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
+# ------------------------------------------------------------------------------
+
+
+# ==============================================================================
+# BLOCCO 11: PAGINA NUOVO LIBRO (CATALOGO)
+# ==============================================================================
+elif st.session_state.pagina == "NuovoLibro":
+    st.subheader("🆕 Aggiungi nuovo titolo")
+    with st.container(border=True):
+        nt = st.text_input("Titolo Libro")
+        col1, col2, col3 = st.columns(3)
+        m_val = col1.text_input("Materia")
+        e_val = col2.text_input("Editore")
+        a_val = col3.text_input("Agenzia")
+        if st.button("✅ SALVA", use_container_width=True, type="primary"):
+            if nt and m_val and e_val:
+                if aggiungi_libro_a_excel(nt, m_val, e_val, a_val):
+                    st.success("Libro aggiunto!"); st.rerun()
+# ------------------------------------------------------------------------------
+
 # BLOCCO 13: PAGINA REGISTRO E MOTORE DI RICERCA
 # ==============================================================================
 elif st.session_state.pagina == "Registro":
@@ -912,6 +912,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
