@@ -85,47 +85,36 @@ ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 # ------------------------------------------------------------------------------
 
-
 # ==============================================================================
-# BLOCCO 4: CLASSE PDF (LOGO INGRANDITO E ANGOLI ARROTONDATI)
+# BLOCCO 4: CLASSE PDF (FINALE - LOGO E CORNICI PULITE)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
         super().__init__(orientation='L', unit='mm', format='A4')
         self.logo_path = "logo.jpg" 
 
-    def rect_arrotondato(self, x, y, w, h, r=3, style=''):
-        """Funzione di supporto per disegnare rettangoli con angoli arrotondati"""
-        self.ellipse(x, y, r*2, r*2, style)
-        self.ellipse(x+w-r*2, y, r*2, r*2, style)
-        self.ellipse(x, y+h-r*2, r*2, r*2, style)
-        self.ellipse(x+w-r*2, y+h-r*2, r*2, r*2, style)
-        self.rect(x+r, y, w-r*2, h, style)
-        self.rect(x, y+r, w, h-r*2, style)
-
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. CARICAMENTO LOGO INGRANDITO E POSIZIONATO
-        # Larghezza aumentata a 70 e posizione X ricalibrata per bilanciamento
+        # 1. CARICAMENTO LOGO (INGRANDITO E SENZA CERCHI NEGLI ANGOLI)
         img_w = 70 
         img_h = 25 
-        img_x = x_offset + (148.5 - img_w) / 2 # Centratura dinamica nel semifoglio
+        img_x = x_offset + (148.5 - img_w) / 2
         img_y = 10
 
         try:
             self.image(self.logo_path, x=img_x, y=img_y, w=img_w)
             self.set_line_width(0.3)
-            # Cornice logo arrotondata che segue le nuove dimensioni
-            self.rect_arrotondato(img_x - 3, img_y - 2, img_w + 6, img_h + 4, r=3) 
+            # Cornice logo con metodo nativo rounded_rect (senza cerchi visibili)
+            self.rounded_rect(img_x - 3, img_y - 2, img_w + 6, img_h + 4, 3) 
         except:
-            self.rect_arrotondato(img_x, img_y, img_w, img_h, r=3)
+            self.rounded_rect(img_x, img_y, img_w, img_h, 3)
             self.set_font('Arial', 'I', 7)
             self.text(img_x + 10, img_y + 12, "Logo non trovato")
         
-        # 2. TITOLO CATEGORIA CON SFONDO ARROTONDATO
+        # 2. TITOLO CATEGORIA (ANGOLI ARROTONDATI PULITI)
         self.set_y(45)
         self.set_x(x_offset + 10)
         self.set_fill_color(235, 235, 235)
-        self.rect_arrotondato(x_offset + 10, 45, 128, 8, r=2, style='DF')
+        self.rounded_rect(x_offset + 10, 45, 128, 8, 2, 'DF')
         self.set_font('Arial', 'B', 10)
         self.cell(128, 8, f"{str(categoria).upper()}", border=0, ln=1, align='C')
         
@@ -147,11 +136,11 @@ class PDF_CONSEGNA(FPDF):
             self.cell(7.8, 7, '', border=1, align='C')
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
-        # 5. DETTAGLI DI CONSEGNA CON CORNICE ARROTONDATA
+        # 5. DETTAGLI DI CONSEGNA
         self.set_y(150)
         self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
-        self.rect_arrotondato(x_offset + 10, 150, 128, 7, r=1.5, style='DF')
+        self.rounded_rect(x_offset + 10, 150, 128, 7, 1.5, 'DF')
         self.set_font('Arial', 'B', 9)
         self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=0, ln=1)
         
@@ -163,6 +152,12 @@ class PDF_CONSEGNA(FPDF):
             self.set_font('Arial', '', 8)
             testo_v = str(val).upper() if val and val != "- SELEZIONA PLESSO -" else ""
             self.cell(93, 6.5, testo_v, border=1, ln=1, align='L')
+
+        # 6. SCRITTA SITO WEB (FUORI DALLA CORNICE)
+        self.set_y(185)
+        self.set_x(x_offset + 10)
+        self.set_font('Arial', 'I', 8)
+        self.cell(128, 5, "www.irpinialibri.it - Distribuzione Editoriale Scolastica", border=0, align='C')
 # ------------------------------------------------------------------------------
 
 
@@ -872,6 +867,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
