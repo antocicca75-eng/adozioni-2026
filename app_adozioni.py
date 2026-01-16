@@ -502,7 +502,7 @@ if st.session_state.pagina == "Consegne":
 
 
 # ==============================================================================
-# BLOCCO 10: PAGINA STORICO (LOGICA AGGIORNATA E LINK MENU CORRETTO)
+# BLOCCO 10: PAGINA STORICO (REGISTRO CARICO - PULITO SENZA TORNA AL MENU)
 # ==============================================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
@@ -535,7 +535,6 @@ elif st.session_state.pagina == "Storico":
                         salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
 
                     with st.expander(f"📘 {tipo.upper()}", expanded=True):
-                        # Creiamo una copia della lista per iterare in sicurezza
                         lista_libri = per_tipo[tipo]
                         for i in range(len(lista_libri) - 1, -1, -1):
                             lib = lista_libri[i]
@@ -546,25 +545,20 @@ elif st.session_state.pagina == "Storico":
                             col_qta.markdown(f"<br><b>Q.tà: {qta_salvata}</b>", unsafe_allow_html=True)
                             
                             with col_ritiro:
-                                # Default a 1 per facilità di sottrazione
                                 q_rit = st.number_input("Da restituire", min_value=1, max_value=qta_salvata, value=1, key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
                                 if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
                                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                                     if tipo not in st.session_state.storico_ritiri[plesso]: st.session_state.storico_ritiri[plesso][tipo] = []
                                     
-                                    # 1. Registriamo il ritiro
                                     rit_item = lib.copy()
                                     rit_item['q'] = q_rit
                                     st.session_state.storico_ritiri[plesso][tipo].append(rit_item)
                                     
-                                    # 2. Sottraiamo e manteniamo in memoria
                                     lib['q'] = qta_salvata - q_rit
                                     
-                                    # Se arriva a zero, rimuoviamo la riga
                                     if lib['q'] <= 0:
                                         lista_libri.pop(i)
                                     
-                                    # Pulizia strutture e salvataggio
                                     if not per_tipo[tipo]: del per_tipo[tipo]
                                     if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                                     
@@ -576,11 +570,6 @@ elif st.session_state.pagina == "Storico":
                                 if not per_tipo[tipo]: del per_tipo[tipo]
                                 if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                                 salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
-
-    # MODIFICA: Puntiamo alla pagina corretta del menu
-    if st.button("⬅️ Torna al Menu"): 
-        st.session_state.pagina = "Nuova Adozione"
-        st.rerun()
 # ------------------------------------------------------------------------------
 
 # ==============================================================================
@@ -871,6 +860,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
