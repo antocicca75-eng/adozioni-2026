@@ -358,8 +358,7 @@ with st.sidebar:
 
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE (GESTIONE MASSIVA E COPIE) ---
-# INIZIO BLOCCO
+# --- BLOCCO 9: PAGINA CONSEGNE (FIX QUANTITÀ DEFINITIVO) ---
 # =========================================================
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
@@ -380,7 +379,6 @@ if st.session_state.pagina == "Consegne":
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
     
-    # Aggiunta opzione "TUTTE LE TIPOLOGIE"
     basi = ["- SELEZIONA -", "TUTTE LE TIPOLOGIE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
     altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
     cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
@@ -388,18 +386,19 @@ if st.session_state.pagina == "Consegne":
     # --- LOGICA CARICAMENTO ---
     if cat_scelta == "TUTTE LE TIPOLOGIE":
         st.info("💡 Hai selezionato l'assegnazione massiva. Clicca su 'CONFERMA CONSEGNA' in basso per registrare tutti i libri del database per questo plesso.")
-        st.session_state.lista_consegne_attuale = [] # Svuota la lista singola per evitare confusioni
+        st.session_state.lista_consegne_attuale = [] 
         st.session_state.last_cat = "TUTTE"
 
     elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
-        caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
-        # Forza ogni libro caricato ad avere quantità 1 di default
-        for voce in caricati:
-            voce['q'] = 1
+        caricati = []
+        for v in st.session_state.db_consegne.get(cat_scelta, []):
+            item = v.copy()
+            if 'q' not in item: item['q'] = 1 # Imposta 1 solo se manca, non sovrascrive
+            caricati.append(item)
         st.session_state.lista_consegne_attuale = caricati
         st.session_state.last_cat = cat_scelta
 
-    # --- VISUALIZZAZIONE LISTA (Solo se non è massiva) ---
+    # --- VISUALIZZAZIONE LISTA ---
     if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
@@ -424,12 +423,8 @@ if st.session_state.pagina == "Consegne":
 
         col_btns = st.columns(2)
         if col_btns[0].button("💾 REGISTRA LISTA BASE", use_container_width=True):
-            lista_da_salvare = []
-            for item in st.session_state.lista_consegne_attuale:
-                nuovo_item = item.copy()
-                nuovo_item['q'] = 1 
-                lista_da_salvare.append(nuovo_item)
-            st.session_state.db_consegne[cat_scelta] = lista_da_salvare
+            # Salva la configurazione mantenendo le quantità scelte
+            st.session_state.db_consegne[cat_scelta] = [item.copy() for item in st.session_state.lista_consegne_attuale]
             salva_config_consegne(st.session_state.db_consegne)
             st.success("Configurazione salvata!")
         
@@ -458,7 +453,7 @@ if st.session_state.pagina == "Consegne":
                         st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1
                         st.rerun()
 
-    # --- DATI RICEVENTE E GENERAZIONE PDF ---
+    # --- DATI RICEVENTE ---
     st.markdown("---")
     d1, d2 = st.columns(2)
     docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
@@ -467,7 +462,6 @@ if st.session_state.pagina == "Consegne":
 
     col_print, col_conf = st.columns(2)
     
-    # Bottone PDF (disabilitato se massiva perché troppo grande)
     if cat_scelta != "TUTTE LE TIPOLOGIE":
         if col_print.button("🖨️ GENERA PDF", use_container_width=True):
             if st.session_state.lista_consegne_attuale:
@@ -478,38 +472,27 @@ if st.session_state.pagina == "Consegne":
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
-   # --- CONFERMA E REGISTRAZIONE (Gestisce anche il MASSIVO) ---
+    # --- CONFERMA E REGISTRAZIONE ---
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
             if p_scelto not in st.session_state.storico_consegne: 
                 st.session_state.storico_consegne[p_scelto] = {}
             
             if cat_scelta == "TUTTE LE TIPOLOGIE":
-                # Ciclo su tutto il database per assegnare ogni categoria al plesso
                 for k, v in st.session_state.db_consegne.items():
                     lista_clean = []
                     for item in v:
                         nuovo = item.copy()
-                        # Manteniamo la quantità se già presente, altrimenti mettiamo 1
                         if 'q' not in nuovo: nuovo['q'] = 1
                         lista_clean.append(nuovo)
                     st.session_state.storico_consegne[p_scelto][k] = lista_clean
                 st.success(f"REGISTRAZIONE MASSIVA COMPLETATA per {p_scelto}!")
             else:
-                # Registrazione singola tipologia
-                # CORREZIONE: Creiamo una copia profonda per salvare le quantità reali (es. 3 o 4 copie)
-                lista_da_salvare = []
-                for lib in st.session_state.lista_consegne_attuale:
-                    voce_da_salvare = lib.copy()
-                    # Se l'utente ha modificato 'q' a 3, qui viene salvato 3
-                    lista_da_salvare.append(voce_da_salvare)
-                
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_da_salvare
+                # Salva le copie reali (es. 3 o 5) nello storico
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = [lib.copy() for lib in st.session_state.lista_consegne_attuale]
                 st.success(f"Consegna registrata per {cat_scelta}!")
             
-            # Salvataggio immediato sul database cloud
             salva_storico_cloud(st.session_state.storico_consegne)
-
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (LOGICA AGGIORNATA E LINK MENU CORRETTO)
 # ==============================================================================
@@ -937,6 +920,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
