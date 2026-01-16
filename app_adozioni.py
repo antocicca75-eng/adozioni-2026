@@ -502,7 +502,7 @@ if st.session_state.pagina == "Consegne":
 
 
 # ==============================================================================
-# BLOCCO 10: PAGINA STORICO (REGISTRO CARICO CON AGGIORNO PARZIALE)
+# BLOCCO 10: PAGINA STORICO (LOGICA AGGIORNATA E LINK MENU CORRETTO)
 # ==============================================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
@@ -577,7 +577,10 @@ elif st.session_state.pagina == "Storico":
                                 if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                                 salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
 
-    if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
+    # MODIFICA: Puntiamo alla pagina corretta del menu
+    if st.button("⬅️ Torna al Menu"): 
+        st.session_state.pagina = "Nuova Adozione"
+        st.rerun()
 # ------------------------------------------------------------------------------
 
 # ==============================================================================
@@ -868,6 +871,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
