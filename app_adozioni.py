@@ -502,7 +502,7 @@ if st.session_state.pagina == "Consegne":
 
 
 # ==============================================================================
-# BLOCCO 10: PAGINA STORICO (LOGICA RITIRO PARZIALE MEMORIZZATA)
+# BLOCCO 10: PAGINA STORICO (FIX QUANTITÀ REALI E RITIRO PARZIALE)
 # ==============================================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
@@ -535,37 +535,41 @@ elif st.session_state.pagina == "Storico":
                         salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
 
                     with st.expander(f"📘 {tipo.upper()}", expanded=True):
-                        # Usiamo un loop sicuro per le modifiche alla lista
                         lista_libri = per_tipo[tipo]
+                        # Loop inverso per gestire rimozioni sicure
                         for i in range(len(lista_libri) - 1, -1, -1):
                             lib = lista_libri[i]
-                            qta_salvata = int(lib.get('q', 1))
+                            
+                            # --- CORREZIONE: Legge la quantità reale salvata ---
+                            qta_salvata = int(lib.get('q', 1)) 
                             
                             col_titolo, col_qta, col_ritiro, col_del = st.columns([0.45, 0.15, 0.30, 0.10])
                             col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
-                            col_qta.write(f"Q.tà: {qta_salvata}")
+                            
+                            # Visualizza la quantità corretta (es. 4 copie)
+                            col_qta.markdown(f"<br><b>Q.tà: {qta_salvata}</b>", unsafe_allow_html=True)
                             
                             with col_ritiro:
-                                # Input numerico per quante copie restituire
-                                q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata), value=1, key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
+                                # Il numero massimo ritirabile è la quantità salvata
+                                q_rit = st.number_input("Ritira", min_value=1, max_value=qta_salvata, value=1, key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
                                 if st.button("OK", key=f"btn_rit_{plesso}_{tipo}_{i}"):
                                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                                     if tipo not in st.session_state.storico_ritiri[plesso]: st.session_state.storico_ritiri[plesso][tipo] = []
                                     
-                                    # 1. Aggiungi allo storico ritiri le copie rimosse
+                                    # 1. Sposta la quantità ritirata nello storico ritiri
                                     rit_item = lib.copy()
                                     rit_item['q'] = q_rit
                                     st.session_state.storico_ritiri[plesso][tipo].append(rit_item)
                                     
-                                    # 2. Sottrai dal carico attuale e salva
+                                    # 2. Aggiorna la quantità restanti nel carico
                                     nuova_qta = qta_salvata - q_rit
                                     if nuova_qta <= 0:
                                         lista_libri.pop(i)
                                     else:
                                         lib['q'] = nuova_qta
                                     
-                                    # 3. Pulizia strutture vuote e salvataggio
-                                    if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
+                                    # 3. Pulizia e Salvataggio immediato
+                                    if not per_tipo[tipo]: del per_tipo[tipo]
                                     if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                                     
                                     salva_storico_cloud(st.session_state.storico_consegne)
@@ -577,7 +581,6 @@ elif st.session_state.pagina == "Storico":
                                 salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
 
     if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
-# ------------------------------------------------------------------------------
 
 
 # ==============================================================================
@@ -926,6 +929,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
