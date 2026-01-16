@@ -492,21 +492,39 @@ if st.session_state.pagina == "Consegne":
             if p_scelto not in st.session_state.storico_consegne: 
                 st.session_state.storico_consegne[p_scelto] = {}
             
+            # --- CONFERMA E REGISTRAZIONE ---
+    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
+        if p_scelto != "- SELEZIONA PLESSO -":
+            if p_scelto not in st.session_state.storico_consegne: 
+                st.session_state.storico_consegne[p_scelto] = {}
+            
             if cat_scelta == "TUTTE LE TIPOLOGIE":
+                # REGISTRAZIONE MASSIVA
                 for k, v in st.session_state.db_consegne.items():
                     lista_clean = []
                     for item in v:
                         nuovo = item.copy()
+                        # Qui 'nuovo' mantiene la 'q' salvata nel database base
                         if 'q' not in nuovo: nuovo['q'] = 1
                         lista_clean.append(nuovo)
                     st.session_state.storico_consegne[p_scelto][k] = lista_clean
                 st.success(f"REGISTRAZIONE MASSIVA COMPLETATA per {p_scelto}!")
+            
             else:
-                # Salva le copie reali (es. 3 o 5) nello storico
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = [lib.copy() for lib in st.session_state.lista_consegne_attuale]
+                # REGISTRAZIONE SINGOLA TIPOLOGIA (Quella con i tasti + e -)
+                # Usiamo una lista temporanea per essere sicuri al 100% di catturare i valori correnti
+                lista_da_registrare = []
+                for lib in st.session_state.lista_consegne_attuale:
+                    nuovo_lib = lib.copy()
+                    # Se non esiste 'q' per qualche motivo, mettiamo 1, altrimenti usiamo quella attuale
+                    if 'q' not in nuovo_lib: nuovo_lib['q'] = 1
+                    lista_da_registrare.append(nuovo_lib)
+                
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_da_registrare
                 st.success(f"Consegna registrata per {cat_scelta}!")
             
-            salva_storico_cloud(st.session_state.storico_consegne)
+            # Salvataggio su Cloud
+            salva_storico_cloud(st.session_state.storico_consegne)storico_consegne)
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (LOGICA AGGIORNATA E LINK MENU CORRETTO)
 # ==============================================================================
@@ -934,6 +952,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
