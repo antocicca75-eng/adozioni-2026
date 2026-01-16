@@ -86,26 +86,26 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 # ------------------------------------------------------------------------------
 
 
-# ==============================================================================
-# BLOCCO 4: CLASSE PDF (REPLICA FIGURA 2 - LOGO JPG CON CORNICE)
+## ==============================================================================
+# BLOCCO 4: CLASSE PDF (REPLICA FIGURA 2 - ORIENTAMENTO ORIZZONTALE)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
+        # Modificato orientation='L' per stampa Orizzontale
         super().__init__(orientation='L', unit='mm', format='A4')
         self.logo_path = "logo.jpg" 
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
         # 1. CARICAMENTO LOGO CON CORNICE
-        # Definiamo le coordinate del logo
         img_x = x_offset + 40
         img_y = 10
         img_w = 52
-        img_h = 22 # Altezza stimata per mantenere le proporzioni
+        img_h = 22 
 
         try:
             # Disegna l'immagine
             self.image(self.logo_path, x=img_x, y=img_y, w=img_w)
-            # Disegna la cornice (rettangolo) attorno all'immagine
+            # Disegna la cornice attorno all'immagine
             self.set_line_width(0.3)
             self.rect(img_x - 2, img_y - 2, img_w + 4, img_h + 4) 
         except:
@@ -864,6 +864,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
