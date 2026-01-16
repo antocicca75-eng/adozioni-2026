@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import pandas as pd
 import json 
@@ -12,21 +10,17 @@ from google.oauth2.service_account import Credentials
 from fpdf import FPDF 
 
 # ==============================================================================
-# BLOCCO 1: FUNZIONI CONFIGURAZIONE CONSEGNE (CORRETTO)
+# BLOCCO 1: FUNZIONI CONFIGURAZIONE CONSEGNE (GOOGLE SHEETS)
 # ==============================================================================
 def salva_config_consegne(db_dict):
     sh = connetti_google_sheets()
     if sh:
         try:
-            try: 
-                foglio = sh.worksheet("ConfigConsegne")
-            except: 
-                foglio = sh.add_worksheet(title="ConfigConsegne", rows="100", cols="20")
-            
+            try: foglio = sh.worksheet("ConfigConsegne")
+            except: foglio = sh.add_worksheet(title="ConfigConsegne", rows="100", cols="20")
             foglio.clear()
             righe = [["Categoria", "Dati_JSON"]]
             for k, v in db_dict.items():
-                # Assicuriamoci che ogni libro salvato mantenga le sue proprietà
                 righe.append([k, json.dumps(v)])
             foglio.update(righe)
         except Exception as e:
@@ -34,7 +28,6 @@ def salva_config_consegne(db_dict):
 
 def carica_config_consegne():
     sh = connetti_google_sheets()
-    # Inizializzazione categorie base
     db_caricato = {
         "LETTURE CLASSE PRIMA": [], "LETTURE CLASSE QUARTA": [],
         "SUSSIDIARI DISCIPLINE": [], "INGLESE CLASSE PRIMA": [], 
@@ -45,18 +38,8 @@ def carica_config_consegne():
             foglio = sh.worksheet("ConfigConsegne")
             dati = foglio.get_all_records()
             for r in dati:
-                categoria = r["Categoria"]
-                lista_libri = json.loads(r["Dati_JSON"])
-                
-                # FIX: Quando carichiamo, verifichiamo che ogni libro abbia la sua 'q'
-                # Se manca (vecchi salvataggi), mettiamo 1, altrimenti manteniamo il numero salvato
-                for libro in lista_libri:
-                    if 'q' not in libro:
-                        libro['q'] = 1
-                
-                db_caricato[categoria] = lista_libri
-        except: 
-            pass 
+                db_caricato[r["Categoria"]] = json.loads(r["Dati_JSON"])
+        except: pass 
     return db_caricato
 # ------------------------------------------------------------------------------
 
@@ -104,118 +87,77 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 
 
 # ==============================================================================
-# BLOCCO 4: CLASSE PDF (DEFINITIVO - SENZA ERRORI DI SINTASSI)
+# BLOCCO 4: CLASSE PDF (REPLICA FIGURA 2 - LOGO JPG CON CORNICE)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
         super().__init__(orientation='L', unit='mm', format='A4')
         self.logo_path = "logo.jpg" 
 
-    def rounded_rect(self, x, y, w, h, r, style='', corners='1234'):
-        """Disegna un rettangolo con angoli arrotondati senza dipendenze esterne"""
-        k = self.k
-        hp = self.h
-        if style == 'F': op = 'f'
-        elif style == 'FD' or style == 'DF': op = 'B'
-        else: op = 'S'
-        my_arc = 4/3 * (pow(2, 0.5) - 1)
-        self._out(f'{(x + r) * k:.2f} {(hp - y) * k:.2f} m')
-        xc = x + w - r
-        yc = y + r
-        self._out(f'{xc * k:.2f} {(hp - y) * k:.2f} l')
-        if '2' in corners:
-            self._arc(xc + r * my_arc, yc - r, xc + r, yc - r * my_arc, xc + r, yc)
-        else:
-            self._out(f'{(x + w) * k:.2f} {(hp - y) * k:.2f} l')
-        xc = x + w - r
-        yc = y + h - r
-        self._out(f'{(x + w) * k:.2f} {(hp - yc) * k:.2f} l')
-        if '3' in corners:
-            self._arc(xc + r, yc + r * my_arc, xc + r * my_arc, yc + r, xc, yc + r)
-        else:
-            self._out(f'{(x + w) * k:.2f} {(hp - (y + h)) * k:.2f} l')
-        xc = x + r
-        yc = y + h - r
-        self._out(f'{xc * k:.2f} {(hp - (y + h)) * k:.2f} l')
-        if '4' in corners:
-            self._arc(xc - r * my_arc, yc + r, xc - r, yc + r * my_arc, xc - r, yc)
-        else:
-            self._out(f'{x * k:.2f} {(hp - (y + h)) * k:.2f} l')
-        xc = x + r
-        yc = y + r
-        self._out(f'{x * k:.2f} {(hp - yc) * k:.2f} l')
-        if '1' in corners:
-            self._arc(xc - r, yc - r * my_arc, xc - r * my_arc, yc - r, xc, yc - r)
-        else:
-            self._out(f'{x * k:.2f} {(hp - y) * k:.2f} l')
-        self._out(op)
-
-    def _arc(self, x1, y1, x2, y2, x3, y3):
-        """Funzione di supporto per gli archi degli angoli arrotondati"""
-        h = self.h
-        # CORRETTO: self.k (non self.self.k)
-        self._out(f'{x1 * self.k:.2f} {(h - y1) * self.k:.2f} {x2 * self.k:.2f} {(h - y2) * self.k:.2f} {x3 * self.k:.2f} {(h - y3) * self.k:.2f} c')
-
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. LOGO E CORNICE (SISTEMATA)
-        img_w = 70
-        img_x = x_offset + (148.5 - img_w) / 2
-        img_y = 8  
-        
-        # Cornice generosa (32mm) per contenere il logo in orizzontale
-        box_h = 32
-        box_w = img_w + 6
+        # 1. CARICAMENTO LOGO CON CORNICE
+        # Definiamo le coordinate del logo
+        img_x = x_offset + 40
+        img_y = 10
+        img_w = 52
+        img_h = 22 # Altezza stimata per mantenere le proporzioni
 
         try:
-            # Posizionamento logo con margine di sicurezza inferiore
-            self.image(self.logo_path, x=img_x, y=img_y + 2, w=img_w)
+            # Disegna l'immagine
+            self.image(self.logo_path, x=img_x, y=img_y, w=img_w)
+            # Disegna la cornice (rettangolo) attorno all'immagine
             self.set_line_width(0.3)
-            self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3) 
+            self.rect(img_x - 2, img_y - 2, img_w + 4, img_h + 4) 
         except:
-            self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3)
+            # Cornice vuota di sicurezza se il file manca
+            self.rect(img_x, img_y, img_w, img_h)
             self.set_font('Arial', 'I', 7)
-            self.text(img_x + 10, img_y + 15, "Logo non trovato")
+            self.text(img_x + 5, img_y + 10, "Logo non trovato")
         
-        # 2. TITOLO CATEGORIA (Spostato per non toccare il logo)
-        self.set_y(46); self.set_x(x_offset + 10)
+        # 2. TITOLO CATEGORIA
+        self.set_y(45)
+        self.set_x(x_offset + 10)
         self.set_fill_color(235, 235, 235)
-        self.rounded_rect(x_offset + 10, 46, 128, 8, 2, 'DF')
         self.set_font('Arial', 'B', 10)
-        self.cell(128, 8, f"{str(categoria).upper()}", border=0, ln=1, align='C')
+        self.cell(128, 8, f"{str(categoria).upper()}", border=1, ln=1, align='C', fill=True)
         
         # 3. TESTATA TABELLA
         self.set_x(x_offset + 10)
-        self.set_fill_color(245, 245, 245); self.set_font('Arial', 'B', 8)
+        self.set_fill_color(245, 245, 245)
+        self.set_font('Arial', 'B', 8)
         self.cell(75, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
         self.cell(23, 7, 'CLASSE', border=1, align='C', fill=True) 
         self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
         
-        # 4. RIGHE TABELLA
+        # 4. RIGHE CON I 3 QUADRATINI
         self.set_font('Arial', '', 8)
         for i, lib in enumerate(libri[:15]):
             self.set_x(x_offset + 10)
             self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
+            # I 3 QUADRATINI (CLASSE)
             self.cell(7.6, 7, '', border=1, align='C')
             self.cell(7.6, 7, '', border=1, align='C')
             self.cell(7.8, 7, '', border=1, align='C')
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
         # 5. DETTAGLI DI CONSEGNA
-        self.set_y(155); self.set_x(x_offset + 10)
+        self.set_y(150)
+        self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
-        self.rounded_rect(x_offset + 10, 155, 128, 7, 1.5, 'DF')
         self.set_font('Arial', 'B', 9)
-        self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=0, ln=1)
+        self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=1, ln=1, fill=True)
         
         campi = [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]
         for label, val in campi:
-            self.set_x(x_offset + 10); self.set_font('Arial', 'B', 8)
+            self.set_x(x_offset + 10)
+            self.set_font('Arial', 'B', 8)
             self.cell(35, 6.5, label, border=1, align='L')
             self.set_font('Arial', '', 8)
-            t_v = str(val).upper() if val and val != "- SELEZIONA PLESSO -" else ""
-            self.cell(93, 6.5, t_v, border=1, ln=1, align='L')
+            testo_v = str(val).upper() if val and val != "- SELEZIONA PLESSO -" else ""
+            self.cell(93, 6.5, testo_v, border=1, ln=1, align='L')
+# ------------------------------------------------------------------------------
 
-       
+
 # ==============================================================================
 # BLOCCO 5: CONNESSIONE GOOGLE DRIVE E BACKUP
 # ==============================================================================
@@ -371,9 +313,9 @@ with st.sidebar:
 # ------------------------------------------------------------------------------
 
 
-# =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE (FIX QUANTITÀ DEFINITIVO) ---
-# =========================================================
+# ==============================================================================
+# BLOCCO 9: PAGINA CONSEGNE (STAMPA DOPPIA E PDF)
+# ==============================================================================
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
     
@@ -397,48 +339,38 @@ if st.session_state.pagina == "Consegne":
     altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
     cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
 
-    # --- LOGICA CARICAMENTO ---
     if cat_scelta == "TUTTE LE TIPOLOGIE":
-        st.info("💡 Hai selezionato l'assegnazione massiva. Clicca su 'CONFERMA CONSEGNA' in basso per registrare tutti i libri del database per questo plesso.")
-        st.session_state.lista_consegne_attuale = [] 
+        st.info("💡 Assegnazione massiva selezionata.")
+        st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = "TUTTE"
 
     elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
-        caricati = []
-        for v in st.session_state.db_consegne.get(cat_scelta, []):
-            item = v.copy()
-            if 'q' not in item: item['q'] = 1 # Imposta 1 solo se manca, non sovrascrive
-            caricati.append(item)
+        caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
+        for voce in caricati: voce['q'] = 1
         st.session_state.lista_consegne_attuale = caricati
         st.session_state.last_cat = cat_scelta
 
-    # --- VISUALIZZAZIONE LISTA ---
     if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
             if 'q' not in lib: lib['q'] = 1
-            
             c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
             c_info.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
-            
             m1, v1, p1 = c_qta.columns([1,1,1])
             if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
-                if lib['q'] > 1:
-                    lib['q'] -= 1
-                    st.rerun()
+                if lib['q'] > 1: lib['q'] -= 1; st.rerun()
             v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px;'>{lib['q']}</p>", unsafe_allow_html=True)
             if p1.button("➕", key=f"p_{cat_scelta}_{i}"):
-                lib['q'] += 1
-                st.rerun()
-
+                lib['q'] += 1; st.rerun()
             if c_del.button("❌", key=f"del_{cat_scelta}_{i}"):
-                st.session_state.lista_consegne_attuale.pop(i)
-                st.rerun()
+                st.session_state.lista_consegne_attuale.pop(i); st.rerun()
 
         col_btns = st.columns(2)
         if col_btns[0].button("💾 REGISTRA LISTA BASE", use_container_width=True):
-            # Salva la configurazione mantenendo le quantità scelte
-            st.session_state.db_consegne[cat_scelta] = [item.copy() for item in st.session_state.lista_consegne_attuale]
+            lista_da_salvare = []
+            for item in st.session_state.lista_consegne_attuale:
+                nuovo_item = item.copy(); nuovo_item['q'] = 1; lista_da_salvare.append(nuovo_item)
+            st.session_state.db_consegne[cat_scelta] = lista_da_salvare
             salva_config_consegne(st.session_state.db_consegne)
             st.success("Configurazione salvata!")
         
@@ -446,7 +378,6 @@ if st.session_state.pagina == "Consegne":
             st.session_state.reset_ctr = st.session_state.get('reset_ctr', 0) + 1
             reset_consegne_totale()
 
-        # --- CERCA E AGGIUNGI LIBRO ---
         with st.expander("➕ Cerca e Aggiungi Libro"):
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
@@ -458,16 +389,13 @@ if st.session_state.pagina == "Consegne":
                     c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
                     c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
                     c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
-                    
                     if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
                         st.session_state.lista_consegne_attuale.append({
                             "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(), 
                             "q": 1, "c1": c1in, "c2": c2in, "c3": c3in, "sez": sez_in
                         })
-                        st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1
-                        st.rerun()
+                        st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1; st.rerun()
 
-    # --- DATI RICEVENTE ---
     st.markdown("---")
     d1, d2 = st.columns(2)
     docente = d1.text_input("Insegnante ricevente", key=f"doc_{ctr}")
@@ -477,54 +405,36 @@ if st.session_state.pagina == "Consegne":
     col_print, col_conf = st.columns(2)
     
     if cat_scelta != "TUTTE LE TIPOLOGIE":
-        if col_print.button("🖨️ GENERA PDF", use_container_width=True):
+        logo_up = st.file_uploader("Upload Logo Scuola", type=["png", "jpg"], key="up_logo_consegne")
+        if col_print.button("🖨️ GENERA PDF", use_container_width=True, key="btn_pdf_landscape"):
             if st.session_state.lista_consegne_attuale:
-                pdf = PDF_CONSEGNA(st.session_state.get('logo_scuola'))
+                pdf = PDF_CONSEGNA(logo_data=logo_up)
                 pdf.add_page()
                 pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
-                pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
+                pdf.set_draw_color(150, 150, 150)
+                pdf.dashed_line(148.5, 0, 148.5, 210, 1, 1)
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
-# --- CONFERMA E REGISTRAZIONE (VERSIONE FINALE BLOCCATA) ---
-    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True, key="btn_registrazione_definitiva_v1"):
+    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
-            # Crea lo storico del plesso se non esiste
-            if p_scelto not in st.session_state.storico_consegne: 
-                st.session_state.storico_consegne[p_scelto] = {}
-            
+            if p_scelto not in st.session_state.storico_consegne: st.session_state.storico_consegne[p_scelto] = {}
             if cat_scelta == "TUTTE LE TIPOLOGIE":
-                # Salvataggio Massivo
                 for k, v in st.session_state.db_consegne.items():
-                    st.session_state.storico_consegne[p_scelto][k] = [item.copy() for item in v]
-                st.success(f"REGISTRAZIONE MASSIVA COMPLETATA per {p_scelto}!")
-            
+                    lista_clean = []
+                    for item in v:
+                        nuovo = item.copy(); nuovo['q'] = 1; lista_clean.append(nuovo)
+                    st.session_state.storico_consegne[p_scelto][k] = lista_clean
+                st.success(f"REGISTRAZIONE MASSIVA COMPLETATA!")
             else:
-                # --- QUESTA È LA PARTE CHE RISOLVE IL TUO PROBLEMA ---
-                lista_da_salvare_nel_registro = []
-                
-                # Cicliamo sulla lista che vedi a schermo (quella con i tasti + e -)
-                for lib in st.session_state.lista_consegne_attuale:
-                    # Creiamo un nuovo dizionario che FORZA il valore di 'q' attuale
-                    voce_registrata = {
-                        "t": lib.get('t', ''),
-                        "e": lib.get('e', ''),
-                        "q": int(lib['q']), # <--- Prende il numero esatto (1, 2, 3...) che vedi a video
-                        "c1": lib.get('c1', ''),
-                        "c2": lib.get('c2', ''),
-                        "c3": lib.get('c3', ''),
-                        "sez": lib.get('sez', '')
-                    }
-                    lista_da_salvare_nel_registro.append(voce_registrata)
-                
-                # Sostituiamo i dati nel registro storico
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_da_salvare_nel_registro
-                st.success(f"CONSEGNA REGISTRATA: Salvati {len(lista_da_salvare_nel_registro)} libri con le quantità scelte!")
-            
-            # Salvataggio su Cloud
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
+                st.success(f"Consegna registrata!")
             salva_storico_cloud(st.session_state.storico_consegne)
+# ------------------------------------------------------------------------------
+
+
 # ==============================================================================
-# BLOCCO 10: PAGINA STORICO (LOGICA AGGIORNATA E LINK MENU CORRETTO)
+# BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI)
 # ==============================================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
@@ -557,53 +467,91 @@ elif st.session_state.pagina == "Storico":
                         salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
 
                     with st.expander(f"📘 {tipo.upper()}", expanded=True):
-                        # Creiamo una copia della lista per iterare in sicurezza
-                        lista_libri = per_tipo[tipo]
-                        for i in range(len(lista_libri) - 1, -1, -1):
-                            lib = lista_libri[i]
+                        lista_libri = list(per_tipo[tipo])
+                        for i, lib in enumerate(lista_libri):
                             qta_salvata = int(lib.get('q', 1))
-                            
-                            col_titolo, col_qta, col_ritiro, col_del = st.columns([0.40, 0.15, 0.35, 0.10])
+                            col_titolo, col_qta, col_ritiro, col_del = st.columns([0.45, 0.15, 0.30, 0.10])
                             col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
-                            col_qta.markdown(f"<br><b>Q.tà: {qta_salvata}</b>", unsafe_allow_html=True)
-                            
+                            col_qta.write(f"Q.tà: {qta_salvata}")
                             with col_ritiro:
-                                # Default a 1 per facilità di sottrazione
-                                q_rit = st.number_input("Da restituire", min_value=1, max_value=qta_salvata, value=1, key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
-                                if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
+                                q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata), value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
+                                if st.button("OK", key=f"btn_rit_{plesso}_{tipo}_{i}"):
                                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                                     if tipo not in st.session_state.storico_ritiri[plesso]: st.session_state.storico_ritiri[plesso][tipo] = []
-                                    
-                                    # 1. Registriamo il ritiro
-                                    rit_item = lib.copy()
-                                    rit_item['q'] = q_rit
-                                    st.session_state.storico_ritiri[plesso][tipo].append(rit_item)
-                                    
-                                    # 2. Sottraiamo e manteniamo in memoria
+                                    rit_item = lib.copy(); rit_item['q'] = q_rit; st.session_state.storico_ritiri[plesso][tipo].append(rit_item)
                                     lib['q'] = qta_salvata - q_rit
-                                    
-                                    # Se arriva a zero, rimuoviamo la riga
-                                    if lib['q'] <= 0:
-                                        lista_libri.pop(i)
-                                    
-                                    # Pulizia strutture e salvataggio
-                                    if not per_tipo[tipo]: del per_tipo[tipo]
+                                    if lib['q'] <= 0: per_tipo[tipo].pop(i)
+                                    if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
                                     if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                                    
-                                    salva_storico_cloud(st.session_state.storico_consegne)
-                                    st.rerun()
-
+                                    salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
                             if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
-                                lista_libri.pop(i)
+                                per_tipo[tipo].pop(i)
                                 if not per_tipo[tipo]: del per_tipo[tipo]
-                                if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                                 salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
 
-    # MODIFICA: Puntiamo alla pagina corretta del menu
-    if st.button("⬅️ Torna al Menu"): 
-        st.session_state.pagina = "Nuova Adozione"
-        st.rerun()
+    if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
 # ------------------------------------------------------------------------------
+
+
+# ==============================================================================
+# BLOCCO 11: PAGINA NUOVO LIBRO (CATALOGO)
+# ==============================================================================
+elif st.session_state.pagina == "NuovoLibro":
+    st.subheader("🆕 Aggiungi nuovo titolo")
+    with st.container(border=True):
+        nt = st.text_input("Titolo Libro")
+        col1, col2, col3 = st.columns(3)
+        m_val = col1.text_input("Materia")
+        e_val = col2.text_input("Editore")
+        a_val = col3.text_input("Agenzia")
+        if st.button("✅ SALVA", use_container_width=True, type="primary"):
+            if nt and m_val and e_val:
+                if aggiungi_libro_a_excel(nt, m_val, e_val, a_val):
+                    st.success("Libro aggiunto!"); st.rerun()
+# ------------------------------------------------------------------------------
+
+
+# ==============================================================================
+# BLOCCO 12: PAGINA INSERIMENTO NUOVA ADOZIONE
+# ==============================================================================
+elif st.session_state.pagina == "Inserimento":
+    st.subheader("Nuova Registrazione Adozione")
+    if "form_id" not in st.session_state: st.session_state.form_id = 0
+    with st.container(border=True):
+        titolo_scelto = st.selectbox("📕 SELEZIONA TITOLO", [""] + elenco_titoli, key=f"tit_{st.session_state.form_id}")
+        if titolo_scelto:
+            info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
+            if not info.empty:
+                st.info(f"Materia: {info.iloc[0,1]} | Editore: {info.iloc[0,2]} | Agenzia: {info.iloc[0,3]}")
+        c1, c2, c3 = st.columns([2, 1, 1])
+        with c1:
+            plesso = st.selectbox("🏫 Plesso", [""] + elenco_plessi, key=f"ple_{st.session_state.form_id}")
+            note = st.text_area("📝 Note", key=f"not_{st.session_state.form_id}", height=70)
+        with c2:
+            n_sez = st.number_input("🔢 N° sezioni", min_value=1, value=1, key=f"n_{st.session_state.form_id}")
+            saggio = st.selectbox("📚 Saggio consegnato", ["-", "NO", "SI"], key=f"sag_{st.session_state.form_id}")
+        with c3:
+            sez_lett = st.text_input("🔡 Lettera Sezione", key=f"sez_{st.session_state.form_id}")
+        if st.button("💾 SALVA ADOZIONE", use_container_width=True, type="primary"):
+            if titolo_scelto and plesso and saggio != "-":
+                info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
+                nuova_riga = pd.DataFrame([{
+                    "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "Plesso": plesso, "Materia": info.iloc[0,1], "Titolo": titolo_scelto,
+                    "Editore": info.iloc[0,2], "Agenzia": info.iloc[0,3], "N° sezioni": n_sez,
+                    "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "Note": note
+                }])
+                df_attuale = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame()
+                df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
+                df_finale.to_csv(DB_FILE, index=False)
+                backup_su_google_sheets(df_finale)
+                st.session_state.form_id += 1; st.success("✅ Registrazione avvenuta!"); st.rerun()
+            elif saggio == "-": st.error("⚠️ Specifica SI/NO!")
+            else: st.error("⚠️ Compila i campi obbligatori!")
+# ------------------------------------------------------------------------------
+
+
+# ==============================================================================
 # BLOCCO 13: PAGINA REGISTRO E MOTORE DI RICERCA
 # ==============================================================================
 elif st.session_state.pagina == "Registro":
@@ -639,65 +587,6 @@ elif st.session_state.pagina == "Ricerca":
             st.dataframe(df.sort_index(ascending=False), use_container_width=True)
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
-# ------------------------------------------------------------------------------
-# =========================================================
-# --- BLOCCO 12: PAGINA INSERIMENTO ADOZIONE ---
-# INIZIO BLOCCO
-# =========================================================
-elif st.session_state.pagina == "Inserimento":
-    st.subheader("Nuova Registrazione Adozione")
-    if "form_id" not in st.session_state: st.session_state.form_id = 0
-    with st.container(border=True):
-        titolo_scelto = st.selectbox("📕 SELEZIONA TITOLO", [""] + elenco_titoli, key=f"tit_{st.session_state.form_id}")
-        if titolo_scelto:
-            info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
-            if not info.empty:
-                st.info(f"Materia: {info.iloc[0,1]} | Editore: {info.iloc[0,2]} | Agenzia: {info.iloc[0,3]}")
-        c1, c2, c3 = st.columns([2, 1, 1])
-        with c1:
-            plesso = st.selectbox("🏫 Plesso", [""] + elenco_plessi, key=f"ple_{st.session_state.form_id}")
-            note = st.text_area("📝 Note", key=f"not_{st.session_state.form_id}", height=70)
-        with c2:
-            n_sez = st.number_input("🔢 N° sezioni", min_value=1, value=1, key=f"n_{st.session_state.form_id}")
-            saggio = st.selectbox("📚 Saggio consegnato", ["-", "NO", "SI"], key=f"sag_{st.session_state.form_id}")
-        with c3:
-            sez_lett = st.text_input("🔡 Lettera Sezione", key=f"sez_{st.session_state.form_id}")
-        if st.button("💾 SALVA ADOZIONE", use_container_width=True, type="primary"):
-            if titolo_scelto and plesso and saggio != "-":
-                info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
-                nuova_riga = pd.DataFrame([{
-                    "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "Plesso": plesso, "Materia": info.iloc[0,1], "Titolo": titolo_scelto,
-                    "Editore": info.iloc[0,2], "Agenzia": info.iloc[0,3], "N° sezioni": n_sez,
-                    "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "Note": note
-                }])
-                df_attuale = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame()
-                df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
-                df_finale.to_csv(DB_FILE, index=False)
-                backup_su_google_sheets(df_finale)
-                st.session_state.form_id += 1
-                st.success("✅ Registrazione avvenuta con successo!")
-                st.rerun()
-            elif saggio == "-": st.error("⚠️ Devi specificare SI/NO!")
-            else: st.error("⚠️ Seleziona Titolo e Plesso!")
-# =========================================================
-# FINE BLOCCO 12
-# =========================================================
-# ==============================================================================
-# BLOCCO 11: PAGINA NUOVO LIBRO (CATALOGO)
-# ==============================================================================
-elif st.session_state.pagina == "NuovoLibro":
-    st.subheader("🆕 Aggiungi nuovo titolo")
-    with st.container(border=True):
-        nt = st.text_input("Titolo Libro")
-        col1, col2, col3 = st.columns(3)
-        m_val = col1.text_input("Materia")
-        e_val = col2.text_input("Editore")
-        a_val = col3.text_input("Agenzia")
-        if st.button("✅ SALVA", use_container_width=True, type="primary"):
-            if nt and m_val and e_val:
-                if aggiungi_libro_a_excel(nt, m_val, e_val, a_val):
-                    st.success("Libro aggiunto!"); st.rerun()
 # ------------------------------------------------------------------------------
 # =========================================================
 # --- BLOCCO 14: PAGINA MODIFICA ---
@@ -950,29 +839,6 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
