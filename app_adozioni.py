@@ -393,8 +393,29 @@ if st.session_state.pagina == "Consegne":
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
     
-    basi = ["- SELEZIONA -", "TUTTE LE TIPOLOGIE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]
-    altre = [k for k in st.session_state.db_consegne.keys() if k not in ["INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA"]]
+    # --- COPIA E SOSTITUISCI QUESTE RIGHE ---
+    basi = [
+        "- SELEZIONA -", 
+        "TUTTE LE TIPOLOGIE", 
+        "INGLESE CLASSE PRIMA", 
+        "INGLESE CLASSE QUARTA",
+        "QUADERNI VACANZE CLASSE PRIMA",
+        "QUADERNI VACANZE CLASSE SECONDA",
+        "QUADERNI VACANZE CLASSE TERZA",
+        "QUADERNI VACANZE CLASSE QUARTA",
+        "QUADERNI VACANZE CLASSE QUINTA",
+        "QUADERNI VACANZE INGLESE"
+    ]
+    
+    # Lista per evitare duplicati nel menu "altre"
+    escludi = [
+        "INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA",
+        "QUADERNI VACANZE CLASSE PRIMA", "QUADERNI VACANZE CLASSE SECONDA",
+        "QUADERNI VACANZE CLASSE TERZA", "QUADERNI VACANZE CLASSE QUARTA",
+        "QUADERNI VACANZE CLASSE QUINTA", "QUADERNI VACANZE INGLESE"
+    ]
+    
+    altre = [k for k in st.session_state.db_consegne.keys() if k not in escludi]
     cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
 
     if cat_scelta == "TUTTE LE TIPOLOGIE":
@@ -921,6 +942,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
