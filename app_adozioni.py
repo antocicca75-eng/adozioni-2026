@@ -372,7 +372,7 @@ with st.sidebar:
 
 
 # =========================================================
-# --- BLOCCO 9: PAGINA CONSEGNE (FIX QUANTITÀ DEFINITIVO) ---
+# --- BLOCCO 9: PAGINA CONSEGNE (CORRETTO) ---
 # =========================================================
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
@@ -407,7 +407,9 @@ if st.session_state.pagina == "Consegne":
         caricati = []
         for v in st.session_state.db_consegne.get(cat_scelta, []):
             item = v.copy()
-            if 'q' not in item: item['q'] = 1 # Imposta 1 solo se manca, non sovrascrive
+            # Se la quantità non esiste nel DB, allora mettiamo 1, altrimenti manteniamo quella del DB
+            if 'q' not in item: 
+                item['q'] = 1 
             caricati.append(item)
         st.session_state.lista_consegne_attuale = caricati
         st.session_state.last_cat = cat_scelta
@@ -416,7 +418,7 @@ if st.session_state.pagina == "Consegne":
     if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
-            if 'q' not in lib: lib['q'] = 1
+            # FIX: rimosso il reset forzato a 1 durante il ciclo di visualizzazione
             
             c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
             c_info.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
@@ -437,7 +439,6 @@ if st.session_state.pagina == "Consegne":
 
         col_btns = st.columns(2)
         if col_btns[0].button("💾 REGISTRA LISTA BASE", use_container_width=True):
-            # Salva la configurazione mantenendo le quantità scelte
             st.session_state.db_consegne[cat_scelta] = [item.copy() for item in st.session_state.lista_consegne_attuale]
             salva_config_consegne(st.session_state.db_consegne)
             st.success("Configurazione salvata!")
@@ -486,10 +487,9 @@ if st.session_state.pagina == "Consegne":
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
-# --- CONFERMA E REGISTRAZIONE (VERSIONE FINALE BLOCCATA) ---
-    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True, key="btn_registrazione_definitiva_v1"):
+    # --- CONFERMA E REGISTRAZIONE ---
+    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True, key="btn_conferma_finale_unificato"):
         if p_scelto != "- SELEZIONA PLESSO -":
-            # Crea lo storico del plesso se non esiste
             if p_scelto not in st.session_state.storico_consegne: 
                 st.session_state.storico_consegne[p_scelto] = {}
             
@@ -498,30 +498,11 @@ if st.session_state.pagina == "Consegne":
                 for k, v in st.session_state.db_consegne.items():
                     st.session_state.storico_consegne[p_scelto][k] = [item.copy() for item in v]
                 st.success(f"REGISTRAZIONE MASSIVA COMPLETATA per {p_scelto}!")
-            
             else:
-                # --- QUESTA È LA PARTE CHE RISOLVE IL TUO PROBLEMA ---
-                lista_da_salvare_nel_registro = []
-                
-                # Cicliamo sulla lista che vedi a schermo (quella con i tasti + e -)
-                for lib in st.session_state.lista_consegne_attuale:
-                    # Creiamo un nuovo dizionario che FORZA il valore di 'q' attuale
-                    voce_registrata = {
-                        "t": lib.get('t', ''),
-                        "e": lib.get('e', ''),
-                        "q": int(lib['q']), # <--- Prende il numero esatto (1, 2, 3...) che vedi a video
-                        "c1": lib.get('c1', ''),
-                        "c2": lib.get('c2', ''),
-                        "c3": lib.get('c3', ''),
-                        "sez": lib.get('sez', '')
-                    }
-                    lista_da_salvare_nel_registro.append(voce_registrata)
-                
-                # Sostituiamo i dati nel registro storico
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_da_salvare_nel_registro
-                st.success(f"CONSEGNA REGISTRATA: Salvati {len(lista_da_salvare_nel_registro)} libri con le quantità scelte!")
+                # REGISTRAZIONE SINGOLA: Salviamo i libri con la 'q' modificata
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = [lib.copy() for lib in st.session_state.lista_consegne_attuale]
+                st.success(f"CONSEGNA REGISTRATA per {cat_scelta}!")
             
-            # Salvataggio su Cloud
             salva_storico_cloud(st.session_state.storico_consegne)
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (VERSIONE AGGIORNATA)
@@ -946,6 +927,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
