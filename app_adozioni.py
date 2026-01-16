@@ -753,13 +753,12 @@ elif st.session_state.pagina == "Modifica":
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
-# --- BLOCCO 15: TABELLONE GENERALE (BIG FONT & BLACK BADGE) ---
-# INIZIO BLOCCO
+# --- BLOCCO 15: TABELLONE GENERALE (FORMA RETTANGOLARE) ---
 # =========================================================
 elif st.session_state.pagina == "Tabellone Stato":
     st.header("📊 Tabellone Avanzamento Plessi")
 
-   # Mappatura Sigle Aggiornata
+    # Mappatura Sigle Aggiornata
     mappa_sigle = {
         "LETTURE CLASSE PRIMA": "L1",
         "LETTURE CLASSE QUARTA": "L4",
@@ -774,6 +773,10 @@ elif st.session_state.pagina == "Tabellone Stato":
         "QUADERNI VACANZE CLASSE QUINTA": "V5",
         "QUADERNI VACANZE INGLESE": "VE"
     }
+
+    # Definizione ordine per righe rettangolo
+    riga_sup_target = ["L1", "L4", "S4", "R1\\4", "E1", "E4"]
+    riga_inf_target = ["V1", "V2", "V3", "V4", "V5", "VE"]
 
     elenco_totale = get_lista_plessi()
     consegnati = st.session_state.get("storico_consegne", {})
@@ -826,48 +829,46 @@ elif st.session_state.pagina == "Tabellone Stato":
                 for j, plesso in enumerate(mostra[i:i+n_col]):
                     
                     categorie_attive = consegnati.get(plesso, {}).keys()
-                    sigle_da_mostrare = [mappa_sigle.get(cat, cat[:2]) for cat in categorie_attive]
+                    sigle_attive = [mappa_sigle.get(cat, cat[:2]) for cat in categorie_attive]
                     
                     bg, txt, lab, brd = ("#f8f9fa", "#333", "DA INIZIARE", "2px solid #dee2e6")
                     
-                    if plesso in ritirati and not sigle_da_mostrare:
+                    if plesso in ritirati and not sigle_attive:
                         bg, txt, lab, brd = ("#28a745", "#FFF", "✅ COMPLETATO", "2px solid #1e7e34")
-                    elif sigle_da_mostrare:
+                    elif sigle_attive:
                         bg, txt, lab, brd = ("#FF8C00", "#FFF", "🚚 IN CONSEGNA", "2px solid #e67e22")
 
-                    # --- COSTRUZIONE BOX SIGLE (TESTO NERO) ---
+                    # --- COSTRUZIONE RETTANGOLO SIGLE ---
                     html_blocco_sigle = ""
-                    if sigle_da_mostrare:
-                        span_sigle = "".join([
-                            f'''<span style="
-                                background: white; 
-                                color: black; 
-                                padding: 5px 10px; 
-                                border-radius: 6px; 
-                                font-size: 15px; 
-                                font-weight: 900; 
-                                margin: 4px; 
-                                border: 2.5px solid #000; 
-                                display: inline-block;
-                                box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
-                            ">{s}</span>''' 
-                            for s in sigle_da_mostrare
-                        ])
-                        html_blocco_sigle = f'<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: 12px;">{span_sigle}</div>'
+                    if sigle_attive:
+                        def crea_span(s):
+                            return f'''<span style="background: white; color: black; padding: 2px 6px; 
+                                     border-radius: 4px; font-size: 13px; font-weight: 900; margin: 2px; 
+                                     border: 2px solid #000; display: inline-block; min-width: 35px;
+                                     box-shadow: 1px 1px 0px rgba(0,0,0,0.2);">{s}</span>'''
+
+                        # Dividiamo le sigle presenti nelle due righe
+                        riga1 = [crea_span(s) for s in riga_sup_target if s in sigle_attive]
+                        riga2 = [crea_span(s) for s in riga_inf_target if s in sigle_attive]
+                        
+                        html_r1 = f'<div style="margin-bottom: 2px;">{"".join(riga1)}</div>' if riga1 else ""
+                        html_r2 = f'<div>{"".join(riga2)}</div>' if riga2 else ""
+                        
+                        html_blocco_sigle = f'<div style="margin-top: 10px; display: flex; flex-direction: column; align-items: center;">{html_r1}{html_r2}</div>'
 
                     with cols[j]:
                         st.markdown(f"""
                             <div style="
                                 background-color: {bg}; color: {txt}; border: {brd};
-                                border-radius: 12px; padding: 20px 10px; margin-bottom: 20px;
-                                text-align: center; min-height: 190px; display: flex;
+                                border-radius: 12px; padding: 15px 5px; margin-bottom: 20px;
+                                text-align: center; min-height: 220px; display: flex;
                                 flex-direction: column; justify-content: center; align-items: center;
                                 box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
                             ">
-                                <div style="font-size: 20px; font-weight: 900; line-height: 1.2; text-transform: uppercase; margin-bottom: 8px;">
+                                <div style="font-size: 18px; font-weight: 900; line-height: 1.1; text-transform: uppercase; margin-bottom: 5px;">
                                     {plesso}
                                 </div>
-                                <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">
+                                <div style="font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">
                                     {lab}
                                 </div>
                                 {html_blocco_sigle}
@@ -877,7 +878,6 @@ elif st.session_state.pagina == "Tabellone Stato":
     st.markdown("---")
     if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final"):
         st.session_state.pagina = "Consegne"; st.rerun()
-# =========================================================  
 # =========================================================
 # --- BLOCCO 16: RICERCA COLLANE E CONSEGNE ---
 # =========================================================
@@ -948,6 +948,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
