@@ -12,17 +12,21 @@ from google.oauth2.service_account import Credentials
 from fpdf import FPDF 
 
 # ==============================================================================
-# BLOCCO 1: FUNZIONI CONFIGURAZIONE CONSEGNE (GOOGLE SHEETS)
+# BLOCCO 1: FUNZIONI CONFIGURAZIONE CONSEGNE (CORRETTO)
 # ==============================================================================
 def salva_config_consegne(db_dict):
     sh = connetti_google_sheets()
     if sh:
         try:
-            try: foglio = sh.worksheet("ConfigConsegne")
-            except: foglio = sh.add_worksheet(title="ConfigConsegne", rows="100", cols="20")
+            try: 
+                foglio = sh.worksheet("ConfigConsegne")
+            except: 
+                foglio = sh.add_worksheet(title="ConfigConsegne", rows="100", cols="20")
+            
             foglio.clear()
             righe = [["Categoria", "Dati_JSON"]]
             for k, v in db_dict.items():
+                # Assicuriamoci che ogni libro salvato mantenga le sue proprietà
                 righe.append([k, json.dumps(v)])
             foglio.update(righe)
         except Exception as e:
@@ -30,6 +34,7 @@ def salva_config_consegne(db_dict):
 
 def carica_config_consegne():
     sh = connetti_google_sheets()
+    # Inizializzazione categorie base
     db_caricato = {
         "LETTURE CLASSE PRIMA": [], "LETTURE CLASSE QUARTA": [],
         "SUSSIDIARI DISCIPLINE": [], "INGLESE CLASSE PRIMA": [], 
@@ -40,11 +45,20 @@ def carica_config_consegne():
             foglio = sh.worksheet("ConfigConsegne")
             dati = foglio.get_all_records()
             for r in dati:
-                db_caricato[r["Categoria"]] = json.loads(r["Dati_JSON"])
-        except: pass 
+                categoria = r["Categoria"]
+                lista_libri = json.loads(r["Dati_JSON"])
+                
+                # FIX: Quando carichiamo, verifichiamo che ogni libro abbia la sua 'q'
+                # Se manca (vecchi salvataggi), mettiamo 1, altrimenti manteniamo il numero salvato
+                for libro in lista_libri:
+                    if 'q' not in libro:
+                        libro['q'] = 1
+                
+                db_caricato[categoria] = lista_libri
+        except: 
+            pass 
     return db_caricato
 # ------------------------------------------------------------------------------
-
 
 
 # ==============================================================================
@@ -920,6 +934,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
