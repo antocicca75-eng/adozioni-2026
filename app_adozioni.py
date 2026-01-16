@@ -478,7 +478,7 @@ if st.session_state.pagina == "Consegne":
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
-    # --- CONFERMA E REGISTRAZIONE (Gestisce anche il MASSIVO) ---
+   # --- CONFERMA E REGISTRAZIONE (Gestisce anche il MASSIVO) ---
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
             if p_scelto not in st.session_state.storico_consegne: 
@@ -490,17 +490,25 @@ if st.session_state.pagina == "Consegne":
                     lista_clean = []
                     for item in v:
                         nuovo = item.copy()
-                        nuovo['q'] = 1 # Forza sempre a 1 per il registro storico
+                        # Manteniamo la quantità se già presente, altrimenti mettiamo 1
+                        if 'q' not in nuovo: nuovo['q'] = 1
                         lista_clean.append(nuovo)
                     st.session_state.storico_consegne[p_scelto][k] = lista_clean
                 st.success(f"REGISTRAZIONE MASSIVA COMPLETATA per {p_scelto}!")
             else:
                 # Registrazione singola tipologia
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
+                # CORREZIONE: Creiamo una copia profonda per salvare le quantità reali (es. 3 o 4 copie)
+                lista_da_salvare = []
+                for lib in st.session_state.lista_consegne_attuale:
+                    voce_da_salvare = lib.copy()
+                    # Se l'utente ha modificato 'q' a 3, qui viene salvato 3
+                    lista_da_salvare.append(voce_da_salvare)
+                
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_da_salvare
                 st.success(f"Consegna registrata per {cat_scelta}!")
             
+            # Salvataggio immediato sul database cloud
             salva_storico_cloud(st.session_state.storico_consegne)
-
 
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (LOGICA AGGIORNATA E LINK MENU CORRETTO)
@@ -929,6 +937,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
