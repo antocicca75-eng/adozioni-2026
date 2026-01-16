@@ -44,9 +44,10 @@ def carica_config_consegne():
         except: pass 
     return db_caricato
 # ------------------------------------------------------------------------------
-==============================================================================
-# BLOCCO 12: PAGINA INSERIMENTO NUOVA ADOZIONE
-# ==============================================================================
+# =========================================================
+# --- BLOCCO 12: PAGINA INSERIMENTO ADOZIONE ---
+# INIZIO BLOCCO
+# =========================================================
 elif st.session_state.pagina == "Inserimento":
     st.subheader("Nuova Registrazione Adozione")
     if "form_id" not in st.session_state: st.session_state.form_id = 0
@@ -78,10 +79,12 @@ elif st.session_state.pagina == "Inserimento":
                 df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
                 df_finale.to_csv(DB_FILE, index=False)
                 backup_su_google_sheets(df_finale)
-                st.session_state.form_id += 1; st.success("✅ Registrazione avvenuta!"); st.rerun()
-            elif saggio == "-": st.error("⚠️ Specifica SI/NO!")
-            else: st.error("⚠️ Compila i campi obbligatori!")
-# ------------------------------------------------------------------------------
+                st.session_state.form_id += 1
+                st.success("✅ Registrazione avvenuta con successo!")
+                st.rerun()
+            elif saggio == "-": st.error("⚠️ Devi specificare SI/NO!")
+            else: st.error("⚠️ Seleziona Titolo e Plesso!")
+
 
 
 
@@ -899,6 +902,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
