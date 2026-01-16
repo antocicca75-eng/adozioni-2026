@@ -86,7 +86,7 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 # ------------------------------------------------------------------------------
 
 # ==============================================================================
-# BLOCCO 4: CLASSE PDF (CORRETTA - SENZA ERRORI E SENZA CERCHI)
+# BLOCCO 4: CLASSE PDF (FINALE - FIX CORNICE LOGO)
 # ==============================================================================
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
@@ -137,23 +137,28 @@ class PDF_CONSEGNA(FPDF):
         self._out(f'{x1 * self.k:.2f} {(h - y1) * self.k:.2f} {x2 * self.k:.2f} {(h - y2) * self.k:.2f} {x3 * self.k:.2f} {(h - y3) * self.k:.2f} c')
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. LOGO INGRANDITO
-        img_w, img_h = 70, 25 
+        # 1. LOGO INGRANDITO E CORNICE CALIBRATA
+        img_w = 70 
         img_x = x_offset + (148.5 - img_w) / 2
         img_y = 10
+        # Cornice più alta (30mm) per contenere il logo senza farlo uscire
+        box_h = 30 
+        box_w = img_w + 6
+
         try:
-            self.image(self.logo_path, x=img_x, y=img_y, w=img_w)
+            # Centra l'immagine verticalmente nella cornice
+            self.image(self.logo_path, x=img_x, y=img_y + 2.5, w=img_w)
             self.set_line_width(0.3)
-            self.rounded_rect(img_x - 3, img_y - 2, img_w + 6, img_h + 4, 3) 
+            self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3) 
         except:
-            self.rounded_rect(img_x, img_y, img_w, img_h, 3)
+            self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3)
             self.set_font('Arial', 'I', 7)
-            self.text(img_x + 10, img_y + 12, "Logo non trovato")
+            self.text(img_x + 10, img_y + 15, "Logo non trovato")
         
         # 2. TITOLO CATEGORIA
-        self.set_y(45); self.set_x(x_offset + 10)
+        self.set_y(48); self.set_x(x_offset + 10) # Abbassato leggermente per distacco dal logo
         self.set_fill_color(235, 235, 235)
-        self.rounded_rect(x_offset + 10, 45, 128, 8, 2, 'DF')
+        self.rounded_rect(x_offset + 10, 48, 128, 8, 2, 'DF')
         self.set_font('Arial', 'B', 10)
         self.cell(128, 8, f"{str(categoria).upper()}", border=0, ln=1, align='C')
         
@@ -175,9 +180,9 @@ class PDF_CONSEGNA(FPDF):
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
         # 5. DETTAGLI DI CONSEGNA
-        self.set_y(150); self.set_x(x_offset + 10)
+        self.set_y(155); self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
-        self.rounded_rect(x_offset + 10, 150, 128, 7, 1.5, 'DF')
+        self.rounded_rect(x_offset + 10, 155, 128, 7, 1.5, 'DF')
         self.set_font('Arial', 'B', 9)
         self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=0, ln=1)
         
@@ -189,10 +194,10 @@ class PDF_CONSEGNA(FPDF):
             t_v = str(val).upper() if val and val != "- SELEZIONA PLESSO -" else ""
             self.cell(93, 6.5, t_v, border=1, ln=1, align='L')
 
-        # 6. SCRITTA SITO WEB (POSIZIONE PULITA)
-        self.set_y(185); self.set_x(x_offset + 10)
+        # 6. SCRITTA SITO WEB
+        self.set_y(190); self.set_x(x_offset + 10)
         self.set_font('Arial', 'I', 8)
-        self.cell(128, 5, "www.irpinialibri.it - Distribuzione Editoriale Scolastica", border=0, align='C')
+        self.cell(128, 5, "www.irpinialibri.it - Distribuzione Editoriale Scolastica", border=0, align='C')'C')
 
 
 # ==============================================================================
@@ -901,6 +906,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
