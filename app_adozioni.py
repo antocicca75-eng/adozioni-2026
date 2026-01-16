@@ -491,11 +491,24 @@ if st.session_state.pagina == "Consegne":
                         nuovo = item.copy()
                         nuovo['q'] = 1 # Forza sempre a 1 per il registro storico
                         lista_clean.append(nuovo)
+                  if tutte:
+                # Registrazione massiva
+                for k, v in st.session_state.consegne_per_tipo.items():
+                    # Creiamo una copia profonda con le quantità esplicite
+                    lista_clean = [lib.copy() for lib in v]
                     st.session_state.storico_consegne[p_scelto][k] = lista_clean
                 st.success(f"REGISTRAZIONE MASSIVA COMPLETATA per {p_scelto}!")
             else:
                 # Registrazione singola tipologia
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = list(st.session_state.lista_consegne_attuale)
+                # CORREZIONE: Assicuriamo che la quantità 'q' sia salvata per ogni libro
+                lista_da_salvare = []
+                for lib in st.session_state.lista_consegne_attuale:
+                    item = lib.copy()
+                    # Se per caso 'q' manca, lo impostiamo a 1, altrimenti manteniamo quello scelto
+                    if 'q' not in item: item['q'] = 1
+                    lista_da_salvare.append(item)
+                
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_da_salvare
                 st.success(f"Consegna registrata per {cat_scelta}!")
             
             salva_storico_cloud(st.session_state.storico_consegne)
@@ -929,6 +942,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
