@@ -463,7 +463,7 @@ if st.session_state.pagina == "Consegne":
     col_print, col_conf = st.columns(2)
     
     if cat_scelta != "TUTTE LE TIPOLOGIE":
-        logo_up = st.file_uploader("Upload Logo Scuola", type=["png", "jpg"], key="up_logo_consegne")
+    
         if col_print.button("🖨️ GENERA PDF", use_container_width=True, key="btn_pdf_landscape"):
             if st.session_state.lista_consegne_attuale:
                 pdf = PDF_CONSEGNA(logo_data=logo_up)
@@ -921,6 +921,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
