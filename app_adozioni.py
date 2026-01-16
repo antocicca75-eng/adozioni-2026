@@ -486,11 +486,6 @@ if st.session_state.pagina == "Consegne":
                 pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
-    # --- CONFERMA E REGISTRAZIONE ---
-    if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
-        if p_scelto != "- SELEZIONA PLESSO -":
-            if p_scelto not in st.session_state.storico_consegne: 
-                st.session_state.storico_consegne[p_scelto] = {}
 # --- CONFERMA E REGISTRAZIONE ---
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
@@ -937,6 +932,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
