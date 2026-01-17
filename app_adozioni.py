@@ -528,7 +528,7 @@ if st.session_state.pagina == "Consegne":
             
             # Invio finale al cloud
             salva_storico_cloud(st.session_state.storico_consegne)
-            st.balloons()
+          
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI) - MODIFICA TASTO AGGIORNA
 # ==============================================================================
@@ -991,6 +991,7 @@ elif st.session_state.pagina == "Ricerca Collane":
         
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
 
 
 
