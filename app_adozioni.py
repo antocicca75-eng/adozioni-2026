@@ -321,28 +321,19 @@ def get_lista_plessi():
 
 def aggiungi_libro_a_excel(t, m, e, a):
     try:
-        # 1) Salva sul file Excel locale
-        wb = load_workbook(CONFIG_FILE)
-        ws = wb["ListaLibri"]
-        ws.append([t, m, e, a])
-        wb.save(CONFIG_FILE)
-
-        # 2) Salva anche su Google Sheets (foglio "Catalogo")
+        # Salva su Google Sheets (foglio "Catalogo")
         sh = connetti_google_sheets()
         if sh:
-            try:
-                foglio_catalogo = sh.worksheet("Catalogo")
-                foglio_catalogo.append_row([t, m, e, a])
-            except Exception as e:
-                st.warning(f"⚠️ Salvato localmente, ma errore su Google Sheets: {e}")
-
-        # 3) Pulisci la cache per ricaricare i dati aggiornati
-        st.cache_data.clear()
-        return True
+            foglio_catalogo = sh.worksheet("Catalogo")
+            foglio_catalogo.append_row([t, m, e, a])
+            st.cache_data.clear()
+            return True
+        else:
+            st.error("❌ Impossibile connettersi a Google Sheets")
+            return False
     except Exception as e:
         st.error(f"❌ Errore salvataggio: {e}")
         return False
-
 
 # ------------------------------------------------------------------------------
 
@@ -674,28 +665,47 @@ elif st.session_state.pagina == "Storico":
 
     if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
 
-
 # ==============================================================================
 # BLOCCO 11: PAGINA NUOVO LIBRO (CATALOGO)
 # ==============================================================================
 elif st.session_state.pagina == "NuovoLibro":
     st.subheader("🆕 Aggiungi nuovo titolo")
+
+    # Inizializza chiavi session_state per pulire i campi
+    if "nuovo_libro_salvato" not in st.session_state:
+        st.session_state.nuovo_libro_salvato = False
+
     with st.container(border=True):
-        nt = st.text_input("Titolo Libro")
+        nt = st.text_input("Titolo Libro", key="input_titolo",
+                           value="" if st.session_state.nuovo_libro_salvato else st.session_state.get("input_titolo",
+                                                                                                      ""))
         col1, col2, col3 = st.columns(3)
-        m_val = col1.text_input("Materia")
-        e_val = col2.text_input("Editore")
-        a_val = col3.text_input("Agenzia")
+        m_val = col1.text_input("Materia", key="input_materia",
+                                value="" if st.session_state.nuovo_libro_salvato else st.session_state.get(
+                                    "input_materia", ""))
+        e_val = col2.text_input("Editore", key="input_editore",
+                                value="" if st.session_state.nuovo_libro_salvato else st.session_state.get(
+                                    "input_editore", ""))
+        a_val = col3.text_input("Agenzia", key="input_agenzia",
+                                value="" if st.session_state.nuovo_libro_salvato else st.session_state.get(
+                                    "input_agenzia", ""))
 
         if st.button("✅ SALVA", use_container_width=True, type="primary"):
             if not nt or not m_val or not e_val:
                 st.warning("⚠️ Inserisci almeno Titolo, Materia ed Editore!")
             else:
                 if aggiungi_libro_a_excel(nt, m_val, e_val, a_val):
+                    st.session_state.nuovo_libro_salvato = True
                     st.success(f"✅ Libro **'{nt}'** aggiunto con successo!")
                     st.rerun()
                 else:
                     st.error("❌ Errore durante il salvataggio del libro.")
+
+        # Reset flag dopo rerun
+        if st.session_state.nuovo_libro_salvato:
+            st.session_state.nuovo_libro_salvato = False
+# ------------------------------------------------------------------------------
+
 # ------------------------------------------------------------------------------
 # BLOCCO 13: PAGINA REGISTRO E MOTORE DI RICERCA
 # ==============================================================================
