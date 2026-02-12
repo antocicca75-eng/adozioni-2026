@@ -3,8 +3,6 @@ import pandas as pd
 import json
 import os
 from datetime import datetime
-from openpyxl import load_workbook
-import io
 import gspread
 from google.oauth2.service_account import Credentials
 from fpdf import FPDF
