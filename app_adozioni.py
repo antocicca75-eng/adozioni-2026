@@ -1,15 +1,14 @@
-
-
 import streamlit as st
 import pandas as pd
-import json 
+import json
 import os
 from datetime import datetime
 from openpyxl import load_workbook
 import io
 import gspread
 from google.oauth2.service_account import Credentials
-from fpdf import FPDF 
+from fpdf import FPDF
+
 
 # ==============================================================================
 # BLOCCO 1: FUNZIONI CONFIGURAZIONE CONSEGNE (CORRETTO)
@@ -18,11 +17,11 @@ def salva_config_consegne(db_dict):
     sh = connetti_google_sheets()
     if sh:
         try:
-            try: 
+            try:
                 foglio = sh.worksheet("ConfigConsegne")
-            except: 
+            except:
                 foglio = sh.add_worksheet(title="ConfigConsegne", rows="100", cols="20")
-            
+
             foglio.clear()
             righe = [["Categoria", "Dati_JSON"]]
             for k, v in db_dict.items():
@@ -32,12 +31,13 @@ def salva_config_consegne(db_dict):
         except Exception as e:
             st.sidebar.error(f"Errore salvataggio config: {e}")
 
+
 def carica_config_consegne():
     sh = connetti_google_sheets()
     # Inizializzazione categorie base
     db_caricato = {
         "LETTURE CLASSE PRIMA": [], "LETTURE CLASSE QUARTA": [],
-        "SUSSIDIARI DISCIPLINE": [], "INGLESE CLASSE PRIMA": [], 
+        "SUSSIDIARI DISCIPLINE": [], "INGLESE CLASSE PRIMA": [],
         "INGLESE CLASSE QUARTA": [], "RELIGIONE": []
     }
     if sh:
@@ -47,17 +47,19 @@ def carica_config_consegne():
             for r in dati:
                 categoria = r["Categoria"]
                 lista_libri = json.loads(r["Dati_JSON"])
-                
+
                 # FIX: Quando carichiamo, verifichiamo che ogni libro abbia la sua 'q'
                 # Se manca (vecchi salvataggi), mettiamo 1, altrimenti manteniamo il numero salvato
                 for libro in lista_libri:
                     if 'q' not in libro:
                         libro['q'] = 1
-                
+
                 db_caricato[categoria] = lista_libri
-        except: 
-            pass 
+        except:
+            pass
     return db_caricato
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -68,8 +70,10 @@ def salva_storico_cloud(storico_dict):
     sh = connetti_google_sheets()
     if sh:
         try:
-            try: foglio = sh.worksheet("StoricoConsegne")
-            except: foglio = sh.add_worksheet(title="StoricoConsegne", rows="1000", cols="20")
+            try:
+                foglio = sh.worksheet("StoricoConsegne")
+            except:
+                foglio = sh.add_worksheet(title="StoricoConsegne", rows="1000", cols="20")
             foglio.clear()
             righe = [["Plesso", "Dati_JSON"]]
             for plesso, dati in storico_dict.items():
@@ -77,6 +81,7 @@ def salva_storico_cloud(storico_dict):
             foglio.update(righe)
         except Exception as e:
             st.sidebar.error(f"Errore salvataggio storico: {e}")
+
 
 def carica_storico_cloud():
     sh = connetti_google_sheets()
@@ -87,8 +92,11 @@ def carica_storico_cloud():
             dati = foglio.get_all_records()
             for r in dati:
                 storico_caricato[r["Plesso"]] = json.loads(r["Dati_JSON"])
-        except: pass
+        except:
+            pass
     return storico_caricato
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -100,6 +108,8 @@ CONFIG_FILE = "anagrafiche.xlsx"
 ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
 
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -109,16 +119,19 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
         super().__init__(orientation='L', unit='mm', format='A4')
-        self.logo_path = "logo.jpg" 
+        self.logo_path = "logo.jpg"
 
     def rounded_rect(self, x, y, w, h, r, style='', corners='1234'):
         """Disegna un rettangolo con angoli arrotondati senza dipendenze esterne"""
         k = self.k
         hp = self.h
-        if style == 'F': op = 'f'
-        elif style == 'FD' or style == 'DF': op = 'B'
-        else: op = 'S'
-        my_arc = 4/3 * (pow(2, 0.5) - 1)
+        if style == 'F':
+            op = 'f'
+        elif style == 'FD' or style == 'DF':
+            op = 'B'
+        else:
+            op = 'S'
+        my_arc = 4 / 3 * (pow(2, 0.5) - 1)
         self._out(f'{(x + r) * k:.2f} {(hp - y) * k:.2f} m')
         xc = x + w - r
         yc = y + r
@@ -154,14 +167,15 @@ class PDF_CONSEGNA(FPDF):
         """Funzione di supporto per gli archi degli angoli arrotondati"""
         h = self.h
         # CORRETTO: self.k (non self.self.k)
-        self._out(f'{x1 * self.k:.2f} {(h - y1) * self.k:.2f} {x2 * self.k:.2f} {(h - y2) * self.k:.2f} {x3 * self.k:.2f} {(h - y3) * self.k:.2f} c')
+        self._out(
+            f'{x1 * self.k:.2f} {(h - y1) * self.k:.2f} {x2 * self.k:.2f} {(h - y2) * self.k:.2f} {x3 * self.k:.2f} {(h - y3) * self.k:.2f} c')
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
         # 1. LOGO E CORNICE (SISTEMATA)
         img_w = 70
         img_x = x_offset + (148.5 - img_w) / 2
-        img_y = 8  
-        
+        img_y = 8
+
         # Cornice generosa (32mm) per contenere il logo in orizzontale
         box_h = 32
         box_w = img_w + 6
@@ -170,26 +184,28 @@ class PDF_CONSEGNA(FPDF):
             # Posizionamento logo con margine di sicurezza inferiore
             self.image(self.logo_path, x=img_x, y=img_y + 2, w=img_w)
             self.set_line_width(0.3)
-            self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3) 
+            self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3)
         except:
             self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3)
             self.set_font('Arial', 'I', 7)
             self.text(img_x + 10, img_y + 15, "Logo non trovato")
-        
+
         # 2. TITOLO CATEGORIA (Spostato per non toccare il logo)
-        self.set_y(46); self.set_x(x_offset + 10)
+        self.set_y(46);
+        self.set_x(x_offset + 10)
         self.set_fill_color(235, 235, 235)
         self.rounded_rect(x_offset + 10, 46, 128, 8, 2, 'DF')
         self.set_font('Arial', 'B', 10)
         self.cell(128, 8, f"{str(categoria).upper()}", border=0, ln=1, align='C')
-        
+
         # 3. TESTATA TABELLA
         self.set_x(x_offset + 10)
-        self.set_fill_color(245, 245, 245); self.set_font('Arial', 'B', 8)
+        self.set_fill_color(245, 245, 245);
+        self.set_font('Arial', 'B', 8)
         self.cell(75, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
-        self.cell(23, 7, 'CLASSE', border=1, align='C', fill=True) 
+        self.cell(23, 7, 'CLASSE', border=1, align='C', fill=True)
         self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
-        
+
         # 4. RIGHE TABELLA
         self.set_font('Arial', '', 8)
         for i, lib in enumerate(libri[:15]):
@@ -201,21 +217,23 @@ class PDF_CONSEGNA(FPDF):
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
         # 5. DETTAGLI DI CONSEGNA
-        self.set_y(155); self.set_x(x_offset + 10)
+        self.set_y(155);
+        self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
         self.rounded_rect(x_offset + 10, 155, 128, 7, 1.5, 'DF')
         self.set_font('Arial', 'B', 9)
         self.cell(128, 7, ' DETTAGLI DI CONSEGNA', border=0, ln=1)
-        
+
         campi = [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]
         for label, val in campi:
-            self.set_x(x_offset + 10); self.set_font('Arial', 'B', 8)
+            self.set_x(x_offset + 10);
+            self.set_font('Arial', 'B', 8)
             self.cell(35, 6.5, label, border=1, align='L')
             self.set_font('Arial', '', 8)
             t_v = str(val).upper() if val and val != "- SELEZIONA PLESSO -" else ""
             self.cell(93, 6.5, t_v, border=1, ln=1, align='L')
 
-       
+
 # ==============================================================================
 # BLOCCO 5: CONNESSIONE GOOGLE DRIVE E BACKUP
 # ==============================================================================
@@ -233,6 +251,7 @@ def connetti_google_sheets():
         st.error(f"⚠️ Errore connessione Cloud: {e}")
         return None
 
+
 def backup_su_google_sheets(df_da_salvare):
     sh = connetti_google_sheets()
     if sh:
@@ -246,6 +265,8 @@ def backup_su_google_sheets(df_da_salvare):
             st.sidebar.error(f"Errore scrittura Cloud: {e}")
             return False
     return False
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -260,6 +281,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+
 @st.cache_data(ttl=3600)
 def get_catalogo_libri():
     sh = connetti_google_sheets()
@@ -267,14 +289,17 @@ def get_catalogo_libri():
         try:
             df = pd.DataFrame(sh.worksheet("Catalogo").get_all_records())
             return df.fillna("")
-        except: pass
+        except:
+            pass
     if os.path.exists(CONFIG_FILE):
         try:
             df = pd.read_excel(CONFIG_FILE, sheet_name="ListaLibri")
             df.columns = [c.strip() for c in df.columns]
             return df.fillna("")
-        except: return pd.DataFrame()
+        except:
+            return pd.DataFrame()
     return pd.DataFrame()
+
 
 @st.cache_data(ttl=3600)
 def get_lista_plessi():
@@ -283,23 +308,42 @@ def get_lista_plessi():
         try:
             df = pd.DataFrame(sh.worksheet("Plesso").get_all_records())
             return sorted(df.iloc[:, 0].dropna().unique().tolist())
-        except: pass
+        except:
+            pass
     if os.path.exists(CONFIG_FILE):
         try:
             df = pd.read_excel(CONFIG_FILE, sheet_name="Plesso")
             return sorted(df.iloc[:, 0].dropna().unique().tolist())
-        except: return []
+        except:
+            return []
     return []
+
 
 def aggiungi_libro_a_excel(t, m, e, a):
     try:
+        # 1) Salva sul file Excel locale
         wb = load_workbook(CONFIG_FILE)
         ws = wb["ListaLibri"]
         ws.append([t, m, e, a])
         wb.save(CONFIG_FILE)
-        st.cache_data.clear() 
+
+        # 2) Salva anche su Google Sheets (foglio "Catalogo")
+        sh = connetti_google_sheets()
+        if sh:
+            try:
+                foglio_catalogo = sh.worksheet("Catalogo")
+                foglio_catalogo.append_row([t, m, e, a])
+            except Exception as e:
+                st.warning(f"⚠️ Salvato localmente, ma errore su Google Sheets: {e}")
+
+        # 3) Pulisci la cache per ricaricare i dati aggiornati
+        st.cache_data.clear()
         return True
-    except: return False
+    except Exception as e:
+        st.error(f"❌ Errore salvataggio: {e}")
+        return False
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -325,6 +369,7 @@ if 'db_consegne' not in st.session_state:
 if 'lista_consegne_attuale' not in st.session_state:
     st.session_state.lista_consegne_attuale = []
 
+
 def reset_ricerca():
     st.session_state.r_attiva = False
     st.session_state.ft = []
@@ -333,6 +378,8 @@ def reset_ricerca():
     st.session_state.fm = []
     st.session_state.fe = []
     st.session_state.fsag = "TUTTI"
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -341,33 +388,41 @@ def reset_ricerca():
 # ==============================================================================
 with st.sidebar:
     st.title("🧭 MENU")
-    if st.button("➕ NUOVA ADOZIONE", use_container_width=True): 
-        st.session_state.pagina = "Inserimento"; st.rerun()
-    
-    if st.button("✏️ MODIFICA ADOZIONE", use_container_width=True): 
-        st.session_state.pagina = "Modifica"; st.rerun()
-    
-    if st.button("🆕 AGGIUNGI A CATALOGO", use_container_width=True): 
-        st.session_state.pagina = "NuovoLibro"; st.rerun()
-    
-    if st.button("📊 REGISTRO COMPLETO", use_container_width=True): 
-        st.session_state.pagina = "Registro"; st.rerun()
-    
-    if st.button("🔍 PIVOT ADOZIONI", use_container_width=True): 
-        st.session_state.pagina = "Ricerca"; st.rerun()
-    
-    if st.button("📄 MODULO CONSEGNE", use_container_width=True): 
-        st.session_state.pagina = "Consegne"; st.rerun()
-    
-    if st.button("📚 COLLANE CONSEGNATE", use_container_width=True): 
-        st.session_state.pagina = "Storico"; st.rerun()
+    if st.button("➕ NUOVA ADOZIONE", use_container_width=True):
+        st.session_state.pagina = "Inserimento";
+        st.rerun()
 
-    if st.button("🔍 RICERCA COLLANE", use_container_width=True): 
+    if st.button("✏️ MODIFICA ADOZIONE", use_container_width=True):
+        st.session_state.pagina = "Modifica";
+        st.rerun()
+
+    if st.button("🆕 AGGIUNGI A CATALOGO", use_container_width=True):
+        st.session_state.pagina = "NuovoLibro";
+        st.rerun()
+
+    if st.button("📊 REGISTRO COMPLETO", use_container_width=True):
+        st.session_state.pagina = "Registro";
+        st.rerun()
+
+    if st.button("🔍 PIVOT ADOZIONI", use_container_width=True):
+        st.session_state.pagina = "Ricerca";
+        st.rerun()
+
+    if st.button("📄 MODULO CONSEGNE", use_container_width=True):
+        st.session_state.pagina = "Consegne";
+        st.rerun()
+
+    if st.button("📚 COLLANE CONSEGNATE", use_container_width=True):
+        st.session_state.pagina = "Storico";
+        st.rerun()
+
+    if st.button("🔍 RICERCA COLLANE", use_container_width=True):
         st.session_state.pagina = "Ricerca Collane"
         st.rerun()
 
-    if st.button("📊 TABELLONE STATO", use_container_width=True): 
-        st.session_state.pagina = "Tabellone Stato"; st.rerun()
+    if st.button("📊 TABELLONE STATO", use_container_width=True):
+        st.session_state.pagina = "Tabellone Stato";
+        st.rerun()
 # ------------------------------------------------------------------------------
 
 
@@ -376,28 +431,30 @@ with st.sidebar:
 # ==============================================================================
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
-    
-    if "storico_consegne" not in st.session_state: 
+
+    if "storico_consegne" not in st.session_state:
         st.session_state.storico_consegne = carica_storico_cloud()
-    
+
     elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
-    
+
+
     def reset_consegne_totale():
         st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = None
         st.rerun()
+
 
     ctr = st.session_state.get('reset_ctr', 0)
     actr = st.session_state.get('add_ctr', 0)
 
     col_p, col_c = st.columns(2)
     p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
-    
+
     # --- COPIA E SOSTITUISCI QUESTE RIGHE ---
     basi = [
-        "- SELEZIONA -", 
-        "TUTTE LE TIPOLOGIE", 
-        "INGLESE CLASSE PRIMA", 
+        "- SELEZIONA -",
+        "TUTTE LE TIPOLOGIE",
+        "INGLESE CLASSE PRIMA",
         "INGLESE CLASSE QUARTA",
         "QUADERNI VACANZE CLASSE PRIMA",
         "QUADERNI VACANZE CLASSE SECONDA",
@@ -406,7 +463,7 @@ if st.session_state.pagina == "Consegne":
         "QUADERNI VACANZE CLASSE QUINTA",
         "QUADERNI VACANZE INGLESE"
     ]
-    
+
     # Lista per evitare duplicati nel menu "altre"
     escludi = [
         "INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA",
@@ -414,7 +471,7 @@ if st.session_state.pagina == "Consegne":
         "QUADERNI VACANZE CLASSE TERZA", "QUADERNI VACANZE CLASSE QUARTA",
         "QUADERNI VACANZE CLASSE QUINTA", "QUADERNI VACANZE INGLESE"
     ]
-    
+
     altre = [k for k in st.session_state.db_consegne.keys() if k not in escludi]
     cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
 
@@ -435,24 +492,29 @@ if st.session_state.pagina == "Consegne":
             if 'q' not in lib: lib['q'] = 1
             c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
             c_info.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
-            m1, v1, p1 = c_qta.columns([1,1,1])
+            m1, v1, p1 = c_qta.columns([1, 1, 1])
             if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
                 if lib['q'] > 1: lib['q'] -= 1; st.rerun()
-            v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px;'>{lib['q']}</p>", unsafe_allow_html=True)
+            v1.markdown(f"<p style='text-align:center; font-weight:bold; font-size:18px;'>{lib['q']}</p>",
+                        unsafe_allow_html=True)
             if p1.button("➕", key=f"p_{cat_scelta}_{i}"):
-                lib['q'] += 1; st.rerun()
+                lib['q'] += 1;
+                st.rerun()
             if c_del.button("❌", key=f"del_{cat_scelta}_{i}"):
-                st.session_state.lista_consegne_attuale.pop(i); st.rerun()
+                st.session_state.lista_consegne_attuale.pop(i);
+                st.rerun()
 
         col_btns = st.columns(2)
         if col_btns[0].button("💾 REGISTRA LISTA BASE", use_container_width=True):
             lista_da_salvare = []
             for item in st.session_state.lista_consegne_attuale:
-                nuovo_item = item.copy(); nuovo_item['q'] = 1; lista_da_salvare.append(nuovo_item)
+                nuovo_item = item.copy();
+                nuovo_item['q'] = 1;
+                lista_da_salvare.append(nuovo_item)
             st.session_state.db_consegne[cat_scelta] = lista_da_salvare
             salva_config_consegne(st.session_state.db_consegne)
             st.success("Configurazione salvata!")
-        
+
         if col_btns[1].button("🗑️ SVUOTA SCHERMATA", use_container_width=True):
             st.session_state.reset_ctr = st.session_state.get('reset_ctr', 0) + 1
             reset_consegne_totale()
@@ -460,7 +522,8 @@ if st.session_state.pagina == "Consegne":
         with st.expander("➕ Cerca e Aggiungi Libro"):
             df_cat = get_catalogo_libri()
             if not df_cat.empty:
-                scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + sorted(df_cat.iloc[:, 0].astype(str).unique().tolist()), key=f"sk_{actr}")
+                scelta_libro = st.selectbox("Seleziona libro:", ["- CERCA TITOLO -"] + sorted(
+                    df_cat.iloc[:, 0].astype(str).unique().tolist()), key=f"sk_{actr}")
                 if scelta_libro != "- CERCA TITOLO -":
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
                     c_sez, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
@@ -470,10 +533,11 @@ if st.session_state.pagina == "Consegne":
                     c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
                     if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
                         st.session_state.lista_consegne_attuale.append({
-                            "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(), 
+                            "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(),
                             "q": 1, "c1": c1in, "c2": c2in, "c3": c3in, "sez": sez_in
                         })
-                        st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1; st.rerun()
+                        st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1;
+                        st.rerun()
 
     st.markdown("---")
     d1, d2 = st.columns(2)
@@ -482,10 +546,10 @@ if st.session_state.pagina == "Consegne":
     classe_man = d1.text_input("Classe specifica", key=f"cla_{ctr}")
 
     col_print, col_conf = st.columns(2)
-    
+
     # --- PARTE FINALE BLOCCO 9: PDF E CONFERMA ---
     col_print, col_conf = st.columns(2)
-    
+
     if cat_scelta != "TUTTE LE TIPOLOGIE" and cat_scelta != "- SELEZIONA -":
         if col_print.button("🖨️ GENERA PDF", use_container_width=True):
             if st.session_state.lista_consegne_attuale:
@@ -494,21 +558,23 @@ if st.session_state.pagina == "Consegne":
                 if os.path.exists("logo.jpg"):
                     with open("logo.jpg", "rb") as f:
                         logo_per_pdf = f.read()
-                
+
                 # Creazione PDF con il logo corretto
                 pdf = PDF_CONSEGNA(logo_data=logo_per_pdf)
                 pdf.add_page()
-                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente,
+                                   classe_man, data_con)
                 pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
-                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente, classe_man, data_con)
+                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente,
+                                   classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
     # --- TASTO CONFERMA SISTEMATO ---
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
         if p_scelto != "- SELEZIONA PLESSO -":
-            if p_scelto not in st.session_state.storico_consegne: 
+            if p_scelto not in st.session_state.storico_consegne:
                 st.session_state.storico_consegne[p_scelto] = {}
-            
+
             if cat_scelta == "TUTTE LE TIPOLOGIE":
                 for k, v in st.session_state.db_consegne.items():
                     # Creiamo una copia pulita con quantità base 1 per il massivo
@@ -525,16 +591,16 @@ if st.session_state.pagina == "Consegne":
                 lista_con_quantita_esatte = [item.copy() for item in st.session_state.lista_consegne_attuale]
                 st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_con_quantita_esatte
                 st.success(f"Consegna registrata con successo!")
-            
+
             # Invio finale al cloud
             salva_storico_cloud(st.session_state.storico_consegne)
-          
+
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI) - MODIFICA TASTO AGGIORNA
 # ==============================================================================
 elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
-    
+
     if "storico_ritiri" not in st.session_state: st.session_state.storico_ritiri = {}
 
     if not st.session_state.get("storico_consegne"):
@@ -547,11 +613,13 @@ elif st.session_state.pagina == "Storico":
 
         for plesso in plessi_da_mostrare:
             with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
-                if st.button(f"🔄 SVUOTA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}", use_container_width=True):
+                if st.button(f"🔄 SVUOTA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
+                             use_container_width=True):
                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                     st.session_state.storico_ritiri[plesso].update(st.session_state.storico_consegne[plesso])
                     del st.session_state.storico_consegne[plesso]
-                    salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
+                    salva_storico_cloud(st.session_state.storico_consegne);
+                    st.rerun()
 
                 per_tipo = st.session_state.storico_consegne[plesso]
                 for tipo in sorted(list(per_tipo.keys())):
@@ -560,7 +628,8 @@ elif st.session_state.pagina == "Storico":
                         st.session_state.storico_ritiri[plesso][tipo] = per_tipo[tipo]
                         del st.session_state.storico_consegne[plesso][tipo]
                         if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                        salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
+                        salva_storico_cloud(st.session_state.storico_consegne);
+                        st.rerun()
 
                     with st.expander(f"📘 {tipo.upper()}", expanded=True):
                         lista_libri = list(per_tipo[tipo])
@@ -569,31 +638,39 @@ elif st.session_state.pagina == "Storico":
                             col_titolo, col_qta, col_ritiro, col_del = st.columns([0.45, 0.15, 0.30, 0.10])
                             col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
                             col_qta.write(f"Q.tà: {qta_salvata}")
-                            
+
                             with col_ritiro:
-                                q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata), value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}", label_visibility="collapsed")
-                                
+                                q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata),
+                                                        value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}",
+                                                        label_visibility="collapsed")
+
                                 # --- MODIFICA RICHIESTA: Sostituito tasto "OK" con "AGGIORNA CARICO" ---
                                 if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
-                                    if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
-                                    if tipo not in st.session_state.storico_ritiri[plesso]: st.session_state.storico_ritiri[plesso][tipo] = []
-                                    
+                                    if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[
+                                        plesso] = {}
+                                    if tipo not in st.session_state.storico_ritiri[plesso]:
+                                        st.session_state.storico_ritiri[plesso][tipo] = []
+
                                     rit_item = lib.copy()
                                     rit_item['q'] = q_rit
                                     st.session_state.storico_ritiri[plesso][tipo].append(rit_item)
-                                    
+
                                     lib['q'] = qta_salvata - q_rit
                                     if lib['q'] <= 0: per_tipo[tipo].pop(i)
-                                    
-                                    if not st.session_state.storico_consegne[plesso][tipo]: del st.session_state.storico_consegne[plesso][tipo]
-                                    if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                                    
-                                    salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
-                            
+
+                                    if not st.session_state.storico_consegne[plesso][tipo]: del \
+                                        st.session_state.storico_consegne[plesso][tipo]
+                                    if not st.session_state.storico_consegne[plesso]: del \
+                                        st.session_state.storico_consegne[plesso]
+
+                                    salva_storico_cloud(st.session_state.storico_consegne);
+                                    st.rerun()
+
                             if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
                                 per_tipo[tipo].pop(i)
                                 if not per_tipo[tipo]: del per_tipo[tipo]
-                                salva_storico_cloud(st.session_state.storico_consegne); st.rerun()
+                                salva_storico_cloud(st.session_state.storico_consegne);
+                                st.rerun()
 
     if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
 
@@ -609,12 +686,17 @@ elif st.session_state.pagina == "NuovoLibro":
         m_val = col1.text_input("Materia")
         e_val = col2.text_input("Editore")
         a_val = col3.text_input("Agenzia")
-        if st.button("✅ SALVA", use_container_width=True, type="primary"):
-            if nt and m_val and e_val:
-                if aggiungi_libro_a_excel(nt, m_val, e_val, a_val):
-                    st.success("Libro aggiunto!"); st.rerun()
-# ------------------------------------------------------------------------------
 
+        if st.button("✅ SALVA", use_container_width=True, type="primary"):
+            if not nt or not m_val or not e_val:
+                st.warning("⚠️ Inserisci almeno Titolo, Materia ed Editore!")
+            else:
+                if aggiungi_libro_a_excel(nt, m_val, e_val, a_val):
+                    st.success(f"✅ Libro **'{nt}'** aggiunto con successo!")
+                    st.rerun()
+                else:
+                    st.error("❌ Errore durante il salvataggio del libro.")
+# ------------------------------------------------------------------------------
 # BLOCCO 13: PAGINA REGISTRO E MOTORE DI RICERCA
 # ==============================================================================
 elif st.session_state.pagina == "Registro":
@@ -627,17 +709,23 @@ elif st.session_state.pagina == "Ricerca":
     if "r_attiva" not in st.session_state: st.session_state.r_attiva = False
     with st.container(border=True):
         r1c1, r1c2, r1c3 = st.columns(3)
-        with r1c1: f_tit = st.multiselect("📕 Titolo", elenco_titoli, key="ft")
-        with r1c2: f_age = st.multiselect("🤝 Agenzia", elenco_agenzie, key="fa")
-        with r1c3: f_sag = st.selectbox("📚 Saggio", ["TUTTI", "SI", "NO"], key="fsag")
+        with r1c1:
+            f_tit = st.multiselect("📕 Titolo", elenco_titoli, key="ft")
+        with r1c2:
+            f_age = st.multiselect("🤝 Agenzia", elenco_agenzie, key="fa")
+        with r1c3:
+            f_sag = st.selectbox("📚 Saggio", ["TUTTI", "SI", "NO"], key="fsag")
         r2c1, r2c2, r2c3 = st.columns(3)
-        with r2c1: f_ple = st.multiselect("🏫 Plesso", ["NESSUNO"] + elenco_plessi, key="fp")
-        with r2c2: f_mat = st.multiselect("📖 Materia", elenco_materie, key="fm")
-        with r2c3: f_edi = st.multiselect("🏢 Editore", elenco_editori, key="fe")
+        with r2c1:
+            f_ple = st.multiselect("🏫 Plesso", ["NESSUNO"] + elenco_plessi, key="fp")
+        with r2c2:
+            f_mat = st.multiselect("📖 Materia", elenco_materie, key="fm")
+        with r2c3:
+            f_edi = st.multiselect("🏢 Editore", elenco_editori, key="fe")
         btn1, btn2, _ = st.columns([1, 1, 2])
         if btn1.button("🔍 AVVIA RICERCA", use_container_width=True, type="primary"): st.session_state.r_attiva = True
         if btn2.button("🧹 PULISCI", use_container_width=True, on_click=reset_ricerca): st.rerun()
-            
+
     if st.session_state.r_attiva and os.path.exists(DB_FILE):
         df = pd.read_csv(DB_FILE).fillna("").astype(str)
         if f_ple: df = df[df["Plesso"].isin(f_ple)]
@@ -649,7 +737,8 @@ elif st.session_state.pagina == "Ricerca":
         if not df.empty:
             st.dataframe(df.sort_index(ascending=False), use_container_width=True)
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
-            st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""",
+                        unsafe_allow_html=True)
 # ------------------------------------------------------------------------------
 # =========================================================
 # --- BLOCCO 12: PAGINA INSERIMENTO ADOZIONE ---
@@ -663,7 +752,7 @@ elif st.session_state.pagina == "Inserimento":
         if titolo_scelto:
             info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
             if not info.empty:
-                st.info(f"Materia: {info.iloc[0,1]} | Editore: {info.iloc[0,2]} | Agenzia: {info.iloc[0,3]}")
+                st.info(f"Materia: {info.iloc[0, 1]} | Editore: {info.iloc[0, 2]} | Agenzia: {info.iloc[0, 3]}")
         c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
             plesso = st.selectbox("🏫 Plesso", [""] + elenco_plessi, key=f"ple_{st.session_state.form_id}")
@@ -678,8 +767,8 @@ elif st.session_state.pagina == "Inserimento":
                 info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
                 nuova_riga = pd.DataFrame([{
                     "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "Plesso": plesso, "Materia": info.iloc[0,1], "Titolo": titolo_scelto,
-                    "Editore": info.iloc[0,2], "Agenzia": info.iloc[0,3], "N° sezioni": n_sez,
+                    "Plesso": plesso, "Materia": info.iloc[0, 1], "Titolo": titolo_scelto,
+                    "Editore": info.iloc[0, 2], "Agenzia": info.iloc[0, 3], "N° sezioni": n_sez,
                     "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "Note": note
                 }])
                 df_attuale = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame()
@@ -689,8 +778,10 @@ elif st.session_state.pagina == "Inserimento":
                 st.session_state.form_id += 1
                 st.success("✅ Registrazione avvenuta con successo!")
                 st.rerun()
-            elif saggio == "-": st.error("⚠️ Devi specificare SI/NO!")
-            else: st.error("⚠️ Seleziona Titolo e Plesso!")
+            elif saggio == "-":
+                st.error("⚠️ Devi specificare SI/NO!")
+            else:
+                st.error("⚠️ Seleziona Titolo e Plesso!")
 # =========================================================
 # FINE BLOCCO 12
 # =========================================================
@@ -708,14 +799,15 @@ elif st.session_state.pagina == "NuovoLibro":
         if st.button("✅ SALVA", use_container_width=True, type="primary"):
             if nt and m_val and e_val:
                 if aggiungi_libro_a_excel(nt, m_val, e_val, a_val):
-                    st.success("Libro aggiunto!"); st.rerun()
+                    st.success("Libro aggiunto!");
+                    st.rerun()
 # ------------------------------------------------------------------------------
 # =========================================================
 # --- BLOCCO 14: PAGINA MODIFICA (VERSIONE STABILE) ---
 # =========================================================
 elif st.session_state.pagina == "Modifica":
     st.subheader("✏️ Modifica o Cancella Adozioni")
-    
+
     # Inizializziamo un contatore per il reset se non esiste
     if "reset_mod_ctr" not in st.session_state:
         st.session_state.reset_mod_ctr = 0
@@ -723,44 +815,50 @@ elif st.session_state.pagina == "Modifica":
     if os.path.exists(DB_FILE):
         df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
         c_ric1, c_ric2 = st.columns(2)
-        
+
         # Usiamo il contatore nella KEY per resettare tutto quando vogliamo
         with c_ric1:
             lista_plessi_db = sorted([x for x in df_mod["Plesso"].unique() if x != ""])
-            p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db, 
-                                 key=f"p_mod_{st.session_state.reset_mod_ctr}")
+            p_cerca = st.selectbox("🔍 Filtra per Plesso", [""] + lista_plessi_db,
+                                   key=f"p_mod_{st.session_state.reset_mod_ctr}")
         with c_ric2:
             lista_titoli_db = sorted([x for x in df_mod["Titolo"].unique() if x != ""])
-            t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db, 
-                                 key=f"t_mod_{st.session_state.reset_mod_ctr}")
-        
+            t_cerca = st.selectbox("🔍 Filtra per Titolo", [""] + lista_titoli_db,
+                                   key=f"t_mod_{st.session_state.reset_mod_ctr}")
+
         if p_cerca or t_cerca:
             df_filtrato = df_mod.copy()
             if p_cerca: df_filtrato = df_filtrato[df_filtrato["Plesso"] == p_cerca]
             if t_cerca: df_filtrato = df_filtrato[df_filtrato["Titolo"] == t_cerca]
-            
+
             if not df_filtrato.empty:
                 for i in df_filtrato.index:
                     with st.container(border=True):
                         st.markdown(f"**Registrazione del {df_mod.at[i, 'Data']}**")
                         col1, col2, col3 = st.columns([2, 1, 1])
                         with col1:
-                            try: idx_p = elenco_plessi.index(df_mod.at[i, 'Plesso'])
-                            except: idx_p = 0
+                            try:
+                                idx_p = elenco_plessi.index(df_mod.at[i, 'Plesso'])
+                            except:
+                                idx_p = 0
                             nuovo_plesso = st.selectbox(f"Plesso", elenco_plessi, index=idx_p, key=f"mp_{i}")
-                            try: idx_t = elenco_titoli.index(df_mod.at[i, 'Titolo'])
-                            except: idx_t = 0
+                            try:
+                                idx_t = elenco_titoli.index(df_mod.at[i, 'Titolo'])
+                            except:
+                                idx_t = 0
                             nuovo_titolo = st.selectbox(f"Titolo Libro", elenco_titoli, index=idx_t, key=f"mt_{i}")
                             nuove_note = st.text_area("Note", value=df_mod.at[i, 'Note'], key=f"mnot_{i}", height=70)
                         with col2:
                             val_sez = int(float(df_mod.at[i, 'N° sezioni'])) if df_mod.at[i, 'N° sezioni'] else 1
                             nuovo_n_sez = st.number_input("N° sezioni", min_value=1, value=val_sez, key=f"mn_{i}")
-                            nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'], key=f"ms_{i}")
+                            nuova_sez_lett = st.text_input("Lettera Sezione", value=df_mod.at[i, 'Sezione'],
+                                                           key=f"ms_{i}")
                         with col3:
                             attuale_sag = df_mod.at[i, 'Saggio Consegna']
                             idx_saggio = ["-", "NO", "SI"].index(attuale_sag) if attuale_sag in ["-", "NO", "SI"] else 0
-                            nuovo_saggio = st.selectbox("Saggio consegnato", ["-", "NO", "SI"], index=idx_saggio, key=f"msag_{i}")
-                        
+                            nuovo_saggio = st.selectbox("Saggio consegnato", ["-", "NO", "SI"], index=idx_saggio,
+                                                        key=f"msag_{i}")
+
                         b1, b2 = st.columns(2)
                         with b1:
                             if st.button("💾 AGGIORNA", key=f"upd_{i}", use_container_width=True, type="primary"):
@@ -770,28 +868,29 @@ elif st.session_state.pagina == "Modifica":
                                     df_full.at[i, 'Plesso'] = nuovo_plesso
                                     df_full.at[i, 'Titolo'] = nuovo_titolo
                                     if not info_new.empty:
-                                        df_full.at[i, 'Materia'] = info_new.iloc[0,1]
-                                        df_full.at[i, 'Editore'] = info_new.iloc[0,2]
-                                        df_full.at[i, 'Agenzia'] = info_new.iloc[0,3]
+                                        df_full.at[i, 'Materia'] = info_new.iloc[0, 1]
+                                        df_full.at[i, 'Editore'] = info_new.iloc[0, 2]
+                                        df_full.at[i, 'Agenzia'] = info_new.iloc[0, 3]
                                     df_full.at[i, 'N° sezioni'] = nuovo_n_sez
                                     df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
                                     df_full.at[i, 'Saggio Consegna'] = nuovo_saggio
                                     df_full.at[i, 'Note'] = nuove_note
-                                    
+
                                     df_full.to_csv(DB_FILE, index=False)
                                     backup_su_google_sheets(df_full)
-                                    
+
                                     # --- TRUCCO PER IL RESET: Incrementiamo il contatore ---
                                     st.session_state.reset_mod_ctr += 1
-                                    
-                                    st.success("Aggiornato!"); st.rerun()
+
+                                    st.success("Aggiornato!");
+                                    st.rerun()
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
                                 df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
                                 df_full = df_full.drop(int(i))
                                 df_full.to_csv(DB_FILE, index=False)
                                 backup_su_google_sheets(df_full)
-                                st.session_state.reset_mod_ctr += 1 # Reset anche qui
+                                st.session_state.reset_mod_ctr += 1  # Reset anche qui
                                 st.rerun()
 # FINE BLOCCO 14
 # =========================================================
@@ -838,7 +937,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         c1.metric("⚪ DA INIZIARE", max(0, n_bianchi_count))
         c2.metric("🟠 DA RITIRARE", n_consegnati_count)
         c3.metric("🟢 COMPLETATI", n_ritirati_count)
-        
+
         st.markdown("---")
 
         # Filtri
@@ -846,8 +945,8 @@ elif st.session_state.pagina == "Tabellone Stato":
         with f1:
             cerca = st.text_input("🔍 Cerca Plesso...", "").upper()
         with f2:
-            filtro_stato = st.selectbox("📂 Filtra per Stato", 
-                                       ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
+            filtro_stato = st.selectbox("📂 Filtra per Stato",
+                                        ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
 
         mostra = []
         for p in elenco_totale:
@@ -857,25 +956,29 @@ elif st.session_state.pagina == "Tabellone Stato":
             e_ritirato = p in ritirati and not ha_sigle
             e_bianco = p not in consegnati and p not in ritirati
 
-            if filtro_stato == "TUTTI": mostra.append(p)
-            elif filtro_stato == "DA INIZIARE" and e_bianco: mostra.append(p)
-            elif filtro_stato == "DA RITIRARE" and ha_sigle: mostra.append(p)
-            elif filtro_stato == "RITIRATI" and e_ritirato: mostra.append(p)
+            if filtro_stato == "TUTTI":
+                mostra.append(p)
+            elif filtro_stato == "DA INIZIARE" and e_bianco:
+                mostra.append(p)
+            elif filtro_stato == "DA RITIRARE" and ha_sigle:
+                mostra.append(p)
+            elif filtro_stato == "RITIRATI" and e_ritirato:
+                mostra.append(p)
 
         # Griglia Plessi
         if not mostra:
             st.info("ℹ️ Nessun plesso trovato.")
         else:
-            n_col = 4 
+            n_col = 4
             for i in range(0, len(mostra), n_col):
                 cols = st.columns(n_col)
-                for j, plesso in enumerate(mostra[i:i+n_col]):
-                    
+                for j, plesso in enumerate(mostra[i:i + n_col]):
+
                     categorie_attive = consegnati.get(plesso, {}).keys()
                     sigle_attive = [mappa_sigle.get(cat, cat[:2]) for cat in categorie_attive]
-                    
+
                     bg, txt, lab, brd = ("#f8f9fa", "#333", "DA INIZIARE", "2px solid #dee2e6")
-                    
+
                     if plesso in ritirati and not sigle_attive:
                         bg, txt, lab, brd = ("#28a745", "#FFF", "✅ COMPLETATO", "2px solid #1e7e34")
                     elif sigle_attive:
@@ -890,13 +993,14 @@ elif st.session_state.pagina == "Tabellone Stato":
                                      border: 2px solid #000; display: inline-block; min-width: 35px;
                                      box-shadow: 1px 1px 0px rgba(0,0,0,0.2);">{s}</span>'''
 
+
                         # Dividiamo le sigle presenti nelle due righe
                         riga1 = [crea_span(s) for s in riga_sup_target if s in sigle_attive]
                         riga2 = [crea_span(s) for s in riga_inf_target if s in sigle_attive]
-                        
+
                         html_r1 = f'<div style="margin-bottom: 2px;">{"".join(riga1)}</div>' if riga1 else ""
                         html_r2 = f'<div>{"".join(riga2)}</div>' if riga2 else ""
-                        
+
                         html_blocco_sigle = f'<div style="margin-top: 10px; display: flex; flex-direction: column; align-items: center;">{html_r1}{html_r2}</div>'
 
                     with cols[j]:
@@ -920,7 +1024,8 @@ elif st.session_state.pagina == "Tabellone Stato":
 
     st.markdown("---")
     if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final"):
-        st.session_state.pagina = "Consegne"; st.rerun()
+        st.session_state.pagina = "Consegne";
+        st.rerun()
 # =========================================================
 # --- BLOCCO 16: RICERCA COLLANE E CONSEGNE ---
 # =========================================================
@@ -947,26 +1052,26 @@ elif st.session_state.pagina == "Ricerca Collane":
                         "Editore": lib.get('e', ''),
                         "Quantità": lib.get('q', 0)
                     })
-    
+
     df_collane = pd.DataFrame(righe_storico)
 
     if not df_collane.empty:
         # --- AREA FILTRI ---
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
-            
+
             # Creiamo un suffisso dinamico basato sul contatore di reset
             suff = str(st.session_state.reset_collane)
-            
+
             # Applichiamo il suffisso alle key (es: f_ple_0, f_ple_1...)
             f_ple = c1.multiselect("🏫 Filtra Plesso", sorted(df_collane["Plesso"].unique()), key="f_ple_" + suff)
             f_tip = c2.multiselect("📚 Filtra Tipologia", sorted(df_collane["Tipologia"].unique()), key="f_tip_" + suff)
             f_edi = c3.multiselect("🏢 Filtra Editore", sorted(df_collane["Editore"].unique()), key="f_edi_" + suff)
-            
+
             # --- TASTO PULISCI CORRETTO ---
             if st.button("🧹 PULISCI TUTTI I FILTRI", use_container_width=True):
                 # Invece di svuotare le liste, cambiamo il nome delle chiavi dei widget
-                st.session_state.reset_collane += 1 
+                st.session_state.reset_collane += 1
                 st.rerun()
 
         # 3. Applicazione filtri
@@ -988,48 +1093,6 @@ elif st.session_state.pagina == "Ricerca Collane":
         """, unsafe_allow_html=True)
 
         st.dataframe(df_filtrato, use_container_width=True, hide_index=True)
-        
+
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
