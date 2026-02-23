@@ -111,16 +111,15 @@ st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
 # ------------------------------------------------------------------------------
 
 
-# ==============================================================================
-# BLOCCO 4: CLASSE PDF (DEFINITIVO - SENZA ERRORI DI SINTASSI)
-# ==============================================================================
+from fpdf import FPDF
+import io
+
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
         super().__init__(orientation='L', unit='mm', format='A4')
         self.logo_path = "logo.jpg"
 
     def rounded_rect(self, x, y, w, h, r, style='', corners='1234'):
-        """Disegna un rettangolo con angoli arrotondati senza dipendenze esterne"""
         k = self.k
         hp = self.h
         if style == 'F':
@@ -162,24 +161,18 @@ class PDF_CONSEGNA(FPDF):
         self._out(op)
 
     def _arc(self, x1, y1, x2, y2, x3, y3):
-        """Funzione di supporto per gli archi degli angoli arrotondati"""
         h = self.h
-        # CORRETTO: self.k (non self.self.k)
         self._out(
-            f'{x1 * self.k:.2f} {(h - y1) * self.k:.2f} {x2 * self.k:.2f} {(h - y2) * self.k:.2f} {x3 * self.k:.2f} {(h - y3) * self.k:.2f} c')
+            f'{x1 * self.k:.2f} {(h - y1) * self.k:.2f} {x2 * self.k:.2f} {(h - y2) * self.k:.2f} {x3 * self.k:.2f} {(h - y3) * self.k:.2f} c'
+        )
 
     def disegna_modulo(self, x_offset, libri, categoria, p, ins, sez, data_m):
-        # 1. LOGO E CORNICE (SISTEMATA)
         img_w = 70
         img_x = x_offset + (148.5 - img_w) / 2
         img_y = 8
-
-        # Cornice generosa (32mm) per contenere il logo in orizzontale
         box_h = 32
         box_w = img_w + 6
-
         try:
-            # Posizionamento logo con margine di sicurezza inferiore
             self.image(self.logo_path, x=img_x, y=img_y + 2, w=img_w)
             self.set_line_width(0.3)
             self.rounded_rect(img_x - 3, img_y, box_w, box_h, 3)
@@ -188,23 +181,20 @@ class PDF_CONSEGNA(FPDF):
             self.set_font('Arial', 'I', 7)
             self.text(img_x + 10, img_y + 15, "Logo non trovato")
 
-        # 2. TITOLO CATEGORIA (Spostato per non toccare il logo)
-        self.set_y(46);
+        self.set_y(46)
         self.set_x(x_offset + 10)
         self.set_fill_color(235, 235, 235)
         self.rounded_rect(x_offset + 10, 46, 128, 8, 2, 'DF')
         self.set_font('Arial', 'B', 10)
         self.cell(128, 8, f"{str(categoria).upper()}", border=0, ln=1, align='C')
 
-        # 3. TESTATA TABELLA
         self.set_x(x_offset + 10)
-        self.set_fill_color(245, 245, 245);
+        self.set_fill_color(245, 245, 245)
         self.set_font('Arial', 'B', 8)
         self.cell(75, 7, 'TITOLO DEL TESTO', border=1, align='C', fill=True)
         self.cell(23, 7, 'CLASSE', border=1, align='C', fill=True)
         self.cell(30, 7, 'EDITORE', border=1, ln=1, align='C', fill=True)
 
-        # 4. RIGHE TABELLA
         self.set_font('Arial', '', 8)
         for i, lib in enumerate(libri[:15]):
             self.set_x(x_offset + 10)
@@ -214,8 +204,7 @@ class PDF_CONSEGNA(FPDF):
             self.cell(7.8, 7, '', border=1, align='C')
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
-        # 5. DETTAGLI DI CONSEGNA
-        self.set_y(155);
+        self.set_y(155)
         self.set_x(x_offset + 10)
         self.set_fill_color(240, 240, 240)
         self.rounded_rect(x_offset + 10, 155, 128, 7, 1.5, 'DF')
@@ -224,13 +213,20 @@ class PDF_CONSEGNA(FPDF):
 
         campi = [("PLESSO:", p), ("INSEGNANTE:", ins), ("CLASSE:", sez), ("DATA:", data_m)]
         for label, val in campi:
-            self.set_x(x_offset + 10);
+            self.set_x(x_offset + 10)
             self.set_font('Arial', 'B', 8)
             self.cell(35, 6.5, label, border=1, align='L')
             self.set_font('Arial', '', 8)
             t_v = str(val).upper() if val and val != "- SELEZIONA PLESSO -" else ""
             self.cell(93, 6.5, t_v, border=1, ln=1, align='L')
 
+def genera_pdf_due_copie(libri, categoria, plesso, insegnante, classe, data_modulo):
+    pdf = PDF_CONSEGNA()
+    pdf.set_auto_page_break(False)
+    pdf.add_page()
+    pdf.disegna_modulo(0, libri, categoria, plesso, insegnante, classe, data_modulo)
+    pdf.disegna_modulo(148.5, libri, categoria, plesso, insegnante, classe, data_modulo)
+    return io.BytesIO(pdf.output(dest='S').encode('latin1'))
 
 # ==============================================================================
 # BLOCCO 5: CONNESSIONE GOOGLE DRIVE E BACKUP
@@ -1104,3 +1100,4 @@ elif st.session_state.pagina == "Ricerca Collane":
 
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
