@@ -127,6 +127,25 @@ def carica_ritiri_cloud():
             pass
     return ritiri_caricati
 
+def aggiungi_ritiri(plesso, tipo, items):
+    if "storico_ritiri" not in st.session_state:
+        st.session_state.storico_ritiri = {}
+    if plesso not in st.session_state.storico_ritiri:
+        st.session_state.storico_ritiri[plesso] = {}
+    if tipo not in st.session_state.storico_ritiri[plesso]:
+        st.session_state.storico_ritiri[plesso][tipo] = []
+    destinazione = st.session_state.storico_ritiri[plesso][tipo]
+    for nuovo in items:
+        q_new = int(nuovo.get('q', 0))
+        unito = False
+        for es in destinazione:
+            if es.get('t') == nuovo.get('t') and es.get('e') == nuovo.get('e'):
+                es['q'] = int(es.get('q', 0)) + q_new
+                unito = True
+                break
+        if not unito:
+            destinazione.append(nuovo.copy())
+
 
 # ==============================================================================
 # BLOCCO 3: COSTANTI E SETTAGGI PAGINA
@@ -430,6 +449,9 @@ with st.sidebar:
     if st.button("📚 COLLANE CONSEGNATE", use_container_width=True):
         st.session_state.pagina = "Storico";
         st.rerun()
+    if st.button("📦 COLLANE RITIRATE", use_container_width=True):
+        st.session_state.pagina = "Ritirate";
+        st.rerun()
 
     if st.button("🔍 RICERCA COLLANE", use_container_width=True):
         st.session_state.pagina = "Ricerca Collane"
@@ -639,8 +661,8 @@ elif st.session_state.pagina == "Storico":
             with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
                 if st.button(f"🔄 SVUOTA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
                              use_container_width=True):
-                    if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
-                    st.session_state.storico_ritiri[plesso].update(st.session_state.storico_consegne[plesso])
+                    for tipo, items in st.session_state.storico_consegne[plesso].items():
+                        aggiungi_ritiri(plesso, tipo, items)
                     del st.session_state.storico_consegne[plesso]
                     salva_storico_cloud(st.session_state.storico_consegne);
                     salva_ritiri_cloud(st.session_state.storico_ritiri);
@@ -655,8 +677,7 @@ elif st.session_state.pagina == "Storico":
                 per_tipo = st.session_state.storico_consegne[plesso]
                 for tipo in sorted(list(per_tipo.keys())):
                     if st.button(f"📦 Ritira tutto: {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
-                        if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
-                        st.session_state.storico_ritiri[plesso][tipo] = per_tipo[tipo]
+                        aggiungi_ritiri(plesso, tipo, per_tipo[tipo])
                         del st.session_state.storico_consegne[plesso][tipo]
                         if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                         salva_storico_cloud(st.session_state.storico_consegne);
@@ -678,14 +699,9 @@ elif st.session_state.pagina == "Storico":
 
                                 # --- MODIFICA RICHIESTA: Sostituito tasto "OK" con "AGGIORNA CARICO" ---
                                 if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
-                                    if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[
-                                        plesso] = {}
-                                    if tipo not in st.session_state.storico_ritiri[plesso]:
-                                        st.session_state.storico_ritiri[plesso][tipo] = []
-
                                     rit_item = lib.copy()
                                     rit_item['q'] = q_rit
-                                    st.session_state.storico_ritiri[plesso][tipo].append(rit_item)
+                                    aggiungi_ritiri(plesso, tipo, [rit_item])
 
                                     lib['q'] = qta_salvata - q_rit
                                     if lib['q'] <= 0: per_tipo[tipo].pop(i)
@@ -1159,3 +1175,46 @@ elif st.session_state.pagina == "Ricerca Collane":
 
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
+
+# =========================================================
+# --- BLOCCO 17: COLLANE RITIRATE ---
+# =========================================================
+elif st.session_state.pagina == "Ritirate":
+    st.subheader("📦 Collane Ritirate")
+    if "storico_ritiri" not in st.session_state:
+        st.session_state.storico_ritiri = carica_ritiri_cloud()
+    righe_ritiri = []
+    for plesso, per_tipo in st.session_state.storico_ritiri.items():
+        for tipo, libri in per_tipo.items():
+            for lib in libri:
+                righe_ritiri.append({
+                    "Plesso": plesso,
+                    "Tipologia": tipo,
+                    "Titolo": lib.get('t', ''),
+                    "Editore": lib.get('e', ''),
+                    "Quantità": int(lib.get('q', 0))
+                })
+    df_r = pd.DataFrame(righe_ritiri)
+    if not df_r.empty:
+        df_r = df_r.groupby(["Plesso", "Tipologia", "Titolo", "Editore"], as_index=False)["Quantità"].sum()
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            f_ple = c1.multiselect("🏫 Filtra Plesso", sorted(df_r["Plesso"].unique()))
+            f_tip = c2.multiselect("📚 Filtra Tipologia", sorted(df_r["Tipologia"].unique()))
+            f_edi = c3.multiselect("🏢 Filtra Editore", sorted(df_r["Editore"].unique()))
+        df_view = df_r.copy()
+        if f_ple: df_view = df_view[df_view["Plesso"].isin(f_ple)]
+        if f_tip: df_view = df_view[df_view["Tipologia"].isin(f_tip)]
+        if f_edi: df_view = df_view[df_view["Editore"].isin(f_edi)]
+        totale = int(df_view["Quantità"].sum())
+        st.markdown(f"""
+            <div style="padding:20px; background-color:#e8f0fe; border-radius:10px; border-left:8px solid #004a99; margin-bottom:20px;">
+                <h3 style='margin:0; color:#004a99;'>Riepilogo Ritiri</h3>
+                <p style='font-size:24px; margin:5px 0 0 0;'>
+                    Totale Copie Ritirate: <b>{totale}</b>
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+        st.dataframe(df_view, use_container_width=True, hide_index=True)
+    else:
+        st.info("ℹ️ Nessuna collana risulta ritirata al momento.")
