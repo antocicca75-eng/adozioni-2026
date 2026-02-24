@@ -1000,14 +1000,14 @@ elif st.session_state.pagina == "Tabellone Stato":
         # Filtri
         f1, f2 = st.columns([2, 1])
         with f1:
-            cerca = st.text_input("🔍 Cerca Plesso...", "").upper()
+            cerca_sel = st.selectbox("🔍 Cerca Plesso...", ["- TUTTI -"] + elenco_totale)
         with f2:
             filtro_stato = st.selectbox("📂 Filtra per Stato",
                                         ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
 
         mostra = []
         for p in elenco_totale:
-            if cerca not in str(p).upper(): continue
+            if cerca_sel != "- TUTTI -" and p != cerca_sel: continue
             cat_attive = consegnati.get(p, {}).keys()
             ha_sigle = len(cat_attive) > 0
             e_ritirato = p in ritirati and not ha_sigle
@@ -1078,6 +1078,12 @@ elif st.session_state.pagina == "Tabellone Stato":
                                 {html_blocco_sigle}
                             </div>
                         """, unsafe_allow_html=True)
+                        if st.button(f"🧨 Reset {plesso}", key=f"reset_tab_{plesso}", use_container_width=True):
+                            if plesso in st.session_state.storico_consegne: del st.session_state.storico_consegne[plesso]
+                            if plesso in st.session_state.storico_ritiri: del st.session_state.storico_ritiri[plesso]
+                            salva_storico_cloud(st.session_state.storico_consegne);
+                            salva_ritiri_cloud(st.session_state.storico_ritiri);
+                            st.rerun()
 
     st.markdown("---")
     if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final"):
