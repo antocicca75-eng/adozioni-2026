@@ -716,9 +716,11 @@ elif st.session_state.pagina == "Storico":
                                     st.rerun()
 
                             if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
+                                aggiungi_ritiri(plesso, tipo, [lib.copy()])
                                 per_tipo[tipo].pop(i)
                                 if not per_tipo[tipo]: del per_tipo[tipo]
                                 salva_storico_cloud(st.session_state.storico_consegne);
+                                salva_ritiri_cloud(st.session_state.storico_ritiri);
                                 st.rerun()
 
     if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
@@ -1183,38 +1185,29 @@ elif st.session_state.pagina == "Ritirate":
     st.subheader("📦 Collane Ritirate")
     if "storico_ritiri" not in st.session_state:
         st.session_state.storico_ritiri = carica_ritiri_cloud()
-    righe_ritiri = []
-    for plesso, per_tipo in st.session_state.storico_ritiri.items():
-        for tipo, libri in per_tipo.items():
-            for lib in libri:
-                righe_ritiri.append({
-                    "Plesso": plesso,
-                    "Tipologia": tipo,
-                    "Titolo": lib.get('t', ''),
-                    "Editore": lib.get('e', ''),
-                    "Quantità": int(lib.get('q', 0))
-                })
-    df_r = pd.DataFrame(righe_ritiri)
-    if not df_r.empty:
-        df_r = df_r.groupby(["Plesso", "Tipologia", "Titolo", "Editore"], as_index=False)["Quantità"].sum()
-        with st.container(border=True):
-            c1, c2, c3 = st.columns(3)
-            f_ple = c1.multiselect("🏫 Filtra Plesso", sorted(df_r["Plesso"].unique()))
-            f_tip = c2.multiselect("📚 Filtra Tipologia", sorted(df_r["Tipologia"].unique()))
-            f_edi = c3.multiselect("🏢 Filtra Editore", sorted(df_r["Editore"].unique()))
-        df_view = df_r.copy()
-        if f_ple: df_view = df_view[df_view["Plesso"].isin(f_ple)]
-        if f_tip: df_view = df_view[df_view["Tipologia"].isin(f_tip)]
-        if f_edi: df_view = df_view[df_view["Editore"].isin(f_edi)]
-        totale = int(df_view["Quantità"].sum())
-        st.markdown(f"""
-            <div style="padding:20px; background-color:#e8f0fe; border-radius:10px; border-left:8px solid #004a99; margin-bottom:20px;">
-                <h3 style='margin:0; color:#004a99;'>Riepilogo Ritiri</h3>
-                <p style='font-size:24px; margin:5px 0 0 0;'>
-                    Totale Copie Ritirate: <b>{totale}</b>
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-        st.dataframe(df_view, use_container_width=True, hide_index=True)
-    else:
+    if not st.session_state.storico_ritiri:
         st.info("ℹ️ Nessuna collana risulta ritirata al momento.")
+    else:
+        elenco_plessi_ritiri = sorted(list(st.session_state.storico_ritiri.keys()))
+        scuola_sel = st.selectbox("🔍 Filtra Plesso:", ["- MOSTRA TUTTI -"] + elenco_plessi_ritiri)
+        plessi_show = [scuola_sel] if scuola_sel != "- MOSTRA TUTTI -" else elenco_plessi_ritiri
+        for plesso in plessi_show:
+            with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
+                per_tipo = st.session_state.storico_ritiri.get(plesso, {})
+                tot_plesso = 0
+                for tipo in sorted(list(per_tipo.keys())):
+                    with st.expander(f"📚 {tipo.upper()}", expanded=True):
+                        libri = per_tipo[tipo]
+                        # Aggrega per titolo+editore
+                        agg = {}
+                        for lib in libri:
+                            key = (lib.get('t',''), lib.get('e',''))
+                            agg[key] = agg.get(key, 0) + int(lib.get('q', 0))
+                        df_tip = pd.DataFrame([{"Titolo": k[0], "Editore": k[1], "Quantità": q} for k, q in agg.items()])
+                        if not df_tip.empty:
+                            df_tip = df_tip.sort_values(by=["Titolo", "Editore"])
+                            st.dataframe(df_tip, use_container_width=True, hide_index=True)
+                            tot_tipo = int(df_tip["Quantità"].sum())
+                            tot_plesso += tot_tipo
+                            st.markdown(f"<div class='totale-box'>Totale tipologia: <b>{tot_tipo}</b></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='totale-box'>Totale ritiri plesso: <b>{tot_plesso}</b></div>", unsafe_allow_html=True)
