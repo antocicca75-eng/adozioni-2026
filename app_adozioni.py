@@ -438,6 +438,13 @@ with st.sidebar:
     if st.button("📊 TABELLONE STATO", use_container_width=True):
         st.session_state.pagina = "Tabellone Stato";
         st.rerun()
+    st.markdown("---")
+    if st.button("🧨 RESET TUTTO TABELLONE", use_container_width=True):
+        st.session_state.storico_consegne = {}
+        st.session_state.storico_ritiri = {}
+        salva_storico_cloud(st.session_state.storico_consegne)
+        salva_ritiri_cloud(st.session_state.storico_ritiri)
+        st.rerun()
 # ------------------------------------------------------------------------------
 
 
@@ -635,6 +642,12 @@ elif st.session_state.pagina == "Storico":
                     if plesso not in st.session_state.storico_ritiri: st.session_state.storico_ritiri[plesso] = {}
                     st.session_state.storico_ritiri[plesso].update(st.session_state.storico_consegne[plesso])
                     del st.session_state.storico_consegne[plesso]
+                    salva_storico_cloud(st.session_state.storico_consegne);
+                    salva_ritiri_cloud(st.session_state.storico_ritiri);
+                    st.rerun()
+                if st.button(f"🧨 RESET PLESSO: {plesso}", key=f"reset_plesso_{plesso}", use_container_width=True):
+                    if plesso in st.session_state.storico_consegne: del st.session_state.storico_consegne[plesso]
+                    if plesso in st.session_state.storico_ritiri: del st.session_state.storico_ritiri[plesso]
                     salva_storico_cloud(st.session_state.storico_consegne);
                     salva_ritiri_cloud(st.session_state.storico_ritiri);
                     st.rerun()
