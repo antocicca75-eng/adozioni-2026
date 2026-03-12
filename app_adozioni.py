@@ -640,6 +640,7 @@ if st.session_state.pagina == "Consegne":
 
             # Invio finale al cloud
             salva_storico_cloud(st.session_state.storico_consegne)
+            reset_consegne_totale()
 
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI) - MODIFICA TASTO AGGIORNA
