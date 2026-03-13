@@ -246,11 +246,19 @@ class PDF_CONSEGNA(FPDF):
 
         self.set_font('Arial', '', 8)
         for i, lib in enumerate(libri[:15]):
+            classi_raw = [
+                str(lib.get('c1', '')).strip(),
+                str(lib.get('c2', '')).strip(),
+                str(lib.get('c3', '')).strip(),
+            ]
+            classi = [c for c in classi_raw if c]
+            while len(classi) < 3:
+                classi.append("")
             self.set_x(x_offset + 10)
             self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
-            self.cell(7.6, 7, '', border=1, align='C')
-            self.cell(7.6, 7, '', border=1, align='C')
-            self.cell(7.8, 7, '', border=1, align='C')
+            self.cell(7.6, 7, classi[0], border=1, align='C')
+            self.cell(7.6, 7, classi[1], border=1, align='C')
+            self.cell(7.8, 7, classi[2], border=1, align='C')
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
         self.set_y(155)
@@ -578,9 +586,13 @@ if st.session_state.pagina == "Consegne":
                     c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
                     c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
                     if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
+                        classi_raw = [str(c1in).strip(), str(c2in).strip(), str(c3in).strip()]
+                        classi = [c for c in classi_raw if c]
+                        while len(classi) < 3:
+                            classi.append("")
                         st.session_state.lista_consegne_attuale.append({
                             "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(),
-                            "q": 1, "c1": c1in, "c2": c2in, "c3": c3in, "sez": sez_in
+                            "q": 1, "c1": classi[0], "c2": classi[1], "c3": classi[2], "sez": sez_in
                         })
                         st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1;
                         st.rerun()
