@@ -6,6 +6,7 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 from fpdf import FPDF
+from consegne_utils import merge_consegne_lists
 
 
 # ==============================================================================
@@ -629,13 +630,17 @@ if st.session_state.pagina == "Consegne":
                         nuovo = item.copy()
                         nuovo['q'] = 1
                         lista_clean.append(nuovo)
-                    st.session_state.storico_consegne[p_scelto][k] = lista_clean
+                    esistenti = st.session_state.storico_consegne[p_scelto].get(k, [])
+                    st.session_state.storico_consegne[p_scelto][k] = merge_consegne_lists(esistenti, lista_clean)
                 st.success(f"REGISTRAZIONE MASSIVA COMPLETATA!")
             else:
                 # SALVATAGGIO QUANTITÀ MODIFICATE:
                 # Usiamo item.copy() per essere sicuri di salvare i numeri scelti dall'utente
                 lista_con_quantita_esatte = [item.copy() for item in st.session_state.lista_consegne_attuale]
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_con_quantita_esatte
+                esistenti = st.session_state.storico_consegne[p_scelto].get(cat_scelta, [])
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = merge_consegne_lists(
+                    esistenti, lista_con_quantita_esatte
+                )
                 st.success(f"Consegna registrata con successo!")
 
             # Invio finale al cloud
