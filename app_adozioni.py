@@ -305,9 +305,12 @@ class PDF_CONSEGNA(FPDF):
         for i, lib in enumerate(libri[:15]):
             self.set_x(x_offset + 10)
             self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
-            self.cell(7.6, 7, '', border=1, align='C')
-            self.cell(7.6, 7, '', border=1, align='C')
-            self.cell(7.8, 7, '', border=1, align='C')
+            c1 = str(lib.get('c1', '')).strip().upper()
+            c2 = str(lib.get('c2', '')).strip().upper()
+            c3 = str(lib.get('c3', '')).strip().upper()
+            self.cell(7.6, 7, c1, border=1, align='C')
+            self.cell(7.6, 7, c2, border=1, align='C')
+            self.cell(7.8, 7, c3, border=1, align='C')
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
         self.set_y(155)
