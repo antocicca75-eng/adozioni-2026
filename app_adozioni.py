@@ -439,9 +439,9 @@ elenco_plessi = get_lista_plessi()
 if "pagina" not in st.session_state:
     st.session_state.pagina = "Inserimento"
 
-if 'db_consegne' not in st.session_state:
+if "db_consegne" not in st.session_state:
     st.session_state.db_consegne = None
-if 'lista_consegne_attuale' not in st.session_state:
+if "lista_consegne_attuale" not in st.session_state:
     st.session_state.lista_consegne_attuale = []
 
 
@@ -519,6 +519,22 @@ with st.sidebar:
 
 # ------------------------------------------------------------------------------
 
+
+# ==============================================================================
+# BLOCCO 9: PAGINA CONSEGNE (STAMPA DOPPIA E PDF)
+# ==============================================================================
+if st.session_state.pagina == "Consegne":
+    st.header("📄 Generazione Moduli Consegna")
+
+    if st.session_state.get("db_consegne") is None:
+        st.session_state.db_consegne = carica_config_consegne()
+
+    if "storico_consegne" not in st.session_state:
+        st.session_state.storico_consegne = carica_storico_cloud()
+    if "storico_ritiri" not in st.session_state:
+        st.session_state.storico_ritiri = carica_ritiri_cloud()
+
+    elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
 
 # ==============================================================================
 # BLOCCO 9: PAGINA CONSEGNE (STAMPA DOPPIA E PDF)
