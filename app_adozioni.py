@@ -1,4 +1,4 @@
-import streamlit as st
+streamlit as st
 import pandas as pd
 import json
 import os
@@ -246,19 +246,11 @@ class PDF_CONSEGNA(FPDF):
 
         self.set_font('Arial', '', 8)
         for i, lib in enumerate(libri[:15]):
-            classi_raw = [
-                str(lib.get('c1', '')).strip(),
-                str(lib.get('c2', '')).strip(),
-                str(lib.get('c3', '')).strip(),
-            ]
-            classi = [c for c in classi_raw if c]
-            while len(classi) < 3:
-                classi.append("")
             self.set_x(x_offset + 10)
             self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
-            self.cell(7.6, 7, classi[0], border=1, align='C')
-            self.cell(7.6, 7, classi[1], border=1, align='C')
-            self.cell(7.8, 7, classi[2], border=1, align='C')
+            self.cell(7.6, 7, '', border=1, align='C')
+            self.cell(7.6, 7, '', border=1, align='C')
+            self.cell(7.8, 7, '', border=1, align='C')
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
         self.set_y(155)
@@ -288,20 +280,16 @@ def genera_pdf_due_copie(libri, categoria, plesso, insegnante, classe, data_modu
 # ==============================================================================
 # BLOCCO 5: CONNESSIONE GOOGLE DRIVE E BACKUP
 # ==============================================================================
-@st.cache_resource
-def _connetti_google_sheets_cached(json_data, id_foglio):
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    json_info = json.loads(json_data, strict=False)
-    if "private_key" in json_info:
-        json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
-    creds = Credentials.from_service_account_info(json_info, scopes=scope)
-    client_gs = gspread.authorize(creds)
-    return client_gs.open_by_key(id_foglio)
-
-
 def connetti_google_sheets():
     try:
-        return _connetti_google_sheets_cached(st.secrets["gspread"]["json_data"], ID_FOGLIO)
+        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        json_info = json.loads(st.secrets["gspread"]["json_data"], strict=False)
+        if "private_key" in json_info:
+            json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
+        creds = Credentials.from_service_account_info(json_info, scopes=scope)
+        client_gs = gspread.authorize(creds)
+        sh = client_gs.open_by_key(ID_FOGLIO)
+        return sh
     except Exception as e:
         st.error(f"⚠️ Errore connessione Cloud: {e}")
         return None
@@ -390,35 +378,6 @@ def aggiungi_libro_a_excel(t, m, e, a):
         st.error(f"❌ Errore salvataggio: {e}")
         return False
 
-
-def aggiorna_libro_catalogo(indice_riga_df, t, m, e, a):
-    try:
-        sh = connetti_google_sheets()
-        if sh:
-            foglio_catalogo = sh.worksheet("Catalogo")
-            riga = int(indice_riga_df) + 2
-            foglio_catalogo.update(f"A{riga}:D{riga}", [[t, m, e, a]])
-            st.cache_data.clear()
-            return True
-
-        if os.path.exists(CONFIG_FILE):
-            df = pd.read_excel(CONFIG_FILE, sheet_name="ListaLibri").fillna("")
-            if 0 <= int(indice_riga_df) < len(df):
-                df.iloc[int(indice_riga_df), 0] = t
-                if df.shape[1] > 1: df.iloc[int(indice_riga_df), 1] = m
-                if df.shape[1] > 2: df.iloc[int(indice_riga_df), 2] = e
-                if df.shape[1] > 3: df.iloc[int(indice_riga_df), 3] = a
-                with pd.ExcelWriter(CONFIG_FILE, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
-                    df.to_excel(writer, sheet_name="ListaLibri", index=False)
-                st.cache_data.clear()
-                return True
-
-        st.error("❌ Impossibile aggiornare: Cloud non disponibile e file locale assente.")
-        return False
-    except Exception as ex:
-        st.error(f"❌ Errore aggiornamento: {ex}")
-        return False
-
 # ------------------------------------------------------------------------------
 
 
@@ -439,9 +398,9 @@ elenco_plessi = get_lista_plessi()
 if "pagina" not in st.session_state:
     st.session_state.pagina = "Inserimento"
 
-if "db_consegne" not in st.session_state:
-    st.session_state.db_consegne = None
-if "lista_consegne_attuale" not in st.session_state:
+if 'db_consegne' not in st.session_state:
+    st.session_state.db_consegne = carica_config_consegne()
+if 'lista_consegne_attuale' not in st.session_state:
     st.session_state.lista_consegne_attuale = []
 
 
@@ -463,41 +422,35 @@ def reset_ricerca():
 # ==============================================================================
 with st.sidebar:
     st.title("🧭 MENU")
-
     if st.button("➕ NUOVA ADOZIONE", use_container_width=True):
-        st.session_state.pagina = "Inserimento"
+        st.session_state.pagina = "Inserimento";
         st.rerun()
 
     if st.button("✏️ MODIFICA ADOZIONE", use_container_width=True):
-        st.session_state.pagina = "Modifica"
+        st.session_state.pagina = "Modifica";
         st.rerun()
 
     if st.button("🆕 AGGIUNGI A CATALOGO", use_container_width=True):
-        st.session_state.pagina = "NuovoLibro"
-        st.rerun()
-
-    if st.button("✏️ MODIFICA LIBRO", use_container_width=True):
-        st.session_state.pagina = "ModificaLibro"
+        st.session_state.pagina = "NuovoLibro";
         st.rerun()
 
     if st.button("📊 REGISTRO COMPLETO", use_container_width=True):
-        st.session_state.pagina = "Registro"
+        st.session_state.pagina = "Registro";
         st.rerun()
 
     if st.button("🔍 PIVOT ADOZIONI", use_container_width=True):
-        st.session_state.pagina = "Ricerca"
+        st.session_state.pagina = "Ricerca";
         st.rerun()
 
     if st.button("📄 MODULO CONSEGNE", use_container_width=True):
-        st.session_state.pagina = "Consegne"
+        st.session_state.pagina = "Consegne";
         st.rerun()
 
     if st.button("📚 COLLANE CONSEGNATE", use_container_width=True):
-        st.session_state.pagina = "Storico"
+        st.session_state.pagina = "Storico";
         st.rerun()
-
     if st.button("📦 COLLANE RITIRATE", use_container_width=True):
-        st.session_state.pagina = "Ritirate"
+        st.session_state.pagina = "Ritirate";
         st.rerun()
 
     if st.button("🔍 RICERCA COLLANE", use_container_width=True):
@@ -505,18 +458,15 @@ with st.sidebar:
         st.rerun()
 
     if st.button("📊 TABELLONE STATO", use_container_width=True):
-        st.session_state.pagina = "Tabellone Stato"
+        st.session_state.pagina = "Tabellone Stato";
         st.rerun()
-
     st.markdown("---")
-
     if st.button("🧨 RESET TUTTO TABELLONE", use_container_width=True):
         st.session_state.storico_consegne = {}
         st.session_state.storico_ritiri = {}
         salva_storico_cloud(st.session_state.storico_consegne)
         salva_ritiri_cloud(st.session_state.storico_ritiri)
         st.rerun()
-
 # ------------------------------------------------------------------------------
 
 
@@ -525,25 +475,6 @@ with st.sidebar:
 # ==============================================================================
 if st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
-
-    if st.session_state.get("db_consegne") is None:
-        st.session_state.db_consegne = carica_config_consegne()
-
-    if "storico_consegne" not in st.session_state:
-        st.session_state.storico_consegne = carica_storico_cloud()
-    if "storico_ritiri" not in st.session_state:
-        st.session_state.storico_ritiri = carica_ritiri_cloud()
-
-    elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
-
-# ==============================================================================
-# BLOCCO 9: PAGINA CONSEGNE (STAMPA DOPPIA E PDF)
-# ==============================================================================
-if st.session_state.pagina == "Consegne":
-    st.header("📄 Generazione Moduli Consegna")
-
-    if st.session_state.get("db_consegne") is None:
-        st.session_state.db_consegne = carica_config_consegne()
 
     if "storico_consegne" not in st.session_state:
         st.session_state.storico_consegne = carica_storico_cloud()
@@ -647,13 +578,9 @@ if st.session_state.pagina == "Consegne":
                     c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
                     c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
                     if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
-                        classi_raw = [str(c1in).strip(), str(c2in).strip(), str(c3in).strip()]
-                        classi = [c for c in classi_raw if c]
-                        while len(classi) < 3:
-                            classi.append("")
                         st.session_state.lista_consegne_attuale.append({
                             "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(),
-                            "q": 1, "c1": classi[0], "c2": classi[1], "c3": classi[2], "sez": sez_in
+                            "q": 1, "c1": c1in, "c2": c2in, "c3": c3in, "sez": sez_in
                         })
                         st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1;
                         st.rerun()
@@ -708,32 +635,7 @@ if st.session_state.pagina == "Consegne":
                 # SALVATAGGIO QUANTITÀ MODIFICATE:
                 # Usiamo item.copy() per essere sicuri di salvare i numeri scelti dall'utente
                 lista_con_quantita_esatte = [item.copy() for item in st.session_state.lista_consegne_attuale]
-                esistente = list(st.session_state.storico_consegne[p_scelto].get(cat_scelta, []))
-                uniti = {}
-                ordine = []
-
-                def _key(lib):
-                    return (
-                        str(lib.get("t", "")).strip().upper(),
-                        str(lib.get("e", "")).strip().upper(),
-                        str(lib.get("c1", "")).strip(),
-                        str(lib.get("c2", "")).strip(),
-                        str(lib.get("c3", "")).strip(),
-                        str(lib.get("sez", "")).strip().upper(),
-                    )
-
-                for lib in esistente + lista_con_quantita_esatte:
-                    k = _key(lib)
-                    if k not in uniti:
-                        nuovo = lib.copy()
-                        if "q" not in nuovo:
-                            nuovo["q"] = 1
-                        uniti[k] = nuovo
-                        ordine.append(k)
-                    else:
-                        uniti[k]["q"] = int(uniti[k].get("q", 1)) + int(lib.get("q", 1))
-
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = [uniti[k] for k in ordine]
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_con_quantita_esatte
                 st.success(f"Consegna registrata con successo!")
 
             # Invio finale al cloud
@@ -864,56 +766,6 @@ elif st.session_state.pagina == "NuovoLibro":
         if st.session_state.nuovo_libro_salvato:
             st.session_state.nuovo_libro_salvato = False
 # ------------------------------------------------------------------------------
-
-# ==============================================================================
-# BLOCCO 11B: PAGINA MODIFICA LIBRO (CATALOGO)
-# ==============================================================================
-elif st.session_state.pagina == "ModificaLibro":
-    st.subheader("✏️ Modifica Libro (Catalogo)")
-
-    df_cat = get_catalogo_libri()
-    if df_cat.empty:
-        st.warning("⚠️ Catalogo vuoto o non disponibile.")
-    else:
-        df_cat = df_cat.fillna("").astype(str)
-        opzioni = []
-        for i in range(len(df_cat)):
-            titolo = str(df_cat.iloc[i, 0]).strip()
-            materia = str(df_cat.iloc[i, 1]).strip() if df_cat.shape[1] > 1 else ""
-            editore = str(df_cat.iloc[i, 2]).strip() if df_cat.shape[1] > 2 else ""
-            agenzia = str(df_cat.iloc[i, 3]).strip() if df_cat.shape[1] > 3 else ""
-            opzioni.append(f"{i + 1}) {titolo} | {editore} | {materia} | {agenzia}")
-
-        scelta = st.selectbox("Seleziona libro da modificare", ["- SELEZIONA -"] + opzioni)
-
-        if scelta != "- SELEZIONA -":
-            idx = int(scelta.split(")")[0]) - 1
-            titolo_old = str(df_cat.iloc[idx, 0]).strip()
-            materia_old = str(df_cat.iloc[idx, 1]).strip() if df_cat.shape[1] > 1 else ""
-            editore_old = str(df_cat.iloc[idx, 2]).strip() if df_cat.shape[1] > 2 else ""
-            agenzia_old = str(df_cat.iloc[idx, 3]).strip() if df_cat.shape[1] > 3 else ""
-
-            with st.container(border=True):
-                nt = st.text_input("Titolo Libro", value=titolo_old, key=f"ml_t_{idx}")
-                c1, c2, c3 = st.columns(3)
-                nm = c1.text_input("Materia", value=materia_old, key=f"ml_m_{idx}")
-                ne = c2.text_input("Editore", value=editore_old, key=f"ml_e_{idx}")
-                na = c3.text_input("Agenzia", value=agenzia_old, key=f"ml_a_{idx}")
-
-                if st.button("💾 SALVA MODIFICA", use_container_width=True, type="primary", key=f"ml_save_{idx}"):
-                    if not nt.strip() or not nm.strip() or not ne.strip():
-                        st.warning("⚠️ Inserisci almeno Titolo, Materia ed Editore!")
-                    else:
-                        ok = aggiorna_libro_catalogo(
-                            idx,
-                            nt.strip(),
-                            nm.strip(),
-                            ne.strip(),
-                            na.strip()
-                        )
-                        if ok:
-                            st.success("✅ Libro aggiornato con successo!")
-                            st.rerun()
 
 # ------------------------------------------------------------------------------
 # BLOCCO 13: PAGINA REGISTRO E MOTORE DI RICERCA
