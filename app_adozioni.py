@@ -463,39 +463,41 @@ def reset_ricerca():
 # ==============================================================================
 with st.sidebar:
     st.title("🧭 MENU")
+
     if st.button("➕ NUOVA ADOZIONE", use_container_width=True):
-        st.session_state.pagina = "Inserimento";
+        st.session_state.pagina = "Inserimento"
         st.rerun()
 
     if st.button("✏️ MODIFICA ADOZIONE", use_container_width=True):
-        st.session_state.pagina = "Modifica";
+        st.session_state.pagina = "Modifica"
         st.rerun()
 
     if st.button("🆕 AGGIUNGI A CATALOGO", use_container_width=True):
-        st.session_state.pagina = "NuovoLibro";
+        st.session_state.pagina = "NuovoLibro"
         st.rerun()
 
     if st.button("✏️ MODIFICA LIBRO", use_container_width=True):
-        st.session_state.pagina = "ModificaLibro";
+        st.session_state.pagina = "ModificaLibro"
         st.rerun()
 
     if st.button("📊 REGISTRO COMPLETO", use_container_width=True):
-        st.session_state.pagina = "Registro";
+        st.session_state.pagina = "Registro"
         st.rerun()
 
     if st.button("🔍 PIVOT ADOZIONI", use_container_width=True):
-        st.session_state.pagina = "Ricerca";
+        st.session_state.pagina = "Ricerca"
         st.rerun()
 
     if st.button("📄 MODULO CONSEGNE", use_container_width=True):
-        st.session_state.pagina = "Consegne";
+        st.session_state.pagina = "Consegne"
         st.rerun()
 
     if st.button("📚 COLLANE CONSEGNATE", use_container_width=True):
-        st.session_state.pagina = "Storico";
+        st.session_state.pagina = "Storico"
         st.rerun()
+
     if st.button("📦 COLLANE RITIRATE", use_container_width=True):
-        st.session_state.pagina = "Ritirate";
+        st.session_state.pagina = "Ritirate"
         st.rerun()
 
     if st.button("🔍 RICERCA COLLANE", use_container_width=True):
@@ -503,15 +505,18 @@ with st.sidebar:
         st.rerun()
 
     if st.button("📊 TABELLONE STATO", use_container_width=True):
-        st.session_state.pagina = "Tabellone Stato";
+        st.session_state.pagina = "Tabellone Stato"
         st.rerun()
+
     st.markdown("---")
+
     if st.button("🧨 RESET TUTTO TABELLONE", use_container_width=True):
         st.session_state.storico_consegne = {}
         st.session_state.storico_ritiri = {}
         salva_storico_cloud(st.session_state.storico_consegne)
         salva_ritiri_cloud(st.session_state.storico_ritiri)
         st.rerun()
+
 # ------------------------------------------------------------------------------
 
 
