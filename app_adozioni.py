@@ -6,7 +6,63 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 from fpdf import FPDF
-from consegne_utils import merge_consegne_lists
+try:
+    from consegne_utils import merge_consegne_lists
+except ModuleNotFoundError:
+    def _norm_str(v):
+        if v is None:
+            return ""
+        return str(v).strip().upper()
+
+    def _q_int(v):
+        try:
+            q = int(v)
+            return q if q > 0 else 1
+        except Exception:
+            return 1
+
+    def _consegna_key(item):
+        return (
+            _norm_str(item.get("t")),
+            _norm_str(item.get("e")),
+            _norm_str(item.get("sez")),
+            _norm_str(item.get("c1")),
+            _norm_str(item.get("c2")),
+            _norm_str(item.get("c3")),
+        )
+
+    def merge_consegne_lists(esistenti, nuovi):
+        esistenti = esistenti or []
+        nuovi = nuovi or []
+
+        mappa = {}
+        ordine = []
+
+        def upsert(item):
+            if not isinstance(item, dict):
+                return
+            k = _consegna_key(item)
+            if k not in mappa:
+                copia = dict(item)
+                copia["q"] = _q_int(copia.get("q", 1))
+                mappa[k] = copia
+                ordine.append(k)
+                return
+
+            base = mappa[k]
+            base["q"] = _q_int(base.get("q", 1)) + _q_int(item.get("q", 1))
+
+            for campo in ("t", "e", "sez", "c1", "c2", "c3"):
+                if not base.get(campo) and item.get(campo):
+                    base[campo] = item.get(campo)
+
+        for it in esistenti:
+            upsert(it)
+
+        for it in nuovi:
+            upsert(it)
+
+        return [mappa[k] for k in ordine]
 
 
 # ==============================================================================
