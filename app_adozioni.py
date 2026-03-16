@@ -1,4 +1,4 @@
-import streamlit as st
+streamlit as st
 import pandas as pd
 import json
 import os
@@ -687,7 +687,32 @@ if st.session_state.pagina == "Consegne":
                 # SALVATAGGIO QUANTITÀ MODIFICATE:
                 # Usiamo item.copy() per essere sicuri di salvare i numeri scelti dall'utente
                 lista_con_quantita_esatte = [item.copy() for item in st.session_state.lista_consegne_attuale]
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = lista_con_quantita_esatte
+                esistente = list(st.session_state.storico_consegne[p_scelto].get(cat_scelta, []))
+                uniti = {}
+                ordine = []
+
+                def _key(lib):
+                    return (
+                        str(lib.get("t", "")).strip().upper(),
+                        str(lib.get("e", "")).strip().upper(),
+                        str(lib.get("c1", "")).strip(),
+                        str(lib.get("c2", "")).strip(),
+                        str(lib.get("c3", "")).strip(),
+                        str(lib.get("sez", "")).strip().upper(),
+                    )
+
+                for lib in esistente + lista_con_quantita_esatte:
+                    k = _key(lib)
+                    if k not in uniti:
+                        nuovo = lib.copy()
+                        if "q" not in nuovo:
+                            nuovo["q"] = 1
+                        uniti[k] = nuovo
+                        ordine.append(k)
+                    else:
+                        uniti[k]["q"] = int(uniti[k].get("q", 1)) + int(lib.get("q", 1))
+
+                st.session_state.storico_consegne[p_scelto][cat_scelta] = [uniti[k] for k in ordine]
                 st.success(f"Consegna registrata con successo!")
 
             # Invio finale al cloud
