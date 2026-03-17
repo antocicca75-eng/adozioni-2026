@@ -438,6 +438,22 @@ def aggiungi_libro_a_excel(t, m, e, a):
         st.error(f"❌ Errore salvataggio: {e}")
         return False
 
+
+def aggiorna_libro_catalogo(row_idx, t, m, e, a):
+    try:
+        sh = connetti_google_sheets()
+        if sh:
+            foglio_catalogo = sh.worksheet("Catalogo")
+            foglio_catalogo.update(f"A{row_idx}:D{row_idx}", [[t, m, e, a]])
+            st.cache_data.clear()
+            return True
+        else:
+            st.error("❌ Impossibile connettersi a Google Sheets")
+            return False
+    except Exception as ex:
+        st.error(f"❌ Errore aggiornamento: {ex}")
+        return False
+
 # ------------------------------------------------------------------------------
 
 
@@ -492,6 +508,10 @@ with st.sidebar:
 
     if st.button("🆕 AGGIUNGI A CATALOGO", use_container_width=True):
         st.session_state.pagina = "NuovoLibro";
+        st.rerun()
+
+    if st.button("✏️ MODIFICA LIBRO", use_container_width=True):
+        st.session_state.pagina = "ModificaLibro";
         st.rerun()
 
     if st.button("📊 REGISTRO COMPLETO", use_container_width=True):
@@ -856,6 +876,71 @@ elif st.session_state.pagina == "NuovoLibro":
         # Reset flag dopo rerun
         if st.session_state.nuovo_libro_salvato:
             st.session_state.nuovo_libro_salvato = False
+# ------------------------------------------------------------------------------
+
+# ==============================================================================
+# BLOCCO 12: PAGINA MODIFICA LIBRO (CATALOGO)
+# ==============================================================================
+elif st.session_state.pagina == "ModificaLibro":
+    st.subheader("✏️ Modifica libro in Catalogo")
+
+    sh = connetti_google_sheets()
+    if not sh:
+        st.error("❌ Impossibile connettersi a Google Sheets")
+    else:
+        foglio_catalogo = sh.worksheet("Catalogo")
+        valori = foglio_catalogo.get_all_values()
+
+        if not valori or len(valori) < 2:
+            st.info("Catalogo vuoto.")
+        else:
+            righe = valori[1:]
+
+            def _s(v):
+                return str(v).strip()
+
+            def _su(v):
+                return _s(v).upper()
+
+            records = []
+            for i, r in enumerate(righe, start=2):
+                titolo = _s(r[0]) if len(r) > 0 else ""
+                materia = _s(r[1]) if len(r) > 1 else ""
+                editore = _s(r[2]) if len(r) > 2 else ""
+                agenzia = _s(r[3]) if len(r) > 3 else ""
+                if titolo:
+                    records.append({"row": i, "t": titolo, "m": materia, "e": editore, "a": agenzia})
+
+            if not records:
+                st.info("Catalogo vuoto.")
+            else:
+                titoli_unici = sorted(list({r["t"] for r in records}))
+                titolo_sel = st.selectbox("Seleziona titolo da modificare:", ["- SELEZIONA -"] + titoli_unici)
+
+                if titolo_sel != "- SELEZIONA -":
+                    candidati = [r for r in records if _su(r["t"]) == _su(titolo_sel)]
+                    opzioni = [f"{c['t']} | {c['m']} | {c['e']} | {c['a']} (riga {c['row']})" for c in candidati]
+                    scelta = st.selectbox("Record:", opzioni) if len(opzioni) > 1 else opzioni[0]
+                    idx = opzioni.index(scelta) if len(opzioni) > 1 else 0
+                    rec = candidati[idx]
+
+                    with st.container(border=True):
+                        nt = st.text_input("Titolo Libro", value=rec["t"], key=f"mod_t_{rec['row']}")
+                        col1, col2, col3 = st.columns(3)
+                        m_val = col1.text_input("Materia", value=rec["m"], key=f"mod_m_{rec['row']}")
+                        e_val = col2.text_input("Editore", value=rec["e"], key=f"mod_e_{rec['row']}")
+                        a_val = col3.text_input("Agenzia", value=rec["a"], key=f"mod_a_{rec['row']}")
+
+                        if st.button("✅ SALVA MODIFICHE", use_container_width=True, type="primary"):
+                            if not nt or not m_val or not e_val:
+                                st.warning("⚠️ Inserisci almeno Titolo, Materia ed Editore!")
+                            else:
+                                if aggiorna_libro_catalogo(rec["row"], nt, m_val, e_val, a_val):
+                                    st.success("✅ Libro aggiornato con successo!")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Errore durante l'aggiornamento del libro.")
+
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
