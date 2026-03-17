@@ -560,6 +560,7 @@ if st.session_state.pagina == "Consegne":
     basi = [
         "- SELEZIONA -",
         "TUTTE LE TIPOLOGIE",
+        "SELEZIONE MULTIPLA",
         "INGLESE CLASSE PRIMA",
         "INGLESE CLASSE QUARTA",
         "QUADERNI VACANZE CLASSE PRIMA",
@@ -580,11 +581,22 @@ if st.session_state.pagina == "Consegne":
 
     altre = [k for k in st.session_state.db_consegne.keys() if k not in escludi]
     cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
+    tipologie_scelte = []
 
     if cat_scelta == "TUTTE LE TIPOLOGIE":
         st.info("💡 Assegnazione massiva selezionata.")
         st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = "TUTTE"
+
+    elif cat_scelta == "SELEZIONE MULTIPLA":
+        st.info("💡 Seleziona più tipologie da assegnare al plesso.")
+        st.session_state.lista_consegne_attuale = []
+        st.session_state.last_cat = "MULTI"
+        tipologie_scelte = st.multiselect(
+            "Seleziona una o più tipologie:",
+            sorted(list(st.session_state.db_consegne.keys())),
+            key=f"multi_tip_{ctr}",
+        )
 
     elif cat_scelta != "- SELEZIONA -" and st.session_state.get('last_cat') != cat_scelta:
         caricati = list(st.session_state.db_consegne.get(cat_scelta, []))
@@ -592,7 +604,7 @@ if st.session_state.pagina == "Consegne":
         st.session_state.lista_consegne_attuale = caricati
         st.session_state.last_cat = cat_scelta
 
-    if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE"]:
+    if cat_scelta not in ["- SELEZIONA -", "TUTTE LE TIPOLOGIE", "SELEZIONE MULTIPLA"]:
         st.markdown("---")
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
             if 'q' not in lib: lib['q'] = 1
@@ -656,7 +668,7 @@ if st.session_state.pagina == "Consegne":
     # --- PARTE FINALE BLOCCO 9: PDF E CONFERMA ---
     col_print, col_conf = st.columns(2)
 
-    if cat_scelta != "TUTTE LE TIPOLOGIE" and cat_scelta != "- SELEZIONA -":
+    if cat_scelta not in ["TUTTE LE TIPOLOGIE", "- SELEZIONA -", "SELEZIONE MULTIPLA"]:
         if col_print.button("🖨️ GENERA PDF", use_container_width=True):
             if st.session_state.lista_consegne_attuale:
                 # Carichiamo il file fisico logo.jpg per evitare l'errore NameError
@@ -681,7 +693,22 @@ if st.session_state.pagina == "Consegne":
             if p_scelto not in st.session_state.storico_consegne:
                 st.session_state.storico_consegne[p_scelto] = {}
 
-            if cat_scelta == "TUTTE LE TIPOLOGIE":
+            if cat_scelta == "SELEZIONE MULTIPLA":
+                if not tipologie_scelte:
+                    st.warning("Seleziona almeno una tipologia.")
+                else:
+                    for k in tipologie_scelte:
+                        v = st.session_state.db_consegne.get(k, [])
+                        lista_clean = []
+                        for item in v:
+                            nuovo = item.copy()
+                            nuovo['q'] = 1
+                            lista_clean.append(nuovo)
+                        esistenti = st.session_state.storico_consegne[p_scelto].get(k, [])
+                        st.session_state.storico_consegne[p_scelto][k] = merge_consegne_lists(esistenti, lista_clean)
+                    st.success("Assegnazione multipla completata!")
+
+            elif cat_scelta == "TUTTE LE TIPOLOGIE":
                 for k, v in st.session_state.db_consegne.items():
                     # Creiamo una copia pulita con quantità base 1 per il massivo
                     lista_clean = []
