@@ -561,9 +561,6 @@ if st.session_state.pagina == "Consegne":
     if "storico_ritiri" not in st.session_state:
         st.session_state.storico_ritiri = carica_ritiri_cloud()
 
-    elenco_plessi_con_vuoto = ["- SELEZIONA PLESSO -"] + elenco_plessi
-
-
     def reset_consegne_totale():
         st.session_state.lista_consegne_attuale = []
         st.session_state.last_cat = None
@@ -574,7 +571,8 @@ if st.session_state.pagina == "Consegne":
     actr = st.session_state.get('add_ctr', 0)
 
     col_p, col_c = st.columns(2)
-    p_scelto = col_p.selectbox("Seleziona Plesso:", elenco_plessi_con_vuoto, key=f"p_sel_{ctr}")
+    plessi_scelti = col_p.multiselect("Seleziona Plesso/i:", elenco_plessi, key=f"p_sel_{ctr}")
+    p_scelto = plessi_scelti[0] if len(plessi_scelti) == 1 else ""
 
     # --- COPIA E SOSTITUISCI QUESTE RIGHE ---
     basi = [
@@ -690,7 +688,9 @@ if st.session_state.pagina == "Consegne":
 
     if cat_scelta not in ["TUTTE LE TIPOLOGIE", "- SELEZIONA -", "SELEZIONE MULTIPLA"]:
         if col_print.button("🖨️ GENERA PDF", use_container_width=True):
-            if st.session_state.lista_consegne_attuale:
+            if len(plessi_scelti) != 1:
+                st.warning("Per generare il PDF seleziona un solo plesso.")
+            elif st.session_state.lista_consegne_attuale:
                 # Carichiamo il file fisico logo.jpg per evitare l'errore NameError
                 logo_per_pdf = None
                 if os.path.exists("logo.jpg"):
@@ -709,49 +709,53 @@ if st.session_state.pagina == "Consegne":
 
     # --- TASTO CONFERMA SISTEMATO ---
     if col_conf.button("✅ CONFERMA CONSEGNA", use_container_width=True):
-        if p_scelto != "- SELEZIONA PLESSO -":
-            if p_scelto not in st.session_state.storico_consegne:
-                st.session_state.storico_consegne[p_scelto] = {}
-
-            if cat_scelta == "SELEZIONE MULTIPLA":
-                if not tipologie_scelte:
-                    st.warning("Seleziona almeno una tipologia.")
-                else:
-                    for k in tipologie_scelte:
-                        v = st.session_state.db_consegne.get(k, [])
-                        lista_clean = []
-                        for item in v:
-                            nuovo = item.copy()
-                            nuovo['q'] = 1
-                            lista_clean.append(nuovo)
-                        esistenti = st.session_state.storico_consegne[p_scelto].get(k, [])
-                        st.session_state.storico_consegne[p_scelto][k] = merge_consegne_lists(esistenti, lista_clean)
-                    st.success("Assegnazione multipla completata!")
-
-            elif cat_scelta == "TUTTE LE TIPOLOGIE":
-                for k, v in st.session_state.db_consegne.items():
-                    # Creiamo una copia pulita con quantità base 1 per il massivo
-                    lista_clean = []
-                    for item in v:
-                        nuovo = item.copy()
-                        nuovo['q'] = 1
-                        lista_clean.append(nuovo)
-                    esistenti = st.session_state.storico_consegne[p_scelto].get(k, [])
-                    st.session_state.storico_consegne[p_scelto][k] = merge_consegne_lists(esistenti, lista_clean)
-                st.success(f"REGISTRAZIONE MASSIVA COMPLETATA!")
+        if not plessi_scelti:
+            st.warning("Seleziona almeno un plesso.")
+        else:
+            if cat_scelta == "SELEZIONE MULTIPLA" and not tipologie_scelte:
+                st.warning("Seleziona almeno una tipologia.")
             else:
-                # SALVATAGGIO QUANTITÀ MODIFICATE:
-                # Usiamo item.copy() per essere sicuri di salvare i numeri scelti dall'utente
-                lista_con_quantita_esatte = [item.copy() for item in st.session_state.lista_consegne_attuale]
-                esistenti = st.session_state.storico_consegne[p_scelto].get(cat_scelta, [])
-                st.session_state.storico_consegne[p_scelto][cat_scelta] = merge_consegne_lists(
-                    esistenti, lista_con_quantita_esatte
-                )
-                st.success(f"Consegna registrata con successo!")
+                for plesso in plessi_scelti:
+                    if plesso not in st.session_state.storico_consegne:
+                        st.session_state.storico_consegne[plesso] = {}
 
-            # Invio finale al cloud
-            salva_storico_cloud(st.session_state.storico_consegne)
-            reset_consegne_totale()
+                    if cat_scelta == "SELEZIONE MULTIPLA":
+                        for k in tipologie_scelte:
+                            v = st.session_state.db_consegne.get(k, [])
+                            lista_clean = []
+                            for item in v:
+                                nuovo = item.copy()
+                                nuovo['q'] = 1
+                                lista_clean.append(nuovo)
+                            esistenti = st.session_state.storico_consegne[plesso].get(k, [])
+                            st.session_state.storico_consegne[plesso][k] = merge_consegne_lists(esistenti, lista_clean)
+
+                    elif cat_scelta == "TUTTE LE TIPOLOGIE":
+                        for k, v in st.session_state.db_consegne.items():
+                            lista_clean = []
+                            for item in v:
+                                nuovo = item.copy()
+                                nuovo['q'] = 1
+                                lista_clean.append(nuovo)
+                            esistenti = st.session_state.storico_consegne[plesso].get(k, [])
+                            st.session_state.storico_consegne[plesso][k] = merge_consegne_lists(esistenti, lista_clean)
+
+                    else:
+                        lista_con_quantita_esatte = [item.copy() for item in st.session_state.lista_consegne_attuale]
+                        esistenti = st.session_state.storico_consegne[plesso].get(cat_scelta, [])
+                        st.session_state.storico_consegne[plesso][cat_scelta] = merge_consegne_lists(
+                            esistenti, lista_con_quantita_esatte
+                        )
+
+                if cat_scelta == "SELEZIONE MULTIPLA":
+                    st.success("Assegnazione multipla completata!")
+                elif cat_scelta == "TUTTE LE TIPOLOGIE":
+                    st.success("REGISTRAZIONE MASSIVA COMPLETATA!")
+                else:
+                    st.success("Consegna registrata con successo!")
+
+                salva_storico_cloud(st.session_state.storico_consegne)
+                reset_consegne_totale()
 
 # ==============================================================================
 # BLOCCO 10: PAGINA STORICO (REGISTRO CARICO PLESSI) - MODIFICA TASTO AGGIORNA
