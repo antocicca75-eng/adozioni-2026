@@ -775,7 +775,7 @@ elif st.session_state.pagina == "Storico":
 
         for plesso in plessi_da_mostrare:
             with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
-                if st.button(f"🔄 SVUOTA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
+                if st.button(f"  RITIRA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
                              use_container_width=True):
                     for tipo, items in st.session_state.storico_consegne[plesso].items():
                         aggiungi_ritiri(plesso, tipo, items)
