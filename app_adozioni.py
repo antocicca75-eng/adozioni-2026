@@ -792,6 +792,13 @@ elif st.session_state.pagina == "Storico":
 
                 per_tipo = st.session_state.storico_consegne[plesso]
                 for tipo in sorted(list(per_tipo.keys())):
+                    if st.button(f"🧨 Reset tipologia: {tipo}", key=f"reset_tipo_{plesso}_{tipo}"):
+                        if plesso in st.session_state.storico_consegne and tipo in st.session_state.storico_consegne[plesso]:
+                            del st.session_state.storico_consegne[plesso][tipo]
+                            if not st.session_state.storico_consegne[plesso]:
+                                del st.session_state.storico_consegne[plesso]
+                        salva_storico_cloud(st.session_state.storico_consegne)
+                        st.rerun()
                     if st.button(f"📦 Ritira tutto: {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
                         aggiungi_ritiri(plesso, tipo, per_tipo[tipo])
                         del st.session_state.storico_consegne[plesso][tipo]
