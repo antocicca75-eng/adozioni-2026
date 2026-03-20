@@ -91,16 +91,18 @@ def salva_config_consegne(db_dict):
 
 def carica_config_consegne():
     sh = connetti_google_sheets()
-    # Inizializzazione categorie base
-    db_caricato = {
+    default = {
         "LETTURE CLASSE PRIMA": [], "LETTURE CLASSE QUARTA": [],
         "SUSSIDIARI DISCIPLINE": [], "INGLESE CLASSE PRIMA": [],
         "INGLESE CLASSE QUARTA": [], "RELIGIONE": []
     }
+    db_caricato = {}
     if sh:
         try:
             foglio = sh.worksheet("ConfigConsegne")
             dati = foglio.get_all_records()
+            if not dati:
+                return default
             for r in dati:
                 categoria = r["Categoria"]
                 lista_libri = json.loads(r["Dati_JSON"])
@@ -113,8 +115,8 @@ def carica_config_consegne():
 
                 db_caricato[categoria] = lista_libri
         except:
-            pass
-    return db_caricato
+            return default
+    return db_caricato if db_caricato else default
 
 
 # ------------------------------------------------------------------------------
@@ -610,11 +612,7 @@ if st.session_state.pagina == "Consegne":
     plessi_scelti = col_p.multiselect("Seleziona Plesso/i:", elenco_plessi, key=f"p_sel_{ctr}")
     p_scelto = plessi_scelti[0] if len(plessi_scelti) == 1 else ""
 
-    # --- COPIA E SOSTITUISCI QUESTE RIGHE ---
-    basi = [
-        "- SELEZIONA -",
-        "TUTTE LE TIPOLOGIE",
-        "SELEZIONE MULTIPLA",
+    tipologie_fisse_menu = [
         "INGLESE CLASSE PRIMA",
         "INGLESE CLASSE QUARTA",
         "QUADERNI VACANZE CLASSE PRIMA",
@@ -625,20 +623,17 @@ if st.session_state.pagina == "Consegne":
         "QUADERNI VACANZE INGLESE"
     ]
 
-    # Lista per evitare duplicati nel menu "altre"
-    escludi = [
-        "INGLESE", "INGLESE CLASSE PRIMA", "INGLESE CLASSE QUARTA",
-        "QUADERNI VACANZE CLASSE PRIMA", "QUADERNI VACANZE CLASSE SECONDA",
-        "QUADERNI VACANZE CLASSE TERZA", "QUADERNI VACANZE CLASSE QUARTA",
-        "QUADERNI VACANZE CLASSE QUINTA", "QUADERNI VACANZE INGLESE"
-    ]
+    basi = [
+        "- SELEZIONA -",
+        "TUTTE LE TIPOLOGIE",
+        "SELEZIONE MULTIPLA",
+    ] + [t for t in tipologie_fisse_menu if t in st.session_state.db_consegne]
 
-    altre = [k for k in st.session_state.db_consegne.keys() if k not in escludi]
-    cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
+    altre = [k for k in st.session_state.db_consegne.keys() if k not in tipologie_fisse_menu]
+    cat_scelta = col_c.selectbox("Tipologia Libri:", basi + sorted(altre), key=f"c_sel_{ctr}")
     tipologie_scelte = []
 
-    eliminabili = [k for k in st.session_state.db_consegne.keys() if k not in basi]
-    if cat_scelta in eliminabili:
+    if cat_scelta in st.session_state.db_consegne:
         del_tipo_key = f"del_tipo_conf_{ctr}"
         del_nome_key = f"del_tipo_nome_{ctr}"
         b_del = st.button("🗑️ ELIMINA TIPOLOGIA", use_container_width=True, key=f"btn_del_tipo_{ctr}")
