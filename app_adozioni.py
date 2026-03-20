@@ -29,6 +29,8 @@ except ModuleNotFoundError:
             _norm_str(item.get("c1")),
             _norm_str(item.get("c2")),
             _norm_str(item.get("c3")),
+            _norm_str(item.get("c4")),
+            _norm_str(item.get("c5")),
         )
 
     def merge_consegne_lists(esistenti, nuovi):
@@ -52,7 +54,7 @@ except ModuleNotFoundError:
             base = mappa[k]
             base["q"] = _q_int(base.get("q", 1)) + _q_int(item.get("q", 1))
 
-            for campo in ("t", "e", "sez", "c1", "c2", "c3"):
+            for campo in ("t", "e", "sez", "c1", "c2", "c3", "c4", "c5"):
                 if not base.get(campo) and item.get(campo):
                     base[campo] = item.get(campo)
 
@@ -305,12 +307,32 @@ class PDF_CONSEGNA(FPDF):
         for i, lib in enumerate(libri[:15]):
             self.set_x(x_offset + 10)
             self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
-            c1 = str(lib.get('c1', '')).strip().upper()
-            c2 = str(lib.get('c2', '')).strip().upper()
-            c3 = str(lib.get('c3', '')).strip().upper()
-            self.cell(7.6, 7, c1, border=1, align='C')
-            self.cell(7.6, 7, c2, border=1, align='C')
-            self.cell(7.8, 7, c3, border=1, align='C')
+            is_vacanze_inglese = "VACANZE INGLESE" in str(categoria).upper()
+            if is_vacanze_inglese:
+                raw = [
+                    str(lib.get('c1', '')).strip().upper(),
+                    str(lib.get('c2', '')).strip().upper(),
+                    str(lib.get('c3', '')).strip().upper(),
+                    str(lib.get('c4', '')).strip().upper(),
+                    str(lib.get('c5', '')).strip().upper(),
+                ]
+                classi = [c for c in raw if c]
+                while len(classi) < 5:
+                    classi.append("")
+                for w, val in [(4.6, classi[0]), (4.6, classi[1]), (4.6, classi[2]), (4.6, classi[3]), (4.6, classi[4])]:
+                    self.cell(w, 7, val, border=1, align='C')
+            else:
+                raw = [
+                    str(lib.get('c1', '')).strip().upper(),
+                    str(lib.get('c2', '')).strip().upper(),
+                    str(lib.get('c3', '')).strip().upper(),
+                ]
+                classi = [c for c in raw if c]
+                while len(classi) < 3:
+                    classi.append("")
+                self.cell(7.6, 7, classi[0], border=1, align='C')
+                self.cell(7.6, 7, classi[1], border=1, align='C')
+                self.cell(7.8, 7, classi[2], border=1, align='C')
             self.cell(30, 7, str(lib.get('e', ''))[:18], border=1, ln=1, align='C')
 
         self.set_y(155)
@@ -621,7 +643,25 @@ if st.session_state.pagina == "Consegne":
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
             if 'q' not in lib: lib['q'] = 1
             c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
-            c_info.info(f"{lib['t']} | {lib['e']} | Classi: {lib['c1']} {lib['c2']} {lib['c3']}")
+            is_vacanze_inglese = str(cat_scelta).upper() == "QUADERNI VACANZE INGLESE"
+            if is_vacanze_inglese:
+                raw = [
+                    str(lib.get("c1", "")).strip(),
+                    str(lib.get("c2", "")).strip(),
+                    str(lib.get("c3", "")).strip(),
+                    str(lib.get("c4", "")).strip(),
+                    str(lib.get("c5", "")).strip(),
+                ]
+                classi = [c for c in raw if c]
+                while len(classi) < 5:
+                    classi.append("")
+                c_info.info(f"{lib['t']} | {lib['e']} | Classi: {classi[0]} {classi[1]} {classi[2]} {classi[3]} {classi[4]}")
+            else:
+                raw = [str(lib.get("c1", "")).strip(), str(lib.get("c2", "")).strip(), str(lib.get("c3", "")).strip()]
+                classi = [c for c in raw if c]
+                while len(classi) < 3:
+                    classi.append("")
+                c_info.info(f"{lib['t']} | {lib['e']} | Classi: {classi[0]} {classi[1]} {classi[2]}")
             m1, v1, p1 = c_qta.columns([1, 1, 1])
             if m1.button("➖", key=f"m_{cat_scelta}_{i}"):
                 if lib['q'] > 1: lib['q'] -= 1; st.rerun()
@@ -656,15 +696,37 @@ if st.session_state.pagina == "Consegne":
                     df_cat.iloc[:, 0].astype(str).unique().tolist()), key=f"sk_{actr}")
                 if scelta_libro != "- CERCA TITOLO -":
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
-                    c_sez, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
-                    sez_in = c_sez.text_input("Sezione", key=f"sez_{actr}")
-                    c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
-                    c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
-                    c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
+                    is_vacanze_inglese = str(cat_scelta).upper() == "QUADERNI VACANZE INGLESE"
+                    if is_vacanze_inglese:
+                        c_sez, c1, c2, c3, c4, c5, _ = st.columns([1.2, 1, 1, 1, 1, 1, 2])
+                        sez_in = c_sez.text_input("Sezione", key=f"sez_{actr}")
+                        c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
+                        c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
+                        c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
+                        c4in = c4.text_input("Classe   ", max_chars=2, key=f"in4_{actr}")
+                        c5in = c5.text_input("Classe    ", max_chars=2, key=f"in5_{actr}")
+                    else:
+                        c_sez, c1, c2, c3, _ = st.columns([1.2, 1, 1, 1, 4])
+                        sez_in = c_sez.text_input("Sezione", key=f"sez_{actr}")
+                        c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
+                        c2in = c2.text_input("Classe ", max_chars=2, key=f"in2_{actr}")
+                        c3in = c3.text_input("Classe  ", max_chars=2, key=f"in3_{actr}")
+                        c4in = ""
+                        c5in = ""
                     if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
+                        raw = [str(c1in).strip(), str(c2in).strip(), str(c3in).strip(), str(c4in).strip(), str(c5in).strip()]
+                        classi = [c for c in raw if c]
+                        while len(classi) < (5 if is_vacanze_inglese else 3):
+                            classi.append("")
+                        if not is_vacanze_inglese:
+                            classi = classi[:3]
                         st.session_state.lista_consegne_attuale.append({
                             "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(),
-                            "q": 1, "c1": c1in, "c2": c2in, "c3": c3in, "sez": sez_in
+                            "q": 1,
+                            "c1": classi[0], "c2": classi[1], "c3": classi[2],
+                            "c4": classi[3] if is_vacanze_inglese else "",
+                            "c5": classi[4] if is_vacanze_inglese else "",
+                            "sez": sez_in
                         })
                         st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1;
                         st.rerun()
@@ -770,7 +832,7 @@ elif st.session_state.pagina == "Storico":
 
         for plesso in plessi_da_mostrare:
             with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
-                if st.button(f"  RITIRA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
+                if st.button(f"� RITIRA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
                              use_container_width=True):
                     for tipo, items in st.session_state.storico_consegne[plesso].items():
                         aggiungi_ritiri(plesso, tipo, items)
