@@ -633,6 +633,26 @@ if st.session_state.pagina == "Consegne":
     cat_scelta = col_c.selectbox("Tipologia Libri:", basi + sorted(altre), key=f"c_sel_{ctr}")
     tipologie_scelte = []
 
+    with st.container(border=True):
+        c_nt, c_btn = st.columns([0.75, 0.25])
+        nuova_tip = c_nt.text_input("Nuova tipologia di libri", key=f"nuova_tip_{ctr}")
+        if c_btn.button("➕ CREA", use_container_width=True, key=f"btn_crea_tip_{ctr}"):
+            nome = str(nuova_tip).strip().upper()
+            vietate = {"- SELEZIONA -", "TUTTE LE TIPOLOGIE", "SELEZIONE MULTIPLA"}
+            if not nome:
+                st.warning("Inserisci un nome per la nuova tipologia.")
+            elif nome in vietate:
+                st.warning("Nome tipologia non valido.")
+            elif nome in st.session_state.db_consegne:
+                st.warning("Questa tipologia esiste già.")
+            else:
+                st.session_state.db_consegne[nome] = []
+                salva_config_consegne(st.session_state.db_consegne)
+                st.session_state.lista_consegne_attuale = []
+                st.session_state.last_cat = nome
+                st.session_state[f"c_sel_{ctr}"] = nome
+                st.rerun()
+
     if cat_scelta in st.session_state.db_consegne:
         del_tipo_key = f"del_tipo_conf_{ctr}"
         del_nome_key = f"del_tipo_nome_{ctr}"
