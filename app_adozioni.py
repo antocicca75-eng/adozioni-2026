@@ -858,12 +858,12 @@ elif st.session_state.pagina == "Storico":
         st.info("Nessuna consegna registrata.")
     else:
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
-        scuola_selezionata = st.selectbox("🔍 Filtra per Plesso:", ["- MOSTRA TUTTI -"] + elenco_plessi_storico)
+        scuola_selezionata = st.selectbox("🔍 Filtra scuola:", ["- MOSTRA TUTTI -"] + elenco_plessi_storico)
         st.markdown("---")
         plessi_da_mostrare = [scuola_selezionata] if scuola_selezionata != "- MOSTRA TUTTI -" else elenco_plessi_storico
 
         for plesso in plessi_da_mostrare:
-            with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
+            with st.expander(f"🏫 {plesso.upper()}", expanded=False):
                 if st.button(f"  RITIRA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
                              use_container_width=True):
                     for tipo, items in st.session_state.storico_consegne[plesso].items():
@@ -1478,10 +1478,10 @@ elif st.session_state.pagina == "Ritirate":
         st.info("ℹ️ Nessuna collana risulta ritirata al momento.")
     else:
         elenco_plessi_ritiri = sorted(list(st.session_state.storico_ritiri.keys()))
-        scuola_sel = st.selectbox("🔍 Filtra Plesso:", ["- MOSTRA TUTTI -"] + elenco_plessi_ritiri)
+        scuola_sel = st.selectbox("🔍 Filtra scuola:", ["- MOSTRA TUTTI -"] + elenco_plessi_ritiri)
         plessi_show = [scuola_sel] if scuola_sel != "- MOSTRA TUTTI -" else elenco_plessi_ritiri
         for plesso in plessi_show:
-            with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
+            with st.expander(f"🏫 {plesso.upper()}", expanded=False):
                 per_tipo = st.session_state.storico_ritiri.get(plesso, {})
                 tot_plesso = 0
                 for tipo in sorted(list(per_tipo.keys())):
