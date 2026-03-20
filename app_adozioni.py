@@ -688,9 +688,10 @@ if st.session_state.pagina == "Consegne":
 
     if cat_scelta not in ["TUTTE LE TIPOLOGIE", "- SELEZIONA -", "SELEZIONE MULTIPLA"]:
         if col_print.button("🖨️ GENERA PDF", use_container_width=True):
-            if len(plessi_scelti) != 1:
-                st.warning("Per generare il PDF seleziona un solo plesso.")
+            if len(plessi_scelti) > 1:
+                st.warning("Per generare il PDF seleziona un solo plesso (oppure nessuno).")
             elif st.session_state.lista_consegne_attuale:
+                plesso_pdf = plessi_scelti[0] if len(plessi_scelti) == 1 else ""
                 # Carichiamo il file fisico logo.jpg per evitare l'errore NameError
                 logo_per_pdf = None
                 if os.path.exists("logo.jpg"):
@@ -700,10 +701,10 @@ if st.session_state.pagina == "Consegne":
                 # Creazione PDF con il logo corretto
                 pdf = PDF_CONSEGNA(logo_data=logo_per_pdf)
                 pdf.add_page()
-                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente,
+                pdf.disegna_modulo(0, st.session_state.lista_consegne_attuale, cat_scelta, plesso_pdf, docente,
                                    classe_man, data_con)
                 pdf.dashed_line(148.5, 0, 148.5, 210, 0.5)
-                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, p_scelto, docente,
+                pdf.disegna_modulo(148.5, st.session_state.lista_consegne_attuale, cat_scelta, plesso_pdf, docente,
                                    classe_man, data_con)
                 st.download_button("📥 SCARICA PDF", bytes(pdf.output()), "consegna.pdf", "application/pdf")
 
