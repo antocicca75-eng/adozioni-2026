@@ -309,8 +309,8 @@ class PDF_CONSEGNA(FPDF):
         for i, lib in enumerate(libri[:15]):
             self.set_x(x_offset + 10)
             self.cell(75, 7, f" {str(lib['t'])[:40]}", border=1, align='L')
-            is_vacanze_inglese = "VACANZE INGLESE" in str(categoria).upper()
-            if is_vacanze_inglese:
+            is_quaderni_vacanze = "QUADERNI VACANZE" in str(categoria).upper()
+            if is_quaderni_vacanze:
                 raw = [
                     str(lib.get('c1', '')).strip().upper(),
                     str(lib.get('c2', '')).strip().upper(),
@@ -708,8 +708,8 @@ if st.session_state.pagina == "Consegne":
         for i, lib in enumerate(st.session_state.lista_consegne_attuale):
             if 'q' not in lib: lib['q'] = 1
             c_info, c_qta, c_del = st.columns([0.6, 0.3, 0.1])
-            is_vacanze_inglese = str(cat_scelta).upper() == "QUADERNI VACANZE INGLESE"
-            if is_vacanze_inglese:
+            is_quaderni_vacanze = "QUADERNI VACANZE" in str(cat_scelta).upper()
+            if is_quaderni_vacanze:
                 raw = [
                     str(lib.get("c1", "")).strip(),
                     str(lib.get("c2", "")).strip(),
@@ -761,8 +761,8 @@ if st.session_state.pagina == "Consegne":
                     df_cat.iloc[:, 0].astype(str).unique().tolist()), key=f"sk_{actr}")
                 if scelta_libro != "- CERCA TITOLO -":
                     dati_libro = df_cat[df_cat.iloc[:, 0] == scelta_libro].iloc[0]
-                    is_vacanze_inglese = str(cat_scelta).upper() == "QUADERNI VACANZE INGLESE"
-                    if is_vacanze_inglese:
+                    is_quaderni_vacanze = "QUADERNI VACANZE" in str(cat_scelta).upper()
+                    if is_quaderni_vacanze:
                         c_sez, c1, c2, c3, c4, c5, _ = st.columns([1.2, 1, 1, 1, 1, 1, 2])
                         sez_in = c_sez.text_input("Sezione", key=f"sez_{actr}")
                         c1in = c1.text_input("Classe", max_chars=2, key=f"in1_{actr}")
@@ -781,16 +781,16 @@ if st.session_state.pagina == "Consegne":
                     if st.button("Conferma Aggiunta", key=f"btn_add_{actr}", use_container_width=True):
                         raw = [str(c1in).strip(), str(c2in).strip(), str(c3in).strip(), str(c4in).strip(), str(c5in).strip()]
                         classi = [c for c in raw if c]
-                        while len(classi) < (5 if is_vacanze_inglese else 3):
+                        while len(classi) < (5 if is_quaderni_vacanze else 3):
                             classi.append("")
-                        if not is_vacanze_inglese:
+                        if not is_quaderni_vacanze:
                             classi = classi[:3]
                         st.session_state.lista_consegne_attuale.append({
                             "t": str(dati_libro.iloc[0]).upper(), "e": str(dati_libro.iloc[2]).upper(),
                             "q": 1,
                             "c1": classi[0], "c2": classi[1], "c3": classi[2],
-                            "c4": classi[3] if is_vacanze_inglese else "",
-                            "c5": classi[4] if is_vacanze_inglese else "",
+                            "c4": classi[3] if is_quaderni_vacanze else "",
+                            "c5": classi[4] if is_quaderni_vacanze else "",
                             "sez": sez_in
                         })
                         st.session_state.add_ctr = st.session_state.get('add_ctr', 0) + 1;
