@@ -650,7 +650,9 @@ if st.session_state.pagina == "Consegne":
                 salva_config_consegne(st.session_state.db_consegne)
                 st.session_state.lista_consegne_attuale = []
                 st.session_state.last_cat = nome
-                st.session_state[f"c_sel_{ctr}"] = nome
+                nuovo_ctr = st.session_state.get("reset_ctr", 0) + 1
+                st.session_state.reset_ctr = nuovo_ctr
+                st.session_state[f"c_sel_{nuovo_ctr}"] = nome
                 st.rerun()
 
     if cat_scelta in st.session_state.db_consegne:
