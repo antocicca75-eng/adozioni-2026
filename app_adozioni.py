@@ -476,6 +476,26 @@ def aggiorna_libro_catalogo(row_idx, t, m, e, a):
         st.error(f"❌ Errore aggiornamento: {ex}")
         return False
 
+
+def elimina_libro_catalogo(row_idx):
+    try:
+        sh = connetti_google_sheets()
+        if sh:
+            r = int(row_idx)
+            if r <= 1:
+                st.error("❌ Impossibile eliminare l'intestazione.")
+                return False
+            foglio_catalogo = sh.worksheet("Catalogo")
+            foglio_catalogo.delete_rows(r)
+            st.cache_data.clear()
+            return True
+        else:
+            st.error("❌ Impossibile connettersi a Google Sheets")
+            return False
+    except Exception as ex:
+        st.error(f"❌ Errore eliminazione: {ex}")
+        return False
+
 # ------------------------------------------------------------------------------
 
 
@@ -616,6 +636,34 @@ if st.session_state.pagina == "Consegne":
     altre = [k for k in st.session_state.db_consegne.keys() if k not in escludi]
     cat_scelta = col_c.selectbox("Tipologia Libri:", basi + altre, key=f"c_sel_{ctr}")
     tipologie_scelte = []
+
+    eliminabili = [k for k in st.session_state.db_consegne.keys() if k not in basi]
+    if cat_scelta in eliminabili:
+        del_tipo_key = f"del_tipo_conf_{ctr}"
+        del_nome_key = f"del_tipo_nome_{ctr}"
+        b_del = st.button("🗑️ ELIMINA TIPOLOGIA", use_container_width=True, key=f"btn_del_tipo_{ctr}")
+        if b_del:
+            st.session_state[del_tipo_key] = True
+            st.session_state[del_nome_key] = cat_scelta
+            st.rerun()
+
+        if st.session_state.get(del_tipo_key) and st.session_state.get(del_nome_key) == cat_scelta:
+            st.warning(f"Confermi eliminazione della tipologia: {cat_scelta}?")
+            c1, c2 = st.columns(2)
+            if c1.button("✅ CONFERMA ELIMINA", use_container_width=True, key=f"btn_del_tipo_ok_{ctr}"):
+                if cat_scelta in st.session_state.db_consegne:
+                    del st.session_state.db_consegne[cat_scelta]
+                    salva_config_consegne(st.session_state.db_consegne)
+                st.session_state.pop(del_tipo_key, None)
+                st.session_state.pop(del_nome_key, None)
+                st.session_state.lista_consegne_attuale = []
+                st.session_state.last_cat = None
+                st.session_state.reset_ctr = st.session_state.get('reset_ctr', 0) + 1
+                st.rerun()
+            if c2.button("Annulla", use_container_width=True, key=f"btn_del_tipo_no_{ctr}"):
+                st.session_state.pop(del_tipo_key, None)
+                st.session_state.pop(del_nome_key, None)
+                st.rerun()
 
     if cat_scelta == "TUTTE LE TIPOLOGIE":
         st.info("💡 Assegnazione massiva selezionata.")
@@ -999,7 +1047,8 @@ elif st.session_state.pagina == "ModificaLibro":
                         e_val = col2.text_input("Editore", value=rec["e"], key=f"mod_e_{rec['row']}")
                         a_val = col3.text_input("Agenzia", value=rec["a"], key=f"mod_a_{rec['row']}")
 
-                        if st.button("✅ SALVA MODIFICHE", use_container_width=True, type="primary"):
+                        b1, b2 = st.columns(2)
+                        if b1.button("✅ SALVA MODIFICHE", use_container_width=True, type="primary", key=f"btn_save_{rec['row']}"):
                             if not nt or not m_val or not e_val:
                                 st.warning("⚠️ Inserisci almeno Titolo, Materia ed Editore!")
                             else:
@@ -1008,6 +1057,23 @@ elif st.session_state.pagina == "ModificaLibro":
                                     st.rerun()
                                 else:
                                     st.error("❌ Errore durante l'aggiornamento del libro.")
+
+                        del_flag_key = f"del_conf_{rec['row']}"
+                        if b2.button("🗑️ ELIMINA LIBRO", use_container_width=True, key=f"btn_del_{rec['row']}"):
+                            st.session_state[del_flag_key] = True
+                            st.rerun()
+
+                        if st.session_state.get(del_flag_key):
+                            st.warning("Confermi eliminazione del libro dal catalogo?")
+                            c1, c2 = st.columns(2)
+                            if c1.button("✅ CONFERMA ELIMINA", use_container_width=True, key=f"btn_del_ok_{rec['row']}"):
+                                if elimina_libro_catalogo(rec["row"]):
+                                    st.success("✅ Libro eliminato con successo!")
+                                    st.session_state.pop(del_flag_key, None)
+                                    st.rerun()
+                            if c2.button("Annulla", use_container_width=True, key=f"btn_del_no_{rec['row']}"):
+                                st.session_state.pop(del_flag_key, None)
+                                st.rerun()
 
 # ------------------------------------------------------------------------------
 
