@@ -541,12 +541,6 @@ with st.sidebar:
         st.session_state.pagina = "Tabellone Stato";
         st.rerun()
     st.markdown("---")
-    if st.button("🧨 RESET TUTTO TABELLONE", use_container_width=True):
-        st.session_state.storico_consegne = {}
-        st.session_state.storico_ritiri = {}
-        salva_storico_cloud(st.session_state.storico_consegne)
-        salva_ritiri_cloud(st.session_state.storico_ritiri)
-        st.rerun()
 # ------------------------------------------------------------------------------
 
 
@@ -1285,12 +1279,6 @@ elif st.session_state.pagina == "Tabellone Stato":
                                 {html_blocco_sigle}
                             </div>
                         """, unsafe_allow_html=True)
-                        if st.button(f"🧨 Reset {plesso}", key=f"reset_tab_{plesso}", use_container_width=True):
-                            if plesso in st.session_state.storico_consegne: del st.session_state.storico_consegne[plesso]
-                            if plesso in st.session_state.storico_ritiri: del st.session_state.storico_ritiri[plesso]
-                            salva_storico_cloud(st.session_state.storico_consegne);
-                            salva_ritiri_cloud(st.session_state.storico_ritiri);
-                            st.rerun()
 
     st.markdown("---")
     if st.button("⬅️ Torna al Modulo Consegne", key="btn_back_tab_final"):
