@@ -861,6 +861,15 @@ elif st.session_state.pagina == "Storico":
         scuola_selezionata = st.selectbox("🔍 Filtra scuola:", ["- MOSTRA TUTTI -"] + elenco_plessi_storico)
         st.markdown("---")
         plessi_da_mostrare = [scuola_selezionata] if scuola_selezionata != "- MOSTRA TUTTI -" else elenco_plessi_storico
+        st.markdown(
+            """
+            <style>
+            div.stButton > button { justify-content: flex-start; text-align: left; }
+            div.stButton > button p { text-align: left; width: 100%; margin: 0; }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
         open_key = "open_plesso_storico"
         if len(plessi_da_mostrare) == 1 and plessi_da_mostrare[0] != "- MOSTRA TUTTI -":
@@ -1491,6 +1500,15 @@ elif st.session_state.pagina == "Ritirate":
         elenco_plessi_ritiri = sorted(list(st.session_state.storico_ritiri.keys()))
         scuola_sel = st.selectbox("🔍 Filtra scuola:", ["- MOSTRA TUTTI -"] + elenco_plessi_ritiri)
         plessi_show = [scuola_sel] if scuola_sel != "- MOSTRA TUTTI -" else elenco_plessi_ritiri
+        st.markdown(
+            """
+            <style>
+            div.stButton > button { justify-content: flex-start; text-align: left; }
+            div.stButton > button p { text-align: left; width: 100%; margin: 0; }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
         open_key = "open_plesso_ritirate"
         if len(plessi_show) == 1 and plessi_show[0] != "- MOSTRA TUTTI -":
             st.session_state[open_key] = plessi_show[0]
