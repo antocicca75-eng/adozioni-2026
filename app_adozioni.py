@@ -864,8 +864,24 @@ elif st.session_state.pagina == "Storico":
         st.markdown(
             """
             <style>
-            div.stButton > button { justify-content: flex-start; text-align: left; }
-            div.stButton > button p { text-align: left; width: 100%; margin: 0; }
+            div.stButton > button {
+              display: flex !important;
+              justify-content: flex-start !important;
+              align-items: center !important;
+              text-align: left !important;
+            }
+            div.stButton > button > div {
+              width: 100% !important;
+              display: flex !important;
+              justify-content: flex-start !important;
+            }
+            div.stButton > button * {
+              text-align: left !important;
+            }
+            div.stButton > button p {
+              width: 100% !important;
+              margin: 0 !important;
+            }
             </style>
             """,
             unsafe_allow_html=True,
@@ -1503,8 +1519,24 @@ elif st.session_state.pagina == "Ritirate":
         st.markdown(
             """
             <style>
-            div.stButton > button { justify-content: flex-start; text-align: left; }
-            div.stButton > button p { text-align: left; width: 100%; margin: 0; }
+            div.stButton > button {
+              display: flex !important;
+              justify-content: flex-start !important;
+              align-items: center !important;
+              text-align: left !important;
+            }
+            div.stButton > button > div {
+              width: 100% !important;
+              display: flex !important;
+              justify-content: flex-start !important;
+            }
+            div.stButton > button * {
+              text-align: left !important;
+            }
+            div.stButton > button p {
+              width: 100% !important;
+              margin: 0 !important;
+            }
             </style>
             """,
             unsafe_allow_html=True,
