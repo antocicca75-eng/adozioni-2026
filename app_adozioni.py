@@ -208,6 +208,48 @@ def aggiungi_ritiri(plesso, tipo, items):
             destinazione.append(nuovo.copy())
 
 
+def salva_adottati_cloud(adottati_dict):
+    sh = connetti_google_sheets()
+    if sh:
+        try:
+            try:
+                foglio = sh.worksheet("StoricoAdottati")
+            except:
+                foglio = sh.add_worksheet(title="StoricoAdottati", rows="1000", cols="20")
+            foglio.clear()
+            righe = [["Plesso", "Dati_JSON"]]
+            for plesso, dati in adottati_dict.items():
+                righe.append([plesso, json.dumps(dati)])
+            foglio.update(righe)
+        except Exception as e:
+            st.sidebar.error(f"Errore salvataggio adottati: {e}")
+
+
+def carica_adottati_cloud():
+    sh = connetti_google_sheets()
+    adottati_caricati = {}
+    if sh:
+        try:
+            foglio = sh.worksheet("StoricoAdottati")
+            dati = foglio.get_all_records()
+            for r in dati:
+                adottati_caricati[r["Plesso"]] = json.loads(r["Dati_JSON"])
+        except:
+            pass
+    return adottati_caricati
+
+
+def aggiungi_adottati(plesso, tipo, items):
+    if "storico_adottati" not in st.session_state:
+        st.session_state.storico_adottati = {}
+    if plesso not in st.session_state.storico_adottati:
+        st.session_state.storico_adottati[plesso] = {}
+    if tipo not in st.session_state.storico_adottati[plesso]:
+        st.session_state.storico_adottati[plesso][tipo] = []
+    esistenti = st.session_state.storico_adottati[plesso].get(tipo, [])
+    st.session_state.storico_adottati[plesso][tipo] = merge_consegne_lists(esistenti, items or [])
+
+
 # ==============================================================================
 # BLOCCO 3: COSTANTI E SETTAGGI PAGINA
 # ==============================================================================
@@ -563,6 +605,10 @@ with st.sidebar:
         st.session_state.pagina = "Ritirate";
         st.rerun()
 
+    if st.button("✅ TESTI ADOTTATI", use_container_width=True):
+        st.session_state.pagina = "Adottati";
+        st.rerun()
+
     if st.button("🔍 RICERCA COLLANE", use_container_width=True):
         st.session_state.pagina = "Ricerca Collane"
         st.rerun()
@@ -853,6 +899,8 @@ elif st.session_state.pagina == "Storico":
     st.subheader("📚 Registro Libri in Carico ai Plessi")
 
     if "storico_ritiri" not in st.session_state: st.session_state.storico_ritiri = carica_ritiri_cloud()
+    if "storico_adottati" not in st.session_state: st.session_state.storico_adottati = carica_adottati_cloud()
+    if "storico_consegne" not in st.session_state: st.session_state.storico_consegne = carica_storico_cloud()
 
     if not st.session_state.get("storico_consegne"):
         st.info("Nessuna consegna registrata.")
@@ -941,12 +989,12 @@ elif st.session_state.pagina == "Storico":
                             col_qta.write(f"Q.tà: {qta_salvata}")
 
                             with col_ritiro:
-                                q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata),
+                                q_rit = st.number_input("Quantità", min_value=1, max_value=max(1, qta_salvata),
                                                         value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}",
                                                         label_visibility="collapsed")
 
-                                # --- MODIFICA RICHIESTA: Sostituito tasto "OK" con "AGGIORNA CARICO" ---
-                                if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
+                                cbtn1, cbtn2 = st.columns(2)
+                                if cbtn1.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}", use_container_width=True):
                                     rit_item = lib.copy()
                                     rit_item['q'] = q_rit
                                     aggiungi_ritiri(plesso, tipo, [rit_item])
@@ -961,6 +1009,24 @@ elif st.session_state.pagina == "Storico":
 
                                     salva_storico_cloud(st.session_state.storico_consegne);
                                     salva_ritiri_cloud(st.session_state.storico_ritiri);
+                                    st.rerun()
+
+                                if cbtn2.button("✅ ADOTTATO", key=f"btn_ad_{plesso}_{tipo}_{i}", use_container_width=True):
+                                    ad_item = lib.copy()
+                                    ad_item["q"] = q_rit
+                                    aggiungi_adottati(plesso, tipo, [ad_item])
+
+                                    lib["q"] = qta_salvata - q_rit
+                                    if lib["q"] <= 0:
+                                        per_tipo[tipo].pop(i)
+
+                                    if not st.session_state.storico_consegne[plesso][tipo]:
+                                        del st.session_state.storico_consegne[plesso][tipo]
+                                    if not st.session_state.storico_consegne[plesso]:
+                                        del st.session_state.storico_consegne[plesso]
+
+                                    salva_storico_cloud(st.session_state.storico_consegne)
+                                    salva_adottati_cloud(st.session_state.storico_adottati)
                                     st.rerun()
 
                             if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
@@ -1499,6 +1565,31 @@ elif st.session_state.pagina == "Ricerca Collane":
         """, unsafe_allow_html=True)
 
         st.dataframe(df_filtrato, use_container_width=True, hide_index=True)
+        try:
+            buf = io.BytesIO()
+            engine = None
+            try:
+                import openpyxl
+                engine = "openpyxl"
+            except Exception:
+                try:
+                    import xlsxwriter
+                    engine = "xlsxwriter"
+                except Exception:
+                    engine = None
+            if engine is None:
+                raise RuntimeError("Nessun engine Excel disponibile")
+            with pd.ExcelWriter(buf, engine=engine) as writer:
+                df_filtrato.to_excel(writer, index=False, sheet_name="Risultati")
+            st.download_button(
+                "📤 ESPORTA EXCEL",
+                data=buf.getvalue(),
+                file_name=f"ricerca_collane_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        except Exception as ex:
+            st.warning(f"Export Excel non disponibile: {ex}")
 
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
@@ -1571,3 +1662,67 @@ elif st.session_state.pagina == "Ritirate":
                                 tot_plesso += tot_tipo
                                 st.markdown(f"<div class='totale-box'>Totale tipologia: <b>{tot_tipo}</b></div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='totale-box'>Totale ritiri plesso: <b>{tot_plesso}</b></div>", unsafe_allow_html=True)
+
+# =========================================================
+# --- BLOCCO 18: TESTI ADOTTATI ---
+# =========================================================
+elif st.session_state.pagina == "Adottati":
+    st.subheader("✅ Testi Adottati")
+    if "storico_adottati" not in st.session_state:
+        st.session_state.storico_adottati = carica_adottati_cloud()
+    if not st.session_state.storico_adottati:
+        st.info("ℹ️ Nessun testo risulta adottato al momento.")
+    else:
+        righe = []
+        for plesso, categorie in st.session_state.storico_adottati.items():
+            for cat, libri in (categorie or {}).items():
+                for lib in (libri or []):
+                    raw = [
+                        str(lib.get("c1", "")).strip(),
+                        str(lib.get("c2", "")).strip(),
+                        str(lib.get("c3", "")).strip(),
+                        str(lib.get("c4", "")).strip(),
+                        str(lib.get("c5", "")).strip(),
+                    ]
+                    classi = " ".join([c for c in raw if c])
+                    righe.append({
+                        "Plesso": plesso,
+                        "Tipologia": cat,
+                        "Titolo": lib.get("t", ""),
+                        "Editore": lib.get("e", ""),
+                        "Quantità": int(lib.get("q", 0) or 0),
+                        "Sezione": lib.get("sez", ""),
+                        "Classi": classi,
+                    })
+
+        df_ad = pd.DataFrame(righe)
+        if df_ad.empty:
+            st.info("ℹ️ Nessun testo risulta adottato al momento.")
+        else:
+            if "reset_adottati" not in st.session_state:
+                st.session_state.reset_adottati = 0
+            suff = str(st.session_state.reset_adottati)
+
+            with st.container(border=True):
+                c1, c2, c3 = st.columns(3)
+                f_ple = c1.multiselect("🏫 Filtra Plesso", sorted(df_ad["Plesso"].astype(str).unique()), key="ad_ple_" + suff)
+                f_tip = c2.multiselect("📚 Filtra Tipologia", sorted(df_ad["Tipologia"].astype(str).unique()), key="ad_tip_" + suff)
+                f_edi = c3.multiselect("🏢 Filtra Editore", sorted(df_ad["Editore"].astype(str).unique()), key="ad_edi_" + suff)
+                t_search = st.text_input("🔎 Cerca Titolo", key="ad_tit_" + suff)
+                if st.button("🧹 PULISCI FILTRI", use_container_width=True, key="ad_clear_" + suff):
+                    st.session_state.reset_adottati += 1
+                    st.rerun()
+
+            df_f = df_ad.copy()
+            if f_ple:
+                df_f = df_f[df_f["Plesso"].isin(f_ple)]
+            if f_tip:
+                df_f = df_f[df_f["Tipologia"].isin(f_tip)]
+            if f_edi:
+                df_f = df_f[df_f["Editore"].isin(f_edi)]
+            if t_search:
+                df_f = df_f[df_f["Titolo"].astype(str).str.contains(str(t_search), case=False, na=False)]
+
+            tot = int(pd.to_numeric(df_f["Quantità"], errors="coerce").fillna(0).sum()) if not df_f.empty else 0
+            st.markdown(f"<div class='totale-box'>Totale testi adottati: <b>{tot}</b></div>", unsafe_allow_html=True)
+            st.dataframe(df_f.sort_values(by=["Plesso", "Tipologia", "Titolo", "Editore"]), use_container_width=True, hide_index=True)
