@@ -1577,7 +1577,26 @@ elif st.session_state.pagina == "Ricerca Collane":
             </div>
         """, unsafe_allow_html=True)
 
-        st.dataframe(df_filtrato, use_container_width=True, hide_index=True)
+        df_view = df_filtrato.copy()
+        if not df_view.empty:
+            df_view = df_view.sort_values(by=["Plesso", "Tipologia", "Titolo", "Editore"], kind="stable")
+
+        st.dataframe(df_view, use_container_width=True, hide_index=True)
+        out = io.BytesIO()
+        try:
+            df_export = df_view.copy()
+            if "Quantità" in df_export.columns:
+                df_export["Quantità"] = pd.to_numeric(df_export["Quantità"], errors="coerce").fillna(0).astype(int)
+            df_export.to_excel(out, index=False, sheet_name="Ricerca Collane")
+            st.download_button(
+                "📥 SCARICA EXCEL",
+                data=out.getvalue(),
+                file_name=f"ricerca_collane_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        except Exception as ex:
+            st.error(f"⚠️ Scarico Excel non disponibile: {ex}")
 
     else:
         st.warning("⚠️ Non ci sono ancora dati nello storico delle consegne.")
