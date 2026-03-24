@@ -887,48 +887,19 @@ elif st.session_state.pagina == "Storico":
 
     if "storico_ritiri" not in st.session_state: st.session_state.storico_ritiri = carica_ritiri_cloud()
 
-    if st.session_state.get("show_adottato_dialog"):
-        dati = st.session_state.show_adottato_dialog
-        st.markdown("---")
-        st.markdown("### 📝 Dettagli Adozione")
-        st.write(f"**Plesso:** {dati['plesso']} | **Titolo:** {dati['libro']['t']}")
-        with st.container(border=True):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                n_sez_adott = st.number_input("Numero delle sezioni", min_value=1, value=1, key="adott_n_sez")
-            with c2:
-                sez_lett_adott = st.text_input("Lettera sezione (es. A, B, C)", key="adott_sez_lett")
-            with c3:
-                saggio_adott = st.selectbox("Saggio consegnato?", ["-", "NO", "SI"], key="adott_saggio")
-            
-            c_conf, c_ann = st.columns(2)
-            if c_conf.button("✅ Procedi all'Adozione", type="primary", use_container_width=True):
-                st.session_state.prefill_adozione = {
-                    "plesso": dati['plesso'],
-                    "titolo": dati['libro']['t'],
-                    "n_sez": n_sez_adott,
-                    "sez_lett": sez_lett_adott,
-                    "saggio": saggio_adott
-                }
-                st.session_state.show_adottato_dialog = None
-                st.session_state.pagina = "Inserimento"
-                st.rerun()
-            if c_ann.button("❌ Annulla", use_container_width=True):
-                st.session_state.show_adottato_dialog = None
-                st.rerun()
-        st.markdown("---")
-
     if not st.session_state.get("storico_consegne"):
         st.info("Nessuna consegna registrata.")
     else:
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
-        scuola_selezionata = st.selectbox("🔍 Filtra per Plesso:", ["- MOSTRA TUTTI -"] + elenco_plessi_storico)
-        st.markdown("---")
-        plessi_da_mostrare = [scuola_selezionata] if scuola_selezionata != "- MOSTRA TUTTI -" else elenco_plessi_storico
+        scuola_selezionata = st.selectbox("🔍 Seleziona Plesso:", ["- SELEZIONA -"] + elenco_plessi_storico)
+        if scuola_selezionata == "- SELEZIONA -":
+            st.info("Seleziona un plesso per visualizzare le collane consegnate.")
+            st.stop()
 
-        for plesso in plessi_da_mostrare:
+        plesso = scuola_selezionata
+        for plesso in [plesso]:
             with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
-                if st.button(f"  RITIRA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
+                if st.button(f"📦 RITIRA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
                              use_container_width=True):
                     for tipo, items in st.session_state.storico_consegne[plesso].items():
                         aggiungi_ritiri(plesso, tipo, items)
@@ -970,11 +941,13 @@ elif st.session_state.pagina == "Storico":
 
                             with col_adott:
                                 if st.button("🌟 ADOTTATO", key=f"adott_{plesso}_{tipo}_{i}"):
-                                    st.session_state.show_adottato_dialog = {
+                                    st.session_state.adozione_da_storico = {
                                         "plesso": plesso,
-                                        "tipo": tipo,
-                                        "libro": lib
+                                        "titolo": lib.get("t", ""),
+                                        "editore": lib.get("e", ""),
+                                        "tipologia": tipo,
                                     }
+                                    st.session_state.pagina = "Inserimento"
                                     st.rerun()
 
                             with col_ritiro:
@@ -1186,6 +1159,40 @@ elif st.session_state.pagina == "Inserimento":
     st.subheader("Nuova Registrazione Adozione")
     if "form_id" not in st.session_state: st.session_state.form_id = 0
     
+    if "prefill_adozione" not in st.session_state:
+        st.session_state.prefill_adozione = {}
+
+    if st.session_state.get("adozione_da_storico") and not st.session_state.get("prefill_adozione"):
+        dati = st.session_state.adozione_da_storico
+        st.markdown("### 🌟 Adozione da Collane Consegnate")
+        st.write(f"**Plesso:** {dati.get('plesso','')} | **Titolo:** {dati.get('titolo','')} | **Editore:** {dati.get('editore','')}")
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                n_sez_adott = st.number_input("Numero delle sezioni", min_value=1, value=1, key=f"imp_n_{st.session_state.form_id}")
+            with c2:
+                sez_lett_adott = st.text_input("Lettera sezione (es. A, B, C)", key=f"imp_sez_{st.session_state.form_id}")
+            with c3:
+                saggio_adott = st.selectbox("Saggio consegnato?", ["-", "NO", "SI"], key=f"imp_sag_{st.session_state.form_id}")
+
+            b1, b2 = st.columns(2)
+            if b1.button("✅ CONFERMA DATI", type="primary", use_container_width=True, key=f"imp_ok_{st.session_state.form_id}"):
+                st.session_state.prefill_adozione = {
+                    "plesso": dati.get("plesso", ""),
+                    "titolo": dati.get("titolo", ""),
+                    "n_sez": n_sez_adott,
+                    "sez_lett": sez_lett_adott,
+                    "saggio": saggio_adott,
+                }
+                st.session_state.adozione_da_storico = None
+                st.session_state.form_id += 1
+                st.rerun()
+            if b2.button("⬅️ ANNULLA", use_container_width=True, key=f"imp_no_{st.session_state.form_id}"):
+                st.session_state.adozione_da_storico = None
+                st.session_state.pagina = "Storico"
+                st.rerun()
+        st.stop()
+
     prefill = st.session_state.get("prefill_adozione", {})
     
     with st.container(border=True):
