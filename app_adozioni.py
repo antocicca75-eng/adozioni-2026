@@ -1146,10 +1146,26 @@ elif st.session_state.pagina == "Ricerca":
         if f_edi: df = df[df["Editore"].isin(f_edi)]
         if f_sag != "TUTTI": df = df[df["Saggio Consegna"] == f_sag]
         if not df.empty:
-            st.dataframe(df.sort_index(ascending=False), use_container_width=True)
+            df_view = df.sort_index(ascending=False).copy()
+            st.dataframe(df_view, use_container_width=True)
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""",
                         unsafe_allow_html=True)
+            out = io.BytesIO()
+            try:
+                df_export = df_view.copy()
+                if "N° sezioni" in df_export.columns:
+                    df_export["N° sezioni"] = pd.to_numeric(df_export["N° sezioni"], errors="coerce").fillna(0).astype(int)
+                df_export.to_excel(out, index=False, sheet_name="Pivot Adozioni")
+                st.download_button(
+                    "📥 SCARICA EXCEL",
+                    data=out.getvalue(),
+                    file_name=f"pivot_adozioni_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            except Exception as ex:
+                st.error(f"⚠️ Scarico Excel non disponibile: {ex}")
 # ------------------------------------------------------------------------------
 # =========================================================
 # --- BLOCCO 12: PAGINA INSERIMENTO ADOZIONE ---
