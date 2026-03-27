@@ -954,9 +954,16 @@ elif st.session_state.pagina == "Storico":
                     # Aggiungiamo un contenitore con una classe CSS specifica per allineare a sinistra i bottoni
                     st.markdown("""
                         <style>
-                        .tipo-btn > button {
-                            justify-content: flex-start !important;
+                        /* Forziamo l'allineamento a sinistra all'interno dei bottoni tipo-btn */
+                        div[data-testid="stVerticalBlock"] div.tipo-btn button p {
                             text-align: left !important;
+                            width: 100% !important;
+                            display: flex !important;
+                            justify-content: flex-start !important;
+                        }
+                        div.tipo-btn button {
+                            justify-content: flex-start !important;
+                            padding-left: 15px !important;
                         }
                         </style>
                         """, unsafe_allow_html=True)
@@ -1710,9 +1717,16 @@ elif st.session_state.pagina == "Ritirate":
 
                     st.markdown("""
                         <style>
-                        .tipo-btn-rit > button {
-                            justify-content: flex-start !important;
+                        /* Forziamo l'allineamento a sinistra all'interno dei bottoni tipo-btn-rit */
+                        div[data-testid="stVerticalBlock"] div.tipo-btn-rit button p {
                             text-align: left !important;
+                            width: 100% !important;
+                            display: flex !important;
+                            justify-content: flex-start !important;
+                        }
+                        div.tipo-btn-rit button {
+                            justify-content: flex-start !important;
+                            padding-left: 15px !important;
                         }
                         </style>
                         """, unsafe_allow_html=True)
