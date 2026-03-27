@@ -915,22 +915,24 @@ elif st.session_state.pagina == "Storico":
 
                     per_tipo = st.session_state.storico_consegne[plesso]
                     for tipo in sorted(list(per_tipo.keys())):
-                        if st.button(f"🧨 Reset tipologia: {tipo}", key=f"reset_tipo_{plesso}_{tipo}"):
-                            if plesso in st.session_state.storico_consegne and tipo in st.session_state.storico_consegne[plesso]:
+                        with st.expander(f"📘 {tipo.upper()}", expanded=False):
+                            c_tip1, c_tip2 = st.columns(2)
+                            if c_tip1.button(f"🧨 RESET TIPOLOGIA", key=f"reset_tipo_{plesso}_{tipo}", use_container_width=True):
+                                if plesso in st.session_state.storico_consegne and tipo in st.session_state.storico_consegne[plesso]:
+                                    del st.session_state.storico_consegne[plesso][tipo]
+                                    if not st.session_state.storico_consegne[plesso]:
+                                        del st.session_state.storico_consegne[plesso]
+                                salva_storico_cloud(st.session_state.storico_consegne)
+                                st.rerun()
+                            if c_tip2.button(f"📦 RITIRA TUTTO", key=f"bulk_tipo_{plesso}_{tipo}", use_container_width=True):
+                                aggiungi_ritiri(plesso, tipo, per_tipo[tipo])
                                 del st.session_state.storico_consegne[plesso][tipo]
                                 if not st.session_state.storico_consegne[plesso]:
                                     del st.session_state.storico_consegne[plesso]
-                            salva_storico_cloud(st.session_state.storico_consegne)
-                            st.rerun()
-                        if st.button(f"📦 Ritira tutto: {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
-                            aggiungi_ritiri(plesso, tipo, per_tipo[tipo])
-                            del st.session_state.storico_consegne[plesso][tipo]
-                            if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
-                            salva_storico_cloud(st.session_state.storico_consegne);
-                            salva_ritiri_cloud(st.session_state.storico_ritiri);
-                            st.rerun()
+                                salva_storico_cloud(st.session_state.storico_consegne)
+                                salva_ritiri_cloud(st.session_state.storico_ritiri)
+                                st.rerun()
 
-                        with st.expander(f"📘 {tipo.upper()}", expanded=True):
                             lista_libri = list(per_tipo[tipo])
                             for i, lib in enumerate(lista_libri):
                                 qta_salvata = int(lib.get('q', 1))
@@ -1645,7 +1647,7 @@ elif st.session_state.pagina == "Ritirate":
                     per_tipo = st.session_state.storico_ritiri.get(plesso, {})
                     tot_plesso = 0
                     for tipo in sorted(list(per_tipo.keys())):
-                        with st.expander(f"📚 {tipo.upper()}", expanded=True):
+                        with st.expander(f"📚 {tipo.upper()}", expanded=False):
                             libri = per_tipo[tipo]
                             # Aggrega per titolo+editore
                             agg = {}
