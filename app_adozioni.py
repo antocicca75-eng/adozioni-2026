@@ -947,73 +947,81 @@ elif st.session_state.pagina == "Storico":
                         st.rerun()
 
                     per_tipo = st.session_state.storico_consegne[plesso]
+                    open_tipo_key = f"open_tipo_consegnate_{plesso}"
+                    if open_tipo_key not in st.session_state:
+                        st.session_state[open_tipo_key] = None
+
                     for tipo in ordina_tipologie(per_tipo.keys()):
-                        with st.expander(f"📘 {tipo.upper()}", expanded=False):
-                            c_tip1, c_tip2 = st.columns(2)
-                            if c_tip1.button(f"🧨 RESET TIPOLOGIA", key=f"reset_tipo_{plesso}_{tipo}", use_container_width=True):
-                                if plesso in st.session_state.storico_consegne and tipo in st.session_state.storico_consegne[plesso]:
+                        if st.button(f"📘 {tipo.upper()}", key=f"open_tipo_{plesso}_{tipo}", use_container_width=True):
+                            st.session_state[open_tipo_key] = None if st.session_state.get(open_tipo_key) == tipo else tipo
+                            st.rerun()
+
+                        if st.session_state.get(open_tipo_key) == tipo:
+                            with st.container(border=True):
+                                c_tip1, c_tip2 = st.columns(2)
+                                if c_tip1.button("🧨 RESET TIPOLOGIA", key=f"reset_tipo_{plesso}_{tipo}", use_container_width=True):
+                                    if plesso in st.session_state.storico_consegne and tipo in st.session_state.storico_consegne[plesso]:
+                                        del st.session_state.storico_consegne[plesso][tipo]
+                                        if not st.session_state.storico_consegne[plesso]:
+                                            del st.session_state.storico_consegne[plesso]
+                                    salva_storico_cloud(st.session_state.storico_consegne)
+                                    st.rerun()
+                                if c_tip2.button("📦 RITIRA TUTTO", key=f"bulk_tipo_{plesso}_{tipo}", use_container_width=True):
+                                    aggiungi_ritiri(plesso, tipo, per_tipo[tipo])
                                     del st.session_state.storico_consegne[plesso][tipo]
                                     if not st.session_state.storico_consegne[plesso]:
                                         del st.session_state.storico_consegne[plesso]
-                                salva_storico_cloud(st.session_state.storico_consegne)
-                                st.rerun()
-                            if c_tip2.button(f"📦 RITIRA TUTTO", key=f"bulk_tipo_{plesso}_{tipo}", use_container_width=True):
-                                aggiungi_ritiri(plesso, tipo, per_tipo[tipo])
-                                del st.session_state.storico_consegne[plesso][tipo]
-                                if not st.session_state.storico_consegne[plesso]:
-                                    del st.session_state.storico_consegne[plesso]
-                                salva_storico_cloud(st.session_state.storico_consegne)
-                                salva_ritiri_cloud(st.session_state.storico_ritiri)
-                                st.rerun()
+                                    salva_storico_cloud(st.session_state.storico_consegne)
+                                    salva_ritiri_cloud(st.session_state.storico_ritiri)
+                                    st.rerun()
 
-                            lista_libri = list(per_tipo[tipo])
-                            for i, lib in enumerate(lista_libri):
-                                qta_salvata = int(lib.get('q', 1))
-                                col_titolo, col_qta, col_adott, col_ritiro, col_del = st.columns([0.35, 0.10, 0.15, 0.30, 0.10])
-                                col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
-                                col_qta.write(f"Q.tà: {qta_salvata}")
-    
-                                with col_adott:
-                                    if st.button("🌟 ADOTTATO", key=f"adott_{plesso}_{tipo}_{i}"):
-                                        st.session_state.adozione_da_storico = {
-                                            "plesso": plesso,
-                                            "titolo": lib.get("t", ""),
-                                            "editore": lib.get("e", ""),
-                                            "tipologia": tipo,
-                                        }
-                                        st.session_state.pagina = "Inserimento"
-                                        st.rerun()
-    
-                                with col_ritiro:
-                                    q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata),
-                                                            value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}",
-                                                            label_visibility="collapsed")
-    
-                                    # --- MODIFICA RICHIESTA: Sostituito tasto "OK" con "AGGIORNA CARICO" ---
-                                    if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
-                                        rit_item = lib.copy()
-                                        rit_item['q'] = q_rit
-                                        aggiungi_ritiri(plesso, tipo, [rit_item])
-    
-                                        lib['q'] = qta_salvata - q_rit
-                                        if lib['q'] <= 0: per_tipo[tipo].pop(i)
-    
-                                        if not st.session_state.storico_consegne[plesso][tipo]: del \
-                                            st.session_state.storico_consegne[plesso][tipo]
-                                        if not st.session_state.storico_consegne[plesso]: del \
-                                            st.session_state.storico_consegne[plesso]
-    
+                                lista_libri = list(per_tipo[tipo])
+                                for i, lib in enumerate(lista_libri):
+                                    qta_salvata = int(lib.get('q', 1))
+                                    col_titolo, col_qta, col_adott, col_ritiro, col_del = st.columns([0.35, 0.10, 0.15, 0.30, 0.10])
+                                    col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
+                                    col_qta.write(f"Q.tà: {qta_salvata}")
+
+                                    with col_adott:
+                                        if st.button("🌟 ADOTTATO", key=f"adott_{plesso}_{tipo}_{i}"):
+                                            st.session_state.adozione_da_storico = {
+                                                "plesso": plesso,
+                                                "titolo": lib.get("t", ""),
+                                                "editore": lib.get("e", ""),
+                                                "tipologia": tipo,
+                                            }
+                                            st.session_state.pagina = "Inserimento"
+                                            st.rerun()
+
+                                    with col_ritiro:
+                                        q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata),
+                                                                value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}",
+                                                                label_visibility="collapsed")
+
+                                        if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
+                                            rit_item = lib.copy()
+                                            rit_item['q'] = q_rit
+                                            aggiungi_ritiri(plesso, tipo, [rit_item])
+
+                                            lib['q'] = qta_salvata - q_rit
+                                            if lib['q'] <= 0: per_tipo[tipo].pop(i)
+
+                                            if not st.session_state.storico_consegne[plesso][tipo]: del \
+                                                st.session_state.storico_consegne[plesso][tipo]
+                                            if not st.session_state.storico_consegne[plesso]: del \
+                                                st.session_state.storico_consegne[plesso]
+
+                                            salva_storico_cloud(st.session_state.storico_consegne);
+                                            salva_ritiri_cloud(st.session_state.storico_ritiri);
+                                            st.rerun()
+
+                                    if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
+                                        aggiungi_ritiri(plesso, tipo, [lib.copy()])
+                                        per_tipo[tipo].pop(i)
+                                        if not per_tipo[tipo]: del per_tipo[tipo]
                                         salva_storico_cloud(st.session_state.storico_consegne);
                                         salva_ritiri_cloud(st.session_state.storico_ritiri);
                                         st.rerun()
-    
-                                if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
-                                    aggiungi_ritiri(plesso, tipo, [lib.copy()])
-                                    per_tipo[tipo].pop(i)
-                                    if not per_tipo[tipo]: del per_tipo[tipo]
-                                    salva_storico_cloud(st.session_state.storico_consegne);
-                                    salva_ritiri_cloud(st.session_state.storico_ritiri);
-                                    st.rerun()
 
     if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
 
@@ -1679,19 +1687,27 @@ elif st.session_state.pagina == "Ritirate":
                 with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=True):
                     per_tipo = st.session_state.storico_ritiri.get(plesso, {})
                     tot_plesso = 0
+                    open_tipo_key = f"open_tipo_ritirate_{plesso}"
+                    if open_tipo_key not in st.session_state:
+                        st.session_state[open_tipo_key] = None
+
                     for tipo in ordina_tipologie(per_tipo.keys()):
-                        with st.expander(f"📚 {tipo.upper()}", expanded=False):
-                            libri = per_tipo[tipo]
-                            # Aggrega per titolo+editore
-                            agg = {}
-                            for lib in libri:
-                                key = (lib.get('t',''), lib.get('e',''))
-                                agg[key] = agg.get(key, 0) + int(lib.get('q', 0))
-                            df_tip = pd.DataFrame([{"Titolo": k[0], "Editore": k[1], "Quantità": q} for k, q in agg.items()])
-                            if not df_tip.empty:
-                                df_tip = df_tip.sort_values(by=["Titolo", "Editore"])
-                                st.dataframe(df_tip, use_container_width=True, hide_index=True)
-                                tot_tipo = int(df_tip["Quantità"].sum())
-                                tot_plesso += tot_tipo
-                                st.markdown(f"<div class='totale-box'>Totale tipologia: <b>{tot_tipo}</b></div>", unsafe_allow_html=True)
+                        if st.button(f"📚 {tipo.upper()}", key=f"open_tipo_rit_{plesso}_{tipo}", use_container_width=True):
+                            st.session_state[open_tipo_key] = None if st.session_state.get(open_tipo_key) == tipo else tipo
+                            st.rerun()
+
+                        if st.session_state.get(open_tipo_key) == tipo:
+                            with st.container(border=True):
+                                libri = per_tipo[tipo]
+                                agg = {}
+                                for lib in libri:
+                                    key = (lib.get('t',''), lib.get('e',''))
+                                    agg[key] = agg.get(key, 0) + int(lib.get('q', 0))
+                                df_tip = pd.DataFrame([{"Titolo": k[0], "Editore": k[1], "Quantità": q} for k, q in agg.items()])
+                                if not df_tip.empty:
+                                    df_tip = df_tip.sort_values(by=["Titolo", "Editore"])
+                                    st.dataframe(df_tip, use_container_width=True, hide_index=True)
+                                    tot_tipo = int(df_tip["Quantità"].sum())
+                                    tot_plesso += tot_tipo
+                                    st.markdown(f"<div class='totale-box'>Totale tipologia: <b>{tot_tipo}</b></div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='totale-box'>Totale ritiri plesso: <b>{tot_plesso}</b></div>", unsafe_allow_html=True)
