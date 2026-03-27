@@ -533,6 +533,39 @@ def reset_ricerca():
     st.session_state.fe = []
     st.session_state.fsag = "TUTTI"
 
+def ordina_tipologie(tipologie):
+    ordine = [
+        "LETTURE CLASSE PRIMA",
+        "LETTURE CLASSE QUARTA",
+        "SUSSIDIARI DISCIPLINE",
+        "INGLESE CLASSE PRIMA",
+        "INGLESE CLASSE QUARTA",
+        "RELIGIONE",
+        "QUADERNI VACANZE CLASSE PRIMA",
+        "QUADERNI VACANZE CLASSE SECONDA",
+        "QUADERNI VACANZE CLASSE TERZA",
+        "QUADERNI VACANZE CLASSE QUARTA",
+        "QUADERNI VACANZE CLASSE QUINTA",
+        "QUADERNI VACANZE INGLESE",
+    ]
+
+    def _n(v):
+        return str(v).strip().upper()
+
+    mappa = {}
+    for t in (tipologie or []):
+        mappa[_n(t)] = t
+
+    scelti = []
+    usati = set()
+    for o in ordine:
+        if o in mappa:
+            scelti.append(mappa[o])
+            usati.add(o)
+
+    rimanenti = [mappa[k] for k in sorted([k for k in mappa.keys() if k not in usati])]
+    return scelti + rimanenti
+
 
 # ------------------------------------------------------------------------------
 
@@ -914,7 +947,7 @@ elif st.session_state.pagina == "Storico":
                         st.rerun()
 
                     per_tipo = st.session_state.storico_consegne[plesso]
-                    for tipo in sorted(list(per_tipo.keys())):
+                    for tipo in ordina_tipologie(per_tipo.keys()):
                         with st.expander(f"📘 {tipo.upper()}", expanded=False):
                             c_tip1, c_tip2 = st.columns(2)
                             if c_tip1.button(f"🧨 RESET TIPOLOGIA", key=f"reset_tipo_{plesso}_{tipo}", use_container_width=True):
@@ -1646,7 +1679,7 @@ elif st.session_state.pagina == "Ritirate":
                 with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=True):
                     per_tipo = st.session_state.storico_ritiri.get(plesso, {})
                     tot_plesso = 0
-                    for tipo in sorted(list(per_tipo.keys())):
+                    for tipo in ordina_tipologie(per_tipo.keys()):
                         with st.expander(f"📚 {tipo.upper()}", expanded=False):
                             libri = per_tipo[tipo]
                             # Aggrega per titolo+editore
