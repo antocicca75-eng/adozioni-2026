@@ -951,19 +951,24 @@ elif st.session_state.pagina == "Storico":
                     if open_tipo_key not in st.session_state:
                         st.session_state[open_tipo_key] = None
 
-                    # Aggiungiamo un contenitore con una classe CSS specifica per allineare a sinistra i bottoni
+                    # Forziamo l'allineamento a sinistra del contenuto del bottone
                     st.markdown("""
                         <style>
-                        /* Forziamo l'allineamento a sinistra all'interno dei bottoni tipo-btn */
-                        div[data-testid="stVerticalBlock"] div.tipo-btn button p {
+                        div[data-testid="stButton"] > button {
+                            display: flex !important;
+                            justify-content: flex-start !important;
                             text-align: left !important;
+                            padding-left: 15px !important;
+                        }
+                        div[data-testid="stButton"] > button > div {
                             width: 100% !important;
                             display: flex !important;
                             justify-content: flex-start !important;
                         }
-                        div.tipo-btn button {
-                            justify-content: flex-start !important;
-                            padding-left: 15px !important;
+                        div[data-testid="stButton"] > button > div > p {
+                            width: 100% !important;
+                            text-align: left !important;
+                            margin: 0 !important;
                         }
                         </style>
                         """, unsafe_allow_html=True)
@@ -971,14 +976,10 @@ elif st.session_state.pagina == "Storico":
                     for tipo in ordina_tipologie(per_tipo.keys()):
                         is_open = st.session_state.get(open_tipo_key) == tipo
                         freccia = "🔽" if is_open else "▶️"
-                        
-                        # Inseriamo il bottone in un div con la classe tipo-btn per forzare l'allineamento a sinistra
-                        with st.container():
-                            st.markdown('<div class="tipo-btn">', unsafe_allow_html=True)
-                            if st.button(f"{freccia} 📘 {tipo.upper()}", key=f"open_tipo_{plesso}_{tipo}", use_container_width=True):
-                                st.session_state[open_tipo_key] = None if is_open else tipo
-                                st.rerun()
-                            st.markdown('</div>', unsafe_allow_html=True)
+
+                        if st.button(f"{freccia} 📘 {tipo.upper()}", key=f"open_tipo_{plesso}_{tipo}", use_container_width=True):
+                            st.session_state[open_tipo_key] = None if is_open else tipo
+                            st.rerun()
 
                         if is_open:
                             with st.container(border=True):
@@ -1717,16 +1718,21 @@ elif st.session_state.pagina == "Ritirate":
 
                     st.markdown("""
                         <style>
-                        /* Forziamo l'allineamento a sinistra all'interno dei bottoni tipo-btn-rit */
-                        div[data-testid="stVerticalBlock"] div.tipo-btn-rit button p {
+                        div[data-testid="stButton"] > button {
+                            display: flex !important;
+                            justify-content: flex-start !important;
                             text-align: left !important;
+                            padding-left: 15px !important;
+                        }
+                        div[data-testid="stButton"] > button > div {
                             width: 100% !important;
                             display: flex !important;
                             justify-content: flex-start !important;
                         }
-                        div.tipo-btn-rit button {
-                            justify-content: flex-start !important;
-                            padding-left: 15px !important;
+                        div[data-testid="stButton"] > button > div > p {
+                            width: 100% !important;
+                            text-align: left !important;
+                            margin: 0 !important;
                         }
                         </style>
                         """, unsafe_allow_html=True)
@@ -1734,13 +1740,10 @@ elif st.session_state.pagina == "Ritirate":
                     for tipo in ordina_tipologie(per_tipo.keys()):
                         is_open = st.session_state.get(open_tipo_key) == tipo
                         freccia = "🔽" if is_open else "▶️"
-                        
-                        with st.container():
-                            st.markdown('<div class="tipo-btn-rit">', unsafe_allow_html=True)
-                            if st.button(f"{freccia} 📚 {tipo.upper()}", key=f"open_tipo_rit_{plesso}_{tipo}", use_container_width=True):
-                                st.session_state[open_tipo_key] = None if is_open else tipo
-                                st.rerun()
-                            st.markdown('</div>', unsafe_allow_html=True)
+
+                        if st.button(f"{freccia} 📚 {tipo.upper()}", key=f"open_tipo_rit_{plesso}_{tipo}", use_container_width=True):
+                            st.session_state[open_tipo_key] = None if is_open else tipo
+                            st.rerun()
 
                         if is_open:
                             with st.container(border=True):
