@@ -1148,8 +1148,16 @@ elif st.session_state.pagina == "Ricerca":
             df_view = df.sort_index(ascending=False).copy()
             st.dataframe(df_view, use_container_width=True)
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
-            st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""",
-                        unsafe_allow_html=True)
+            
+            tot_alunni = 0
+            if "N° Alunni" in df.columns:
+                tot_alunni = pd.to_numeric(df["N° Alunni"], errors='coerce').fillna(0).sum()
+                
+            st.markdown(f"""<div class="totale-box">
+                🔢 Totale Classi: <b>{int(somma)}</b><br>
+                👨‍🎓 Totale Alunni: <b>{int(tot_alunni)}</b>
+                </div>""", unsafe_allow_html=True)
+            
             out = io.BytesIO()
             try:
                 df_export = df_view.copy()
@@ -1240,14 +1248,19 @@ elif st.session_state.pagina == "Inserimento":
         with c3:
             default_sez_lett = prefill.get("sez_lett", "")
             sez_lett = st.text_input("🔡 Lettera Sezione", value=default_sez_lett, key=f"sez_{st.session_state.form_id}")
+            
+            default_n_alunni = prefill.get("n_alunni", 0)
+            n_alunni = st.number_input("👨‍🎓 N° Alunni (opzionale)", min_value=0, value=default_n_alunni, key=f"alunni_{st.session_state.form_id}")
+            
         if st.button("💾 SALVA ADOZIONE", use_container_width=True, type="primary"):
             if titolo_scelto and plesso and saggio != "-":
                 info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
+                n_alunni_val = n_alunni if n_alunni > 0 else ""
                 nuova_riga = pd.DataFrame([{
                     "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
                     "Plesso": plesso, "Materia": info.iloc[0, 1], "Titolo": titolo_scelto,
                     "Editore": info.iloc[0, 2], "Agenzia": info.iloc[0, 3], "N° sezioni": n_sez,
-                    "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "Note": note
+                    "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "N° Alunni": n_alunni_val, "Note": note
                 }])
                 df_attuale = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame()
                 df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
@@ -1337,6 +1350,14 @@ elif st.session_state.pagina == "Modifica":
                             idx_saggio = ["-", "NO", "SI"].index(attuale_sag) if attuale_sag in ["-", "NO", "SI"] else 0
                             nuovo_saggio = st.selectbox("Saggio consegnato", ["-", "NO", "SI"], index=idx_saggio,
                                                         key=f"msag_{i}")
+                                                        
+                            val_alunni = 0
+                            if "N° Alunni" in df_mod.columns and df_mod.at[i, 'N° Alunni']:
+                                try:
+                                    val_alunni = int(float(df_mod.at[i, 'N° Alunni']))
+                                except ValueError:
+                                    pass
+                            nuovo_n_alunni = st.number_input("👨‍🎓 N° Alunni", min_value=0, value=val_alunni, key=f"malunni_{i}")
 
                         b1, b2 = st.columns(2)
                         with b1:
@@ -1354,6 +1375,7 @@ elif st.session_state.pagina == "Modifica":
                                     df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
                                     df_full.at[i, 'Saggio Consegna'] = nuovo_saggio
                                     df_full.at[i, 'Note'] = nuove_note
+                                    df_full.at[i, 'N° Alunni'] = nuovo_n_alunni if nuovo_n_alunni > 0 else ""
 
                                     df_full.to_csv(DB_FILE, index=False)
                                     backup_su_google_sheets(df_full)
