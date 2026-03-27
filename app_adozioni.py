@@ -1190,13 +1190,15 @@ elif st.session_state.pagina == "Inserimento":
         st.markdown("### 🌟 Adozione da Collane Consegnate")
         st.write(f"**Plesso:** {dati.get('plesso','')} | **Titolo:** {dati.get('titolo','')} | **Editore:** {dati.get('editore','')}")
         with st.container(border=True):
-            c1, c2, c3 = st.columns(3)
+            c1, c2, c3, c4 = st.columns(4)
             with c1:
                 n_sez_adott = st.number_input("Numero delle sezioni", min_value=1, value=1, key=f"imp_n_{st.session_state.form_id}")
             with c2:
                 sez_lett_adott = st.text_input("Lettera sezione (es. A, B, C)", key=f"imp_sez_{st.session_state.form_id}")
             with c3:
                 saggio_adott = st.selectbox("Saggio consegnato?", ["-", "NO", "SI"], key=f"imp_sag_{st.session_state.form_id}")
+            with c4:
+                n_alunni_adott = st.number_input("👨‍🎓 N° Alunni (opzionale)", min_value=0, value=0, key=f"imp_alunni_{st.session_state.form_id}")
 
             b1, b2 = st.columns(2)
             if b1.button("✅ CONFERMA DATI", type="primary", use_container_width=True, key=f"imp_ok_{st.session_state.form_id}"):
@@ -1206,6 +1208,7 @@ elif st.session_state.pagina == "Inserimento":
                     "n_sez": n_sez_adott,
                     "sez_lett": sez_lett_adott,
                     "saggio": saggio_adott,
+                    "n_alunni": n_alunni_adott if n_alunni_adott > 0 else 0,
                 }
                 st.session_state.adozione_da_storico = None
                 st.session_state.form_id += 1
