@@ -951,12 +951,29 @@ elif st.session_state.pagina == "Storico":
                     if open_tipo_key not in st.session_state:
                         st.session_state[open_tipo_key] = None
 
-                    for tipo in ordina_tipologie(per_tipo.keys()):
-                        if st.button(f"📘 {tipo.upper()}", key=f"open_tipo_{plesso}_{tipo}", use_container_width=True):
-                            st.session_state[open_tipo_key] = None if st.session_state.get(open_tipo_key) == tipo else tipo
-                            st.rerun()
+                    # Aggiungiamo un contenitore con una classe CSS specifica per allineare a sinistra i bottoni
+                    st.markdown("""
+                        <style>
+                        .tipo-btn > button {
+                            justify-content: flex-start !important;
+                            text-align: left !important;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
 
-                        if st.session_state.get(open_tipo_key) == tipo:
+                    for tipo in ordina_tipologie(per_tipo.keys()):
+                        is_open = st.session_state.get(open_tipo_key) == tipo
+                        freccia = "🔽" if is_open else "▶️"
+                        
+                        # Inseriamo il bottone in un div con la classe tipo-btn per forzare l'allineamento a sinistra
+                        with st.container():
+                            st.markdown('<div class="tipo-btn">', unsafe_allow_html=True)
+                            if st.button(f"{freccia} 📘 {tipo.upper()}", key=f"open_tipo_{plesso}_{tipo}", use_container_width=True):
+                                st.session_state[open_tipo_key] = None if is_open else tipo
+                                st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+
+                        if is_open:
                             with st.container(border=True):
                                 c_tip1, c_tip2 = st.columns(2)
                                 if c_tip1.button("🧨 RESET TIPOLOGIA", key=f"reset_tipo_{plesso}_{tipo}", use_container_width=True):
@@ -1691,12 +1708,27 @@ elif st.session_state.pagina == "Ritirate":
                     if open_tipo_key not in st.session_state:
                         st.session_state[open_tipo_key] = None
 
-                    for tipo in ordina_tipologie(per_tipo.keys()):
-                        if st.button(f"📚 {tipo.upper()}", key=f"open_tipo_rit_{plesso}_{tipo}", use_container_width=True):
-                            st.session_state[open_tipo_key] = None if st.session_state.get(open_tipo_key) == tipo else tipo
-                            st.rerun()
+                    st.markdown("""
+                        <style>
+                        .tipo-btn-rit > button {
+                            justify-content: flex-start !important;
+                            text-align: left !important;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
 
-                        if st.session_state.get(open_tipo_key) == tipo:
+                    for tipo in ordina_tipologie(per_tipo.keys()):
+                        is_open = st.session_state.get(open_tipo_key) == tipo
+                        freccia = "🔽" if is_open else "▶️"
+                        
+                        with st.container():
+                            st.markdown('<div class="tipo-btn-rit">', unsafe_allow_html=True)
+                            if st.button(f"{freccia} 📚 {tipo.upper()}", key=f"open_tipo_rit_{plesso}_{tipo}", use_container_width=True):
+                                st.session_state[open_tipo_key] = None if is_open else tipo
+                                st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+
+                        if is_open:
                             with st.container(border=True):
                                 libri = per_tipo[tipo]
                                 agg = {}
