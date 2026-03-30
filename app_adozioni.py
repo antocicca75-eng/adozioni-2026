@@ -890,6 +890,7 @@ if st.session_state.pagina == "Consegne":
             if cat_scelta == "SELEZIONE MULTIPLA" and not tipologie_scelte:
                 st.warning("Seleziona almeno una tipologia.")
             else:
+                sez_default = str(classe_man or "").strip().upper()
                 for plesso in plessi_scelti:
                     if plesso not in st.session_state.storico_consegne:
                         st.session_state.storico_consegne[plesso] = {}
@@ -901,6 +902,8 @@ if st.session_state.pagina == "Consegne":
                             for item in v:
                                 nuovo = item.copy()
                                 nuovo['q'] = 1
+                                if sez_default and not str(nuovo.get('sez', '')).strip():
+                                    nuovo['sez'] = sez_default
                                 lista_clean.append(nuovo)
                             esistenti = st.session_state.storico_consegne[plesso].get(k, [])
                             st.session_state.storico_consegne[plesso][k] = merge_consegne_lists(esistenti, lista_clean)
@@ -911,12 +914,18 @@ if st.session_state.pagina == "Consegne":
                             for item in v:
                                 nuovo = item.copy()
                                 nuovo['q'] = 1
+                                if sez_default and not str(nuovo.get('sez', '')).strip():
+                                    nuovo['sez'] = sez_default
                                 lista_clean.append(nuovo)
                             esistenti = st.session_state.storico_consegne[plesso].get(k, [])
                             st.session_state.storico_consegne[plesso][k] = merge_consegne_lists(esistenti, lista_clean)
 
                     else:
                         lista_con_quantita_esatte = [item.copy() for item in st.session_state.lista_consegne_attuale]
+                        if sez_default:
+                            for it in lista_con_quantita_esatte:
+                                if not str(it.get('sez', '')).strip():
+                                    it['sez'] = sez_default
                         esistenti = st.session_state.storico_consegne[plesso].get(cat_scelta, [])
                         st.session_state.storico_consegne[plesso][cat_scelta] = merge_consegne_lists(
                             esistenti, lista_con_quantita_esatte
@@ -1044,80 +1053,124 @@ elif st.session_state.pagina == "Storico":
                         </style>
                         """, unsafe_allow_html=True)
 
+                    def _norm_sez(v):
+                        s = str(v or "").strip().upper()
+                        return s if s else "-"
+
                     for tipo in ordina_tipologie(per_tipo.keys()):
-                        is_open = st.session_state.get(open_tipo_key) == tipo
-                        freccia = "🔽" if is_open else "▶️"
+                        libri_tipo = list(per_tipo.get(tipo, []) or [])
+                        gruppi = {}
+                        for lib in libri_tipo:
+                            sez_g = _norm_sez(lib.get("sez"))
+                            gruppi.setdefault(sez_g, []).append(lib)
 
-                        if st.button(f"{freccia} 📘 {tipo.upper()}", key=f"open_tipo_{plesso}_{tipo}", use_container_width=True):
-                            st.session_state[open_tipo_key] = None if is_open else tipo
-                            st.rerun()
+                        for sez_g in sorted(list(gruppi.keys()), key=lambda x: (x == "-", x)):
+                            gruppo_id = f"{tipo}||{sez_g}"
+                            is_open = st.session_state.get(open_tipo_key) == gruppo_id
+                            freccia = "🔽" if is_open else "▶️"
+                            label_sez = f" | SEZ. {sez_g}" if sez_g != "-" else ""
 
-                        if is_open:
-                            with st.container(border=True):
-                                c_tip1, c_tip2 = st.columns(2)
-                                if c_tip1.button("🧨 RESET TIPOLOGIA", key=f"reset_tipo_{plesso}_{tipo}", use_container_width=True):
-                                    if plesso in st.session_state.storico_consegne and tipo in st.session_state.storico_consegne[plesso]:
-                                        del st.session_state.storico_consegne[plesso][tipo]
-                                        if not st.session_state.storico_consegne[plesso]:
+                            if st.button(
+                                f"{freccia} 📘 {tipo.upper()}{label_sez}",
+                                key=f"open_tipo_{plesso}_{tipo}_{sez_g}",
+                                use_container_width=True,
+                            ):
+                                st.session_state[open_tipo_key] = None if is_open else gruppo_id
+                                st.rerun()
+
+                            if is_open:
+                                with st.container(border=True):
+                                    c_tip1, c_tip2 = st.columns(2)
+                                    if c_tip1.button(
+                                        "🧨 RESET",
+                                        key=f"reset_tipo_{plesso}_{tipo}_{sez_g}",
+                                        use_container_width=True,
+                                    ):
+                                        per_tipo[tipo] = [x for x in per_tipo.get(tipo, []) if _norm_sez(x.get("sez")) != sez_g]
+                                        if not per_tipo.get(tipo):
+                                            del per_tipo[tipo]
+                                        if not st.session_state.storico_consegne.get(plesso):
                                             del st.session_state.storico_consegne[plesso]
-                                    salva_storico_cloud(st.session_state.storico_consegne)
-                                    st.rerun()
-                                if c_tip2.button("📦 RITIRA TUTTO", key=f"bulk_tipo_{plesso}_{tipo}", use_container_width=True):
-                                    aggiungi_ritiri(plesso, tipo, per_tipo[tipo])
-                                    del st.session_state.storico_consegne[plesso][tipo]
-                                    if not st.session_state.storico_consegne[plesso]:
-                                        del st.session_state.storico_consegne[plesso]
-                                    salva_storico_cloud(st.session_state.storico_consegne)
-                                    salva_ritiri_cloud(st.session_state.storico_ritiri)
-                                    st.rerun()
-
-                                lista_libri = list(per_tipo[tipo])
-                                for i, lib in enumerate(lista_libri):
-                                    qta_salvata = int(lib.get('q', 1))
-                                    col_titolo, col_qta, col_adott, col_ritiro, col_del = st.columns([0.35, 0.10, 0.15, 0.30, 0.10])
-                                    col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
-                                    col_qta.write(f"Q.tà: {qta_salvata}")
-
-                                    with col_adott:
-                                        if st.button("🌟 ADOTTATO", key=f"adott_{plesso}_{tipo}_{i}"):
-                                            st.session_state.adozione_da_storico = {
-                                                "plesso": plesso,
-                                                "titolo": lib.get("t", ""),
-                                                "editore": lib.get("e", ""),
-                                                "tipologia": tipo,
-                                            }
-                                            st.session_state.pagina = "Inserimento"
-                                            st.rerun()
-
-                                    with col_ritiro:
-                                        q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata),
-                                                                value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}",
-                                                                label_visibility="collapsed")
-
-                                        if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
-                                            rit_item = lib.copy()
-                                            rit_item['q'] = q_rit
-                                            aggiungi_ritiri(plesso, tipo, [rit_item])
-
-                                            lib['q'] = qta_salvata - q_rit
-                                            if lib['q'] <= 0: per_tipo[tipo].pop(i)
-
-                                            if not st.session_state.storico_consegne[plesso][tipo]: del \
-                                                st.session_state.storico_consegne[plesso][tipo]
-                                            if not st.session_state.storico_consegne[plesso]: del \
-                                                st.session_state.storico_consegne[plesso]
-
-                                            salva_storico_cloud(st.session_state.storico_consegne);
-                                            salva_ritiri_cloud(st.session_state.storico_ritiri);
-                                            st.rerun()
-
-                                    if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
-                                        aggiungi_ritiri(plesso, tipo, [lib.copy()])
-                                        per_tipo[tipo].pop(i)
-                                        if not per_tipo[tipo]: del per_tipo[tipo]
-                                        salva_storico_cloud(st.session_state.storico_consegne);
-                                        salva_ritiri_cloud(st.session_state.storico_ritiri);
+                                        salva_storico_cloud(st.session_state.storico_consegne)
                                         st.rerun()
+
+                                    if c_tip2.button(
+                                        "📦 RITIRA TUTTO",
+                                        key=f"bulk_tipo_{plesso}_{tipo}_{sez_g}",
+                                        use_container_width=True,
+                                    ):
+                                        aggiungi_ritiri(plesso, tipo, [x.copy() for x in gruppi.get(sez_g, [])])
+                                        per_tipo[tipo] = [x for x in per_tipo.get(tipo, []) if _norm_sez(x.get("sez")) != sez_g]
+                                        if not per_tipo.get(tipo):
+                                            del per_tipo[tipo]
+                                        if not st.session_state.storico_consegne.get(plesso):
+                                            del st.session_state.storico_consegne[plesso]
+                                        salva_storico_cloud(st.session_state.storico_consegne)
+                                        salva_ritiri_cloud(st.session_state.storico_ritiri)
+                                        st.rerun()
+
+                                    lista_libri = list(gruppi.get(sez_g, []))
+                                    for i, lib in enumerate(lista_libri):
+                                        qta_salvata = int(lib.get('q', 1))
+                                        col_titolo, col_qta, col_adott, col_ritiro, col_del = st.columns([0.35, 0.10, 0.15, 0.30, 0.10])
+                                        col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
+                                        col_qta.write(f"Q.tà: {qta_salvata}")
+
+                                        with col_adott:
+                                            if st.button("🌟 ADOTTATO", key=f"adott_{plesso}_{tipo}_{sez_g}_{i}"):
+                                                st.session_state.adozione_da_storico = {
+                                                    "plesso": plesso,
+                                                    "titolo": lib.get("t", ""),
+                                                    "editore": lib.get("e", ""),
+                                                    "tipologia": tipo,
+                                                }
+                                                st.session_state.pagina = "Inserimento"
+                                                st.rerun()
+
+                                        with col_ritiro:
+                                            q_rit = st.number_input(
+                                                "Ritira",
+                                                min_value=1,
+                                                max_value=max(1, qta_salvata),
+                                                value=max(1, qta_salvata),
+                                                key=f"qrit_{plesso}_{tipo}_{sez_g}_{i}",
+                                                label_visibility="collapsed",
+                                            )
+
+                                            if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{sez_g}_{i}"):
+                                                rit_item = lib.copy()
+                                                rit_item['q'] = q_rit
+                                                aggiungi_ritiri(plesso, tipo, [rit_item])
+
+                                                lib['q'] = qta_salvata - q_rit
+                                                if lib['q'] <= 0:
+                                                    for idx_rm, es in enumerate(per_tipo.get(tipo, [])):
+                                                        if es is lib:
+                                                            per_tipo[tipo].pop(idx_rm)
+                                                            break
+
+                                                if not st.session_state.storico_consegne[plesso].get(tipo):
+                                                    del st.session_state.storico_consegne[plesso][tipo]
+                                                if not st.session_state.storico_consegne.get(plesso):
+                                                    del st.session_state.storico_consegne[plesso]
+
+                                                salva_storico_cloud(st.session_state.storico_consegne)
+                                                salva_ritiri_cloud(st.session_state.storico_ritiri)
+                                                st.rerun()
+
+                                        if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{sez_g}_{i}"):
+                                            aggiungi_ritiri(plesso, tipo, [lib.copy()])
+                                            for idx_rm, es in enumerate(per_tipo.get(tipo, [])):
+                                                if es is lib:
+                                                    per_tipo[tipo].pop(idx_rm)
+                                                    break
+                                            if not per_tipo.get(tipo):
+                                                del per_tipo[tipo]
+                                            if not st.session_state.storico_consegne.get(plesso):
+                                                del st.session_state.storico_consegne[plesso]
+                                            salva_storico_cloud(st.session_state.storico_consegne)
+                                            salva_ritiri_cloud(st.session_state.storico_ritiri)
+                                            st.rerun()
 
     if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
 
