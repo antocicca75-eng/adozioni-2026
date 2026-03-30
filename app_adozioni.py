@@ -924,6 +924,76 @@ elif st.session_state.pagina == "Storico":
         st.info("Nessuna consegna registrata.")
     else:
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
+
+        tipologie_obbligatorie = [
+            "LETTURE CLASSE PRIMA",
+            "LETTURE CLASSE QUARTA",
+            "SUSSIDIARI DISCIPLINE",
+            "INGLESE CLASSE PRIMA",
+            "INGLESE CLASSE QUARTA",
+            "RELIGIONE",
+            "QUADERNI VACANZE CLASSE PRIMA",
+            "QUADERNI VACANZE CLASSE SECONDA",
+            "QUADERNI VACANZE CLASSE TERZA",
+            "QUADERNI VACANZE CLASSE QUARTA",
+            "QUADERNI VACANZE CLASSE QUINTA",
+        ]
+
+        def _norm_tip(v):
+            return str(v).strip().upper()
+
+        with st.expander("🧾 Verifica tipologie obbligatorie", expanded=False):
+            plessi_check = st.multiselect(
+                "🏫 Plessi da controllare",
+                elenco_plessi_storico,
+                default=elenco_plessi_storico,
+                key="chk_plessi_obbl",
+            )
+            mostra_completi = st.checkbox("Mostra anche plessi completi", value=False, key="chk_show_ok")
+
+            righe = []
+            for plesso in plessi_check:
+                presenti = {_norm_tip(k) for k in (st.session_state.storico_consegne.get(plesso, {}) or {}).keys()}
+                mancanti = [t for t in tipologie_obbligatorie if _norm_tip(t) not in presenti]
+                if mostra_completi or mancanti:
+                    righe.append({
+                        "Plesso": plesso,
+                        "N Mancanti": len(mancanti),
+                        "Tipologie Mancanti": ", ".join(mancanti),
+                    })
+
+            df_chk = pd.DataFrame(righe)
+            if df_chk.empty:
+                st.success("Tutte le scuole selezionate risultano complete.")
+            else:
+                df_chk = df_chk.sort_values(by=["N Mancanti", "Plesso"], ascending=[False, True])
+                st.dataframe(df_chk, use_container_width=True, hide_index=True)
+                try:
+                    buf = io.BytesIO()
+                    engine = None
+                    try:
+                        import openpyxl
+                        engine = "openpyxl"
+                    except Exception:
+                        try:
+                            import xlsxwriter
+                            engine = "xlsxwriter"
+                        except Exception:
+                            engine = None
+                    if engine is None:
+                        raise RuntimeError("Nessun engine Excel disponibile")
+                    with pd.ExcelWriter(buf, engine=engine) as writer:
+                        df_chk.to_excel(writer, index=False, sheet_name="Controllo")
+                    st.download_button(
+                        "📤 ESPORTA EXCEL CONTROLLO",
+                        data=buf.getvalue(),
+                        file_name=f"controllo_tipologie_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
+                except Exception as ex:
+                    st.warning(f"Export Excel non disponibile: {ex}")
+
         scuole_selezionate = st.multiselect("🔍 Seleziona Plesso/i:", elenco_plessi_storico, key="sel_plessi_storico")
         
         if not scuole_selezionate:
