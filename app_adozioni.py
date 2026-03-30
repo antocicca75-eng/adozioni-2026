@@ -567,6 +567,26 @@ def ordina_tipologie(tipologie):
     return scelti + rimanenti
 
 
+TIPOLOGIE_OBBLIGATORIE = [
+    "LETTURE CLASSE PRIMA",
+    "LETTURE CLASSE QUARTA",
+    "SUSSIDIARI DISCIPLINE",
+    "INGLESE CLASSE PRIMA",
+    "INGLESE CLASSE QUARTA",
+    "RELIGIONE",
+    "QUADERNI VACANZE CLASSE PRIMA",
+    "QUADERNI VACANZE CLASSE SECONDA",
+    "QUADERNI VACANZE CLASSE TERZA",
+    "QUADERNI VACANZE CLASSE QUARTA",
+    "QUADERNI VACANZE CLASSE QUINTA",
+]
+
+
+def tipologie_mancanti_consegna(st_consegne, plesso):
+    presenti = {str(k).strip().upper() for k in (st_consegne.get(plesso, {}) or {}).keys()}
+    return [t for t in TIPOLOGIE_OBBLIGATORIE if str(t).strip().upper() not in presenti]
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -924,24 +944,6 @@ elif st.session_state.pagina == "Storico":
         st.info("Nessuna consegna registrata.")
     else:
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
-
-        tipologie_obbligatorie = [
-            "LETTURE CLASSE PRIMA",
-            "LETTURE CLASSE QUARTA",
-            "SUSSIDIARI DISCIPLINE",
-            "INGLESE CLASSE PRIMA",
-            "INGLESE CLASSE QUARTA",
-            "RELIGIONE",
-            "QUADERNI VACANZE CLASSE PRIMA",
-            "QUADERNI VACANZE CLASSE SECONDA",
-            "QUADERNI VACANZE CLASSE TERZA",
-            "QUADERNI VACANZE CLASSE QUARTA",
-            "QUADERNI VACANZE CLASSE QUINTA",
-        ]
-
-        def _norm_tip(v):
-            return str(v).strip().upper()
-
         with st.expander("🧾 Verifica tipologie obbligatorie", expanded=False):
             plessi_check = st.multiselect(
                 "🏫 Plessi da controllare",
@@ -953,8 +955,7 @@ elif st.session_state.pagina == "Storico":
 
             righe = []
             for plesso in plessi_check:
-                presenti = {_norm_tip(k) for k in (st.session_state.storico_consegne.get(plesso, {}) or {}).keys()}
-                mancanti = [t for t in tipologie_obbligatorie if _norm_tip(t) not in presenti]
+                mancanti = tipologie_mancanti_consegna(st.session_state.storico_consegne, plesso)
                 if mostra_completi or mancanti:
                     righe.append({
                         "Plesso": plesso,
@@ -1594,6 +1595,7 @@ elif st.session_state.pagina == "Tabellone Stato":
         with f2:
             filtro_stato = st.selectbox("📂 Filtra per Stato",
                                         ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
+            solo_incompleti = st.checkbox("Solo DA RITIRARE incompleti", value=False, key="tb_incompleti")
 
         mostra = []
         for p in elenco_totale:
@@ -1602,6 +1604,11 @@ elif st.session_state.pagina == "Tabellone Stato":
             ha_sigle = len(cat_attive) > 0
             e_ritirato = p in ritirati and not ha_sigle
             e_bianco = p not in consegnati and p not in ritirati
+            mancanti_obbl = tipologie_mancanti_consegna(consegnati, p) if ha_sigle else []
+
+            if solo_incompleti and filtro_stato in ["TUTTI", "DA RITIRARE"]:
+                if not (ha_sigle and mancanti_obbl):
+                    continue
 
             if filtro_stato == "TUTTI":
                 mostra.append(p)
