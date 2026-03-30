@@ -364,16 +364,20 @@ def genera_pdf_due_copie(libri, categoria, plesso, insegnante, classe, data_modu
 # ==============================================================================
 # BLOCCO 5: CONNESSIONE GOOGLE DRIVE E BACKUP
 # ==============================================================================
+@st.cache_resource
+def get_spreadsheet_cloud():
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    json_info = json.loads(st.secrets["gspread"]["json_data"], strict=False)
+    if "private_key" in json_info:
+        json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
+    creds = Credentials.from_service_account_info(json_info, scopes=scope)
+    client_gs = gspread.authorize(creds)
+    return client_gs.open_by_key(ID_FOGLIO)
+
+
 def connetti_google_sheets():
     try:
-        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        json_info = json.loads(st.secrets["gspread"]["json_data"], strict=False)
-        if "private_key" in json_info:
-            json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
-        creds = Credentials.from_service_account_info(json_info, scopes=scope)
-        client_gs = gspread.authorize(creds)
-        sh = client_gs.open_by_key(ID_FOGLIO)
-        return sh
+        return get_spreadsheet_cloud()
     except Exception as e:
         st.error(f"⚠️ Errore connessione Cloud: {e}")
         return None
@@ -444,6 +448,21 @@ def get_lista_plessi():
         except:
             return []
     return []
+
+
+@st.cache_data
+def carica_csv(path, mtime):
+    return pd.read_csv(path).fillna("")
+
+
+def carica_db_adozioni():
+    if not os.path.exists(DB_FILE):
+        return pd.DataFrame()
+    try:
+        mtime = os.path.getmtime(DB_FILE)
+    except Exception:
+        mtime = 0
+    return carica_csv(DB_FILE, mtime)
 
 
 def aggiungi_libro_a_excel(t, m, e, a):
@@ -1304,7 +1323,7 @@ elif st.session_state.pagina == "ModificaLibro":
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
     if os.path.exists(DB_FILE):
-        st.dataframe(pd.read_csv(DB_FILE), use_container_width=True)
+        st.dataframe(carica_db_adozioni(), use_container_width=True)
 
 elif st.session_state.pagina == "Ricerca":
     st.subheader("🔍 Motore di Ricerca Adozioni")
@@ -1329,7 +1348,7 @@ elif st.session_state.pagina == "Ricerca":
         if btn2.button("🧹 PULISCI", use_container_width=True, on_click=reset_ricerca): st.rerun()
 
     if st.session_state.r_attiva and os.path.exists(DB_FILE):
-        df = pd.read_csv(DB_FILE).fillna("").astype(str)
+        df = carica_db_adozioni().astype(str)
         if f_ple: df = df[df["Plesso"].isin(f_ple)]
         if f_tit: df = df[df["Titolo"].isin(f_tit)]
         if f_age: df = df[df["Agenzia"].isin(f_age)]
@@ -1457,7 +1476,7 @@ elif st.session_state.pagina == "Inserimento":
                     "Editore": info.iloc[0, 2], "Agenzia": info.iloc[0, 3], "N° sezioni": n_sez,
                     "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "N° Alunni": n_alunni_val, "Note": note
                 }])
-                df_attuale = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame()
+                df_attuale = carica_db_adozioni()
                 df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
                 df_finale.to_csv(DB_FILE, index=False)
                 backup_su_google_sheets(df_finale)
@@ -1500,7 +1519,7 @@ elif st.session_state.pagina == "Modifica":
         st.session_state.reset_mod_ctr = 0
 
     if os.path.exists(DB_FILE):
-        df_mod = pd.read_csv(DB_FILE).fillna("").astype(str)
+        df_mod = carica_db_adozioni().astype(str)
         c_ric1, c_ric2 = st.columns(2)
 
         # Usiamo il contatore nella KEY per resettare tutto quando vogliamo
@@ -1558,7 +1577,7 @@ elif st.session_state.pagina == "Modifica":
                         with b1:
                             if st.button("💾 AGGIORNA", key=f"upd_{i}", use_container_width=True, type="primary"):
                                 if nuovo_saggio != "-":
-                                    df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
+                                    df_full = carica_db_adozioni().astype(str)
                                     info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
                                     df_full.at[i, 'Plesso'] = nuovo_plesso
                                     df_full.at[i, 'Titolo'] = nuovo_titolo
@@ -1582,7 +1601,7 @@ elif st.session_state.pagina == "Modifica":
                                     st.rerun()
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
-                                df_full = pd.read_csv(DB_FILE).fillna("").astype(str)
+                                df_full = carica_db_adozioni().astype(str)
                                 df_full = df_full.drop(int(i))
                                 df_full.to_csv(DB_FILE, index=False)
                                 backup_su_google_sheets(df_full)
