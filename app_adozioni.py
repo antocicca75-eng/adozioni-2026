@@ -2143,39 +2143,49 @@ elif st.session_state.pagina == "Appunti":
                 dfv = dfv[dfv["Completato"].astype(str).str.upper() == "SI"]
         if "Data" in dfv.columns:
             dfv = dfv.sort_values(by=["Data"], ascending=False)
-            
-        for i, row in dfv.iterrows():
-            r_id = row.get("ID", "")
-            r_data = row.get("Data", "")
-            r_ple = row.get("Plesso", "")
-            r_ins = row.get("Insegnante", "")
-            r_cla = row.get("Classe", "")
-            r_sez = row.get("Sez.", "")
-            r_mat = row.get("Materia", "")
-            r_note = row.get("Note", "")
-            r_comp = str(row.get("Completato", "NO")).strip().upper()
-            
-            bg_color = "#d4edda" if r_comp == "SI" else "#ffffff"
-            
-            with st.container(border=True):
-                # Stile personalizzato per evidenziare se completato
-                st.markdown(f"""
-                <div style="background-color: {bg_color}; padding: 10px; border-radius: 5px;">
-                    <b>{r_ple}</b> - {r_ins} | 🏷️ {r_cla} {r_sez} | 📚 {r_mat} <span style="float:right; color:gray;">{r_data}</span><br>
-                    <p style="margin-top: 8px;">{r_note}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                c_btn1, c_btn2, _ = st.columns([0.15, 0.15, 0.7])
-                if r_comp == "SI":
-                    if c_btn1.button("❌ ANNULLA COMPL.", key=f"unc_{r_id}_{i}"):
-                        aggiorna_appunto_cloud(r_id, "NO")
-                        st.rerun()
-                else:
-                    if c_btn1.button("✅ COMPLETA", key=f"chk_{r_id}_{i}"):
-                        aggiorna_appunto_cloud(r_id, "SI")
-                        st.rerun()
-                
-                if c_btn2.button("🗑️ ELIMINA", key=f"del_{r_id}_{i}"):
-                    elimina_appunto_cloud(r_id)
-                    st.rerun()
+
+        if "Plesso" not in dfv.columns or dfv.empty:
+            st.info("Nessun appunto corrisponde ai filtri.")
+        else:
+            for plesso_nome in sorted(dfv["Plesso"].astype(str).fillna("").unique().tolist()):
+                dfp = dfv[dfv["Plesso"].astype(str) == plesso_nome].copy()
+                if dfp.empty:
+                    continue
+                n_tot = len(dfp)
+                n_comp = 0
+                if "Completato" in dfp.columns:
+                    n_comp = int((dfp["Completato"].astype(str).str.upper() == "SI").sum())
+                with st.expander(f"🏫 {plesso_nome}  ({n_comp}/{n_tot} completati)", expanded=False):
+                    for i, row in dfp.iterrows():
+                        r_id = row.get("ID", "")
+                        r_data = row.get("Data", "")
+                        r_ins = row.get("Insegnante", "")
+                        r_cla = row.get("Classe", "")
+                        r_sez = row.get("Sez.", "")
+                        r_mat = row.get("Materia", "")
+                        r_note = row.get("Note", "")
+                        r_comp = str(row.get("Completato", "NO")).strip().upper()
+
+                        bg_color = "#d4edda" if r_comp == "SI" else "#ffffff"
+
+                        with st.container(border=True):
+                            st.markdown(f"""
+                            <div style="background-color: {bg_color}; padding: 10px; border-radius: 5px;">
+                                <b>{plesso_nome}</b> - {r_ins} | 🏷️ {r_cla} {r_sez} | 📚 {r_mat} <span style="float:right; color:gray;">{r_data}</span><br>
+                                <p style="margin-top: 8px;">{r_note}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            c_btn1, c_btn2, _ = st.columns([0.15, 0.15, 0.7])
+                            if r_comp == "SI":
+                                if c_btn1.button("❌ ANNULLA COMPL.", key=f"unc_{r_id}_{i}"):
+                                    aggiorna_appunto_cloud(r_id, "NO")
+                                    st.rerun()
+                            else:
+                                if c_btn1.button("✅ COMPLETA", key=f"chk_{r_id}_{i}"):
+                                    aggiorna_appunto_cloud(r_id, "SI")
+                                    st.rerun()
+
+                            if c_btn2.button("🗑️ ELIMINA", key=f"del_{r_id}_{i}"):
+                                elimina_appunto_cloud(r_id)
+                                st.rerun()
