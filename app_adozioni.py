@@ -364,20 +364,16 @@ def genera_pdf_due_copie(libri, categoria, plesso, insegnante, classe, data_modu
 # ==============================================================================
 # BLOCCO 5: CONNESSIONE GOOGLE DRIVE E BACKUP
 # ==============================================================================
-@st.cache_resource
-def get_spreadsheet_cloud():
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    json_info = json.loads(st.secrets["gspread"]["json_data"], strict=False)
-    if "private_key" in json_info:
-        json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
-    creds = Credentials.from_service_account_info(json_info, scopes=scope)
-    client_gs = gspread.authorize(creds)
-    return client_gs.open_by_key(ID_FOGLIO)
-
-
 def connetti_google_sheets():
     try:
-        return get_spreadsheet_cloud()
+        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        json_info = json.loads(st.secrets["gspread"]["json_data"], strict=False)
+        if "private_key" in json_info:
+            json_info["private_key"] = json_info["private_key"].replace("\\n", "\n")
+        creds = Credentials.from_service_account_info(json_info, scopes=scope)
+        client_gs = gspread.authorize(creds)
+        sh = client_gs.open_by_key(ID_FOGLIO)
+        return sh
     except Exception as e:
         st.error(f"⚠️ Errore connessione Cloud: {e}")
         return None
@@ -396,6 +392,40 @@ def backup_su_google_sheets(df_da_salvare):
             st.sidebar.error(f"Errore scrittura Cloud: {e}")
             return False
     return False
+
+
+def carica_db_adozioni_cloud():
+    sh = connetti_google_sheets()
+    if not sh:
+        return pd.DataFrame()
+    try:
+        foglio = sh.worksheet("Adozioni_DB")
+        values = foglio.get_all_values()
+        if not values:
+            return pd.DataFrame()
+        headers = values[0]
+        rows = values[1:] if len(values) > 1 else []
+        if not headers:
+            return pd.DataFrame()
+        return pd.DataFrame(rows, columns=headers).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def get_db_adozioni():
+    if os.path.exists(DB_FILE):
+        try:
+            return pd.read_csv(DB_FILE).fillna("")
+        except Exception:
+            pass
+    df = carica_db_adozioni_cloud()
+    if not df.empty:
+        try:
+            df.to_csv(DB_FILE, index=False)
+        except Exception:
+            pass
+    return df
 
 
 # ------------------------------------------------------------------------------
@@ -448,21 +478,6 @@ def get_lista_plessi():
         except:
             return []
     return []
-
-
-@st.cache_data
-def carica_csv(path, mtime):
-    return pd.read_csv(path).fillna("")
-
-
-def carica_db_adozioni():
-    if not os.path.exists(DB_FILE):
-        return pd.DataFrame()
-    try:
-        mtime = os.path.getmtime(DB_FILE)
-    except Exception:
-        mtime = 0
-    return carica_csv(DB_FILE, mtime)
 
 
 def aggiungi_libro_a_excel(t, m, e, a):
@@ -551,59 +566,6 @@ def reset_ricerca():
     st.session_state.fm = []
     st.session_state.fe = []
     st.session_state.fsag = "TUTTI"
-
-def ordina_tipologie(tipologie):
-    ordine = [
-        "LETTURE CLASSE PRIMA",
-        "LETTURE CLASSE QUARTA",
-        "SUSSIDIARI DISCIPLINE",
-        "INGLESE CLASSE PRIMA",
-        "INGLESE CLASSE QUARTA",
-        "RELIGIONE",
-        "QUADERNI VACANZE CLASSE PRIMA",
-        "QUADERNI VACANZE CLASSE SECONDA",
-        "QUADERNI VACANZE CLASSE TERZA",
-        "QUADERNI VACANZE CLASSE QUARTA",
-        "QUADERNI VACANZE CLASSE QUINTA",
-        "QUADERNI VACANZE INGLESE",
-    ]
-
-    def _n(v):
-        return str(v).strip().upper()
-
-    mappa = {}
-    for t in (tipologie or []):
-        mappa[_n(t)] = t
-
-    scelti = []
-    usati = set()
-    for o in ordine:
-        if o in mappa:
-            scelti.append(mappa[o])
-            usati.add(o)
-
-    rimanenti = [mappa[k] for k in sorted([k for k in mappa.keys() if k not in usati])]
-    return scelti + rimanenti
-
-
-TIPOLOGIE_OBBLIGATORIE = [
-    "LETTURE CLASSE PRIMA",
-    "LETTURE CLASSE QUARTA",
-    "SUSSIDIARI DISCIPLINE",
-    "INGLESE CLASSE PRIMA",
-    "INGLESE CLASSE QUARTA",
-    "RELIGIONE",
-    "QUADERNI VACANZE CLASSE PRIMA",
-    "QUADERNI VACANZE CLASSE SECONDA",
-    "QUADERNI VACANZE CLASSE TERZA",
-    "QUADERNI VACANZE CLASSE QUARTA",
-    "QUADERNI VACANZE CLASSE QUINTA",
-]
-
-
-def tipologie_mancanti_consegna(st_consegne, plesso):
-    presenti = {str(k).strip().upper() for k in (st_consegne.get(plesso, {}) or {}).keys()}
-    return [t for t in TIPOLOGIE_OBBLIGATORIE if str(t).strip().upper() not in presenti]
 
 
 # ------------------------------------------------------------------------------
@@ -909,7 +871,6 @@ if st.session_state.pagina == "Consegne":
             if cat_scelta == "SELEZIONE MULTIPLA" and not tipologie_scelte:
                 st.warning("Seleziona almeno una tipologia.")
             else:
-                sez_default = str(classe_man or "").strip().upper()
                 for plesso in plessi_scelti:
                     if plesso not in st.session_state.storico_consegne:
                         st.session_state.storico_consegne[plesso] = {}
@@ -921,8 +882,6 @@ if st.session_state.pagina == "Consegne":
                             for item in v:
                                 nuovo = item.copy()
                                 nuovo['q'] = 1
-                                if sez_default and not str(nuovo.get('sez', '')).strip():
-                                    nuovo['sez'] = sez_default
                                 lista_clean.append(nuovo)
                             esistenti = st.session_state.storico_consegne[plesso].get(k, [])
                             st.session_state.storico_consegne[plesso][k] = merge_consegne_lists(esistenti, lista_clean)
@@ -933,18 +892,12 @@ if st.session_state.pagina == "Consegne":
                             for item in v:
                                 nuovo = item.copy()
                                 nuovo['q'] = 1
-                                if sez_default and not str(nuovo.get('sez', '')).strip():
-                                    nuovo['sez'] = sez_default
                                 lista_clean.append(nuovo)
                             esistenti = st.session_state.storico_consegne[plesso].get(k, [])
                             st.session_state.storico_consegne[plesso][k] = merge_consegne_lists(esistenti, lista_clean)
 
                     else:
                         lista_con_quantita_esatte = [item.copy() for item in st.session_state.lista_consegne_attuale]
-                        if sez_default:
-                            for it in lista_con_quantita_esatte:
-                                if not str(it.get('sez', '')).strip():
-                                    it['sez'] = sez_default
                         esistenti = st.session_state.storico_consegne[plesso].get(cat_scelta, [])
                         st.session_state.storico_consegne[plesso][cat_scelta] = merge_consegne_lists(
                             esistenti, lista_con_quantita_esatte
@@ -972,224 +925,95 @@ elif st.session_state.pagina == "Storico":
         st.info("Nessuna consegna registrata.")
     else:
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
-        with st.expander("🧾 Verifica tipologie obbligatorie", expanded=False):
-            plessi_check = st.multiselect(
-                "🏫 Plessi da controllare",
-                elenco_plessi_storico,
-                default=elenco_plessi_storico,
-                key="chk_plessi_obbl",
-            )
-            mostra_completi = st.checkbox("Mostra anche plessi completi", value=False, key="chk_show_ok")
+        scuola_selezionata = st.selectbox("🔍 Seleziona Plesso:", ["- SELEZIONA -"] + elenco_plessi_storico)
+        if scuola_selezionata == "- SELEZIONA -":
+            st.info("Seleziona un plesso per visualizzare le collane consegnate.")
+            st.stop()
 
-            righe = []
-            for plesso in plessi_check:
-                mancanti = tipologie_mancanti_consegna(st.session_state.storico_consegne, plesso)
-                if mostra_completi or mancanti:
-                    righe.append({
-                        "Plesso": plesso,
-                        "N Mancanti": len(mancanti),
-                        "Tipologie Mancanti": ", ".join(mancanti),
-                    })
+        plesso = scuola_selezionata
+        for plesso in [plesso]:
+            with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
+                if st.button(f"📦 RITIRA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
+                             use_container_width=True):
+                    for tipo, items in st.session_state.storico_consegne[plesso].items():
+                        aggiungi_ritiri(plesso, tipo, items)
+                    del st.session_state.storico_consegne[plesso]
+                    salva_storico_cloud(st.session_state.storico_consegne);
+                    salva_ritiri_cloud(st.session_state.storico_ritiri);
+                    st.rerun()
+                if st.button(f"🧨 RESET PLESSO: {plesso}", key=f"reset_plesso_{plesso}", use_container_width=True):
+                    if plesso in st.session_state.storico_consegne: del st.session_state.storico_consegne[plesso]
+                    if plesso in st.session_state.storico_ritiri: del st.session_state.storico_ritiri[plesso]
+                    salva_storico_cloud(st.session_state.storico_consegne);
+                    salva_ritiri_cloud(st.session_state.storico_ritiri);
+                    st.rerun()
 
-            df_chk = pd.DataFrame(righe)
-            if df_chk.empty:
-                st.success("Tutte le scuole selezionate risultano complete.")
-            else:
-                df_chk = df_chk.sort_values(by=["N Mancanti", "Plesso"], ascending=[False, True])
-                st.dataframe(df_chk, use_container_width=True, hide_index=True)
-                try:
-                    buf = io.BytesIO()
-                    engine = None
-                    try:
-                        import openpyxl
-                        engine = "openpyxl"
-                    except Exception:
-                        try:
-                            import xlsxwriter
-                            engine = "xlsxwriter"
-                        except Exception:
-                            engine = None
-                    if engine is None:
-                        raise RuntimeError("Nessun engine Excel disponibile")
-                    with pd.ExcelWriter(buf, engine=engine) as writer:
-                        df_chk.to_excel(writer, index=False, sheet_name="Controllo")
-                    st.download_button(
-                        "📤 ESPORTA EXCEL CONTROLLO",
-                        data=buf.getvalue(),
-                        file_name=f"controllo_tipologie_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                    )
-                except Exception as ex:
-                    st.warning(f"Export Excel non disponibile: {ex}")
-
-        scuole_selezionate = st.multiselect("🔍 Seleziona Plesso/i:", elenco_plessi_storico, key="sel_plessi_storico")
-        
-        if not scuole_selezionate:
-            st.info("Seleziona uno o più plessi per visualizzare le collane consegnate.")
-        else:
-            for plesso in scuole_selezionate:
-                with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=True):
-                    if st.button(f"📦 RITIRA INTERO PLESSO: {plesso}", key=f"bulk_plesso_{plesso}",
-                                 use_container_width=True):
-                        for tipo, items in st.session_state.storico_consegne[plesso].items():
-                            aggiungi_ritiri(plesso, tipo, items)
-                        del st.session_state.storico_consegne[plesso]
-                        salva_storico_cloud(st.session_state.storico_consegne);
-                        salva_ritiri_cloud(st.session_state.storico_ritiri);
+                per_tipo = st.session_state.storico_consegne[plesso]
+                for tipo in sorted(list(per_tipo.keys())):
+                    if st.button(f"🧨 Reset tipologia: {tipo}", key=f"reset_tipo_{plesso}_{tipo}"):
+                        if plesso in st.session_state.storico_consegne and tipo in st.session_state.storico_consegne[plesso]:
+                            del st.session_state.storico_consegne[plesso][tipo]
+                            if not st.session_state.storico_consegne[plesso]:
+                                del st.session_state.storico_consegne[plesso]
+                        salva_storico_cloud(st.session_state.storico_consegne)
                         st.rerun()
-                    if st.button(f"🧨 RESET PLESSO: {plesso}", key=f"reset_plesso_{plesso}", use_container_width=True):
-                        if plesso in st.session_state.storico_consegne: del st.session_state.storico_consegne[plesso]
-                        if plesso in st.session_state.storico_ritiri: del st.session_state.storico_ritiri[plesso]
+                    if st.button(f"📦 Ritira tutto: {tipo}", key=f"bulk_tipo_{plesso}_{tipo}"):
+                        aggiungi_ritiri(plesso, tipo, per_tipo[tipo])
+                        del st.session_state.storico_consegne[plesso][tipo]
+                        if not st.session_state.storico_consegne[plesso]: del st.session_state.storico_consegne[plesso]
                         salva_storico_cloud(st.session_state.storico_consegne);
                         salva_ritiri_cloud(st.session_state.storico_ritiri);
                         st.rerun()
 
-                    per_tipo = st.session_state.storico_consegne[plesso]
-                    open_tipo_key = f"open_tipo_consegnate_{plesso}"
-                    if open_tipo_key not in st.session_state:
-                        st.session_state[open_tipo_key] = None
+                    with st.expander(f"📘 {tipo.upper()}", expanded=True):
+                        lista_libri = list(per_tipo[tipo])
+                        for i, lib in enumerate(lista_libri):
+                            qta_salvata = int(lib.get('q', 1))
+                            col_titolo, col_qta, col_adott, col_ritiro, col_del = st.columns([0.35, 0.10, 0.15, 0.30, 0.10])
+                            col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
+                            col_qta.write(f"Q.tà: {qta_salvata}")
 
-                    # Forziamo l'allineamento a sinistra del contenuto del bottone
-                    st.markdown("""
-                        <style>
-                        div[data-testid="stButton"] > button {
-                            display: flex !important;
-                            justify-content: flex-start !important;
-                            text-align: left !important;
-                            padding-left: 15px !important;
-                        }
-                        div[data-testid="stButton"] > button > div {
-                            width: 100% !important;
-                            display: flex !important;
-                            justify-content: flex-start !important;
-                        }
-                        div[data-testid="stButton"] > button > div > p {
-                            width: 100% !important;
-                            text-align: left !important;
-                            margin: 0 !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
+                            with col_adott:
+                                if st.button("🌟 ADOTTATO", key=f"adott_{plesso}_{tipo}_{i}"):
+                                    st.session_state.adozione_da_storico = {
+                                        "plesso": plesso,
+                                        "titolo": lib.get("t", ""),
+                                        "editore": lib.get("e", ""),
+                                        "tipologia": tipo,
+                                    }
+                                    st.session_state.pagina = "Inserimento"
+                                    st.rerun()
 
-                    def _norm_sez(v):
-                        s = str(v or "").strip().upper()
-                        return s if s else "-"
+                            with col_ritiro:
+                                q_rit = st.number_input("Ritira", min_value=1, max_value=max(1, qta_salvata),
+                                                        value=max(1, qta_salvata), key=f"qrit_{plesso}_{tipo}_{i}",
+                                                        label_visibility="collapsed")
 
-                    for tipo in ordina_tipologie(per_tipo.keys()):
-                        libri_tipo = list(per_tipo.get(tipo, []) or [])
-                        gruppi = {}
-                        for lib in libri_tipo:
-                            sez_g = _norm_sez(lib.get("sez"))
-                            gruppi.setdefault(sez_g, []).append(lib)
+                                # --- MODIFICA RICHIESTA: Sostituito tasto "OK" con "AGGIORNA CARICO" ---
+                                if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{i}"):
+                                    rit_item = lib.copy()
+                                    rit_item['q'] = q_rit
+                                    aggiungi_ritiri(plesso, tipo, [rit_item])
 
-                        for sez_g in sorted(list(gruppi.keys()), key=lambda x: (x == "-", x)):
-                            gruppo_id = f"{tipo}||{sez_g}"
-                            is_open = st.session_state.get(open_tipo_key) == gruppo_id
-                            freccia = "🔽" if is_open else "▶️"
-                            label_sez = f" | SEZ. {sez_g}" if sez_g != "-" else ""
+                                    lib['q'] = qta_salvata - q_rit
+                                    if lib['q'] <= 0: per_tipo[tipo].pop(i)
 
-                            if st.button(
-                                f"{freccia} 📘 {tipo.upper()}{label_sez}",
-                                key=f"open_tipo_{plesso}_{tipo}_{sez_g}",
-                                use_container_width=True,
-                            ):
-                                st.session_state[open_tipo_key] = None if is_open else gruppo_id
+                                    if not st.session_state.storico_consegne[plesso][tipo]: del \
+                                        st.session_state.storico_consegne[plesso][tipo]
+                                    if not st.session_state.storico_consegne[plesso]: del \
+                                        st.session_state.storico_consegne[plesso]
+
+                                    salva_storico_cloud(st.session_state.storico_consegne);
+                                    salva_ritiri_cloud(st.session_state.storico_ritiri);
+                                    st.rerun()
+
+                            if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{i}"):
+                                aggiungi_ritiri(plesso, tipo, [lib.copy()])
+                                per_tipo[tipo].pop(i)
+                                if not per_tipo[tipo]: del per_tipo[tipo]
+                                salva_storico_cloud(st.session_state.storico_consegne);
+                                salva_ritiri_cloud(st.session_state.storico_ritiri);
                                 st.rerun()
-
-                            if is_open:
-                                with st.container(border=True):
-                                    c_tip1, c_tip2 = st.columns(2)
-                                    if c_tip1.button(
-                                        "🧨 RESET",
-                                        key=f"reset_tipo_{plesso}_{tipo}_{sez_g}",
-                                        use_container_width=True,
-                                    ):
-                                        per_tipo[tipo] = [x for x in per_tipo.get(tipo, []) if _norm_sez(x.get("sez")) != sez_g]
-                                        if not per_tipo.get(tipo):
-                                            del per_tipo[tipo]
-                                        if not st.session_state.storico_consegne.get(plesso):
-                                            del st.session_state.storico_consegne[plesso]
-                                        salva_storico_cloud(st.session_state.storico_consegne)
-                                        st.rerun()
-
-                                    if c_tip2.button(
-                                        "📦 RITIRA TUTTO",
-                                        key=f"bulk_tipo_{plesso}_{tipo}_{sez_g}",
-                                        use_container_width=True,
-                                    ):
-                                        aggiungi_ritiri(plesso, tipo, [x.copy() for x in gruppi.get(sez_g, [])])
-                                        per_tipo[tipo] = [x for x in per_tipo.get(tipo, []) if _norm_sez(x.get("sez")) != sez_g]
-                                        if not per_tipo.get(tipo):
-                                            del per_tipo[tipo]
-                                        if not st.session_state.storico_consegne.get(plesso):
-                                            del st.session_state.storico_consegne[plesso]
-                                        salva_storico_cloud(st.session_state.storico_consegne)
-                                        salva_ritiri_cloud(st.session_state.storico_ritiri)
-                                        st.rerun()
-
-                                    lista_libri = list(gruppi.get(sez_g, []))
-                                    for i, lib in enumerate(lista_libri):
-                                        qta_salvata = int(lib.get('q', 1))
-                                        col_titolo, col_qta, col_adott, col_ritiro, col_del = st.columns([0.35, 0.10, 0.15, 0.30, 0.10])
-                                        col_titolo.markdown(f"**{lib['t']}**<br><small>{lib['e']}</small>", unsafe_allow_html=True)
-                                        col_qta.write(f"Q.tà: {qta_salvata}")
-
-                                        with col_adott:
-                                            if st.button("🌟 ADOTTATO", key=f"adott_{plesso}_{tipo}_{sez_g}_{i}"):
-                                                st.session_state.adozione_da_storico = {
-                                                    "plesso": plesso,
-                                                    "titolo": lib.get("t", ""),
-                                                    "editore": lib.get("e", ""),
-                                                    "tipologia": tipo,
-                                                }
-                                                st.session_state.pagina = "Inserimento"
-                                                st.rerun()
-
-                                        with col_ritiro:
-                                            q_rit = st.number_input(
-                                                "Ritira",
-                                                min_value=1,
-                                                max_value=max(1, qta_salvata),
-                                                value=max(1, qta_salvata),
-                                                key=f"qrit_{plesso}_{tipo}_{sez_g}_{i}",
-                                                label_visibility="collapsed",
-                                            )
-
-                                            if st.button("🔄 AGGIORNA CARICO", key=f"btn_rit_{plesso}_{tipo}_{sez_g}_{i}"):
-                                                rit_item = lib.copy()
-                                                rit_item['q'] = q_rit
-                                                aggiungi_ritiri(plesso, tipo, [rit_item])
-
-                                                lib['q'] = qta_salvata - q_rit
-                                                if lib['q'] <= 0:
-                                                    for idx_rm, es in enumerate(per_tipo.get(tipo, [])):
-                                                        if es is lib:
-                                                            per_tipo[tipo].pop(idx_rm)
-                                                            break
-
-                                                if not st.session_state.storico_consegne[plesso].get(tipo):
-                                                    del st.session_state.storico_consegne[plesso][tipo]
-                                                if not st.session_state.storico_consegne.get(plesso):
-                                                    del st.session_state.storico_consegne[plesso]
-
-                                                salva_storico_cloud(st.session_state.storico_consegne)
-                                                salva_ritiri_cloud(st.session_state.storico_ritiri)
-                                                st.rerun()
-
-                                        if col_del.button("❌", key=f"del_h_{plesso}_{tipo}_{sez_g}_{i}"):
-                                            aggiungi_ritiri(plesso, tipo, [lib.copy()])
-                                            for idx_rm, es in enumerate(per_tipo.get(tipo, [])):
-                                                if es is lib:
-                                                    per_tipo[tipo].pop(idx_rm)
-                                                    break
-                                            if not per_tipo.get(tipo):
-                                                del per_tipo[tipo]
-                                            if not st.session_state.storico_consegne.get(plesso):
-                                                del st.session_state.storico_consegne[plesso]
-                                            salva_storico_cloud(st.session_state.storico_consegne)
-                                            salva_ritiri_cloud(st.session_state.storico_ritiri)
-                                            st.rerun()
 
     if st.button("⬅️ Torna al Menu"): st.session_state.pagina = "Inserimento"; st.rerun()
 
@@ -1322,8 +1146,11 @@ elif st.session_state.pagina == "ModificaLibro":
 # ==============================================================================
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
-    if os.path.exists(DB_FILE):
-        st.dataframe(carica_db_adozioni(), use_container_width=True)
+    df_reg = get_db_adozioni()
+    if not df_reg.empty:
+        st.dataframe(df_reg, use_container_width=True)
+    else:
+        st.info("Registro vuoto.")
 
 elif st.session_state.pagina == "Ricerca":
     st.subheader("🔍 Motore di Ricerca Adozioni")
@@ -1347,8 +1174,8 @@ elif st.session_state.pagina == "Ricerca":
         if btn1.button("🔍 AVVIA RICERCA", use_container_width=True, type="primary"): st.session_state.r_attiva = True
         if btn2.button("🧹 PULISCI", use_container_width=True, on_click=reset_ricerca): st.rerun()
 
-    if st.session_state.r_attiva and os.path.exists(DB_FILE):
-        df = carica_db_adozioni().astype(str)
+    if st.session_state.r_attiva:
+        df = get_db_adozioni().fillna("").astype(str)
         if f_ple: df = df[df["Plesso"].isin(f_ple)]
         if f_tit: df = df[df["Titolo"].isin(f_tit)]
         if f_age: df = df[df["Agenzia"].isin(f_age)]
@@ -1359,16 +1186,8 @@ elif st.session_state.pagina == "Ricerca":
             df_view = df.sort_index(ascending=False).copy()
             st.dataframe(df_view, use_container_width=True)
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
-            
-            tot_alunni = 0
-            if "N° Alunni" in df.columns:
-                tot_alunni = pd.to_numeric(df["N° Alunni"], errors='coerce').fillna(0).sum()
-                
-            st.markdown(f"""<div class="totale-box">
-                🔢 Totale Classi: <b>{int(somma)}</b><br>
-                👨‍🎓 Totale Alunni: <b>{int(tot_alunni)}</b>
-                </div>""", unsafe_allow_html=True)
-            
+            st.markdown(f"""<div class="totale-box">🔢 Totale Classi: <b>{int(somma)}</b></div>""",
+                        unsafe_allow_html=True)
             out = io.BytesIO()
             try:
                 df_export = df_view.copy()
@@ -1384,6 +1203,8 @@ elif st.session_state.pagina == "Ricerca":
                 )
             except Exception as ex:
                 st.error(f"⚠️ Scarico Excel non disponibile: {ex}")
+        else:
+            st.info("Nessun risultato.")
 # ------------------------------------------------------------------------------
 # =========================================================
 # --- BLOCCO 12: PAGINA INSERIMENTO ADOZIONE ---
@@ -1401,15 +1222,13 @@ elif st.session_state.pagina == "Inserimento":
         st.markdown("### 🌟 Adozione da Collane Consegnate")
         st.write(f"**Plesso:** {dati.get('plesso','')} | **Titolo:** {dati.get('titolo','')} | **Editore:** {dati.get('editore','')}")
         with st.container(border=True):
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3 = st.columns(3)
             with c1:
                 n_sez_adott = st.number_input("Numero delle sezioni", min_value=1, value=1, key=f"imp_n_{st.session_state.form_id}")
             with c2:
                 sez_lett_adott = st.text_input("Lettera sezione (es. A, B, C)", key=f"imp_sez_{st.session_state.form_id}")
             with c3:
                 saggio_adott = st.selectbox("Saggio consegnato?", ["-", "NO", "SI"], key=f"imp_sag_{st.session_state.form_id}")
-            with c4:
-                n_alunni_adott = st.number_input("👨‍🎓 N° Alunni (opzionale)", min_value=0, value=0, key=f"imp_alunni_{st.session_state.form_id}")
 
             b1, b2 = st.columns(2)
             if b1.button("✅ CONFERMA DATI", type="primary", use_container_width=True, key=f"imp_ok_{st.session_state.form_id}"):
@@ -1419,7 +1238,6 @@ elif st.session_state.pagina == "Inserimento":
                     "n_sez": n_sez_adott,
                     "sez_lett": sez_lett_adott,
                     "saggio": saggio_adott,
-                    "n_alunni": n_alunni_adott if n_alunni_adott > 0 else 0,
                 }
                 st.session_state.adozione_da_storico = None
                 st.session_state.form_id += 1
@@ -1462,24 +1280,20 @@ elif st.session_state.pagina == "Inserimento":
         with c3:
             default_sez_lett = prefill.get("sez_lett", "")
             sez_lett = st.text_input("🔡 Lettera Sezione", value=default_sez_lett, key=f"sez_{st.session_state.form_id}")
-            
-            default_n_alunni = prefill.get("n_alunni", 0)
-            n_alunni = st.number_input("👨‍🎓 N° Alunni (opzionale)", min_value=0, value=default_n_alunni, key=f"alunni_{st.session_state.form_id}")
-            
         if st.button("💾 SALVA ADOZIONE", use_container_width=True, type="primary"):
             if titolo_scelto and plesso and saggio != "-":
                 info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
-                n_alunni_val = n_alunni if n_alunni > 0 else ""
                 nuova_riga = pd.DataFrame([{
                     "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
                     "Plesso": plesso, "Materia": info.iloc[0, 1], "Titolo": titolo_scelto,
                     "Editore": info.iloc[0, 2], "Agenzia": info.iloc[0, 3], "N° sezioni": n_sez,
-                    "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "N° Alunni": n_alunni_val, "Note": note
+                    "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "Note": note
                 }])
-                df_attuale = carica_db_adozioni()
+                df_attuale = get_db_adozioni()
                 df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
                 df_finale.to_csv(DB_FILE, index=False)
                 backup_su_google_sheets(df_finale)
+                st.cache_data.clear()
                 st.session_state.form_id += 1
                 st.session_state.prefill_adozione = {}
                 st.success("✅ Registrazione avvenuta con successo!")
@@ -1518,8 +1332,8 @@ elif st.session_state.pagina == "Modifica":
     if "reset_mod_ctr" not in st.session_state:
         st.session_state.reset_mod_ctr = 0
 
-    if os.path.exists(DB_FILE):
-        df_mod = carica_db_adozioni().astype(str)
+    df_mod = get_db_adozioni().fillna("").astype(str)
+    if not df_mod.empty:
         c_ric1, c_ric2 = st.columns(2)
 
         # Usiamo il contatore nella KEY per resettare tutto quando vogliamo
@@ -1564,20 +1378,12 @@ elif st.session_state.pagina == "Modifica":
                             idx_saggio = ["-", "NO", "SI"].index(attuale_sag) if attuale_sag in ["-", "NO", "SI"] else 0
                             nuovo_saggio = st.selectbox("Saggio consegnato", ["-", "NO", "SI"], index=idx_saggio,
                                                         key=f"msag_{i}")
-                                                        
-                            val_alunni = 0
-                            if "N° Alunni" in df_mod.columns and df_mod.at[i, 'N° Alunni']:
-                                try:
-                                    val_alunni = int(float(df_mod.at[i, 'N° Alunni']))
-                                except ValueError:
-                                    pass
-                            nuovo_n_alunni = st.number_input("👨‍🎓 N° Alunni", min_value=0, value=val_alunni, key=f"malunni_{i}")
 
                         b1, b2 = st.columns(2)
                         with b1:
                             if st.button("💾 AGGIORNA", key=f"upd_{i}", use_container_width=True, type="primary"):
                                 if nuovo_saggio != "-":
-                                    df_full = carica_db_adozioni().astype(str)
+                                    df_full = get_db_adozioni().fillna("").astype(str)
                                     info_new = catalogo[catalogo.iloc[:, 0] == nuovo_titolo]
                                     df_full.at[i, 'Plesso'] = nuovo_plesso
                                     df_full.at[i, 'Titolo'] = nuovo_titolo
@@ -1589,10 +1395,10 @@ elif st.session_state.pagina == "Modifica":
                                     df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
                                     df_full.at[i, 'Saggio Consegna'] = nuovo_saggio
                                     df_full.at[i, 'Note'] = nuove_note
-                                    df_full.at[i, 'N° Alunni'] = nuovo_n_alunni if nuovo_n_alunni > 0 else ""
 
                                     df_full.to_csv(DB_FILE, index=False)
                                     backup_su_google_sheets(df_full)
+                                    st.cache_data.clear()
 
                                     # --- TRUCCO PER IL RESET: Incrementiamo il contatore ---
                                     st.session_state.reset_mod_ctr += 1
@@ -1601,12 +1407,15 @@ elif st.session_state.pagina == "Modifica":
                                     st.rerun()
                         with b2:
                             if st.button("🗑️ ELIMINA", key=f"del_{i}", use_container_width=True):
-                                df_full = carica_db_adozioni().astype(str)
+                                df_full = get_db_adozioni().fillna("").astype(str)
                                 df_full = df_full.drop(int(i))
                                 df_full.to_csv(DB_FILE, index=False)
                                 backup_su_google_sheets(df_full)
+                                st.cache_data.clear()
                                 st.session_state.reset_mod_ctr += 1  # Reset anche qui
                                 st.rerun()
+    else:
+        st.info("Registro vuoto.")
 # FINE BLOCCO 14
 # =========================================================
 # =========================================================
@@ -1667,7 +1476,6 @@ elif st.session_state.pagina == "Tabellone Stato":
         with f2:
             filtro_stato = st.selectbox("📂 Filtra per Stato",
                                         ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
-            solo_incompleti = st.checkbox("Solo DA RITIRARE incompleti", value=False, key="tb_incompleti")
 
         mostra = []
         for p in elenco_totale:
@@ -1676,11 +1484,6 @@ elif st.session_state.pagina == "Tabellone Stato":
             ha_sigle = len(cat_attive) > 0
             e_ritirato = p in ritirati and not ha_sigle
             e_bianco = p not in consegnati and p not in ritirati
-            mancanti_obbl = tipologie_mancanti_consegna(consegnati, p) if ha_sigle else []
-
-            if solo_incompleti and filtro_stato in ["TUTTI", "DA RITIRARE"]:
-                if not (ha_sigle and mancanti_obbl):
-                    continue
 
             if filtro_stato == "TUTTI":
                 mostra.append(p)
@@ -1853,59 +1656,25 @@ elif st.session_state.pagina == "Ritirate":
         st.info("ℹ️ Nessuna collana risulta ritirata al momento.")
     else:
         elenco_plessi_ritiri = sorted(list(st.session_state.storico_ritiri.keys()))
-        plessi_show = st.multiselect("🔍 Seleziona Plesso/i:", elenco_plessi_ritiri, key="sel_plessi_ritirati")
-        if not plessi_show:
-            st.info("Seleziona uno o più plessi per visualizzare le collane ritirate.")
-        else:
-            for plesso in plessi_show:
-                with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=True):
-                    per_tipo = st.session_state.storico_ritiri.get(plesso, {})
-                    tot_plesso = 0
-                    open_tipo_key = f"open_tipo_ritirate_{plesso}"
-                    if open_tipo_key not in st.session_state:
-                        st.session_state[open_tipo_key] = None
-
-                    st.markdown("""
-                        <style>
-                        div[data-testid="stButton"] > button {
-                            display: flex !important;
-                            justify-content: flex-start !important;
-                            text-align: left !important;
-                            padding-left: 15px !important;
-                        }
-                        div[data-testid="stButton"] > button > div {
-                            width: 100% !important;
-                            display: flex !important;
-                            justify-content: flex-start !important;
-                        }
-                        div[data-testid="stButton"] > button > div > p {
-                            width: 100% !important;
-                            text-align: left !important;
-                            margin: 0 !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
-
-                    for tipo in ordina_tipologie(per_tipo.keys()):
-                        is_open = st.session_state.get(open_tipo_key) == tipo
-                        freccia = "🔽" if is_open else "▶️"
-
-                        if st.button(f"{freccia} 📚 {tipo.upper()}", key=f"open_tipo_rit_{plesso}_{tipo}", use_container_width=True):
-                            st.session_state[open_tipo_key] = None if is_open else tipo
-                            st.rerun()
-
-                        if is_open:
-                            with st.container(border=True):
-                                libri = per_tipo[tipo]
-                                agg = {}
-                                for lib in libri:
-                                    key = (lib.get('t',''), lib.get('e',''))
-                                    agg[key] = agg.get(key, 0) + int(lib.get('q', 0))
-                                df_tip = pd.DataFrame([{"Titolo": k[0], "Editore": k[1], "Quantità": q} for k, q in agg.items()])
-                                if not df_tip.empty:
-                                    df_tip = df_tip.sort_values(by=["Titolo", "Editore"])
-                                    st.dataframe(df_tip, use_container_width=True, hide_index=True)
-                                    tot_tipo = int(df_tip["Quantità"].sum())
-                                    tot_plesso += tot_tipo
-                                    st.markdown(f"<div class='totale-box'>Totale tipologia: <b>{tot_tipo}</b></div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='totale-box'>Totale ritiri plesso: <b>{tot_plesso}</b></div>", unsafe_allow_html=True)
+        scuola_sel = st.selectbox("🔍 Filtra Plesso:", ["- MOSTRA TUTTI -"] + elenco_plessi_ritiri)
+        plessi_show = [scuola_sel] if scuola_sel != "- MOSTRA TUTTI -" else elenco_plessi_ritiri
+        for plesso in plessi_show:
+            with st.expander(f"🏫 PLESSO: {plesso.upper()}", expanded=False):
+                per_tipo = st.session_state.storico_ritiri.get(plesso, {})
+                tot_plesso = 0
+                for tipo in sorted(list(per_tipo.keys())):
+                    with st.expander(f"📚 {tipo.upper()}", expanded=True):
+                        libri = per_tipo[tipo]
+                        # Aggrega per titolo+editore
+                        agg = {}
+                        for lib in libri:
+                            key = (lib.get('t',''), lib.get('e',''))
+                            agg[key] = agg.get(key, 0) + int(lib.get('q', 0))
+                        df_tip = pd.DataFrame([{"Titolo": k[0], "Editore": k[1], "Quantità": q} for k, q in agg.items()])
+                        if not df_tip.empty:
+                            df_tip = df_tip.sort_values(by=["Titolo", "Editore"])
+                            st.dataframe(df_tip, use_container_width=True, hide_index=True)
+                            tot_tipo = int(df_tip["Quantità"].sum())
+                            tot_plesso += tot_tipo
+                            st.markdown(f"<div class='totale-box'>Totale tipologia: <b>{tot_tipo}</b></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='totale-box'>Totale ritiri plesso: <b>{tot_plesso}</b></div>", unsafe_allow_html=True)
