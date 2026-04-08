@@ -457,6 +457,50 @@ def scarica_db_da_google_sheets():
         return pd.DataFrame()
 
 
+def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
+    sh = connetti_google_sheets()
+    if not sh:
+        return False
+    try:
+        try:
+            ws = sh.worksheet("Appunti")
+        except Exception:
+            ws = sh.add_worksheet(title="Appunti", rows="5000", cols="20")
+        values = ws.get_all_values()
+        if not values:
+            ws.append_row(["Data", "Plesso", "Insegnante", "Classe", "Sez.", "Materia", "Note"])
+        ws.append_row([
+            datetime.now().strftime("%d/%m/%Y %H:%M"),
+            str(plesso or ""),
+            str(insegnante or ""),
+            str(classe or ""),
+            str(sezione or ""),
+            str(materia or ""),
+            str(note or ""),
+        ])
+        try:
+            carica_appunti_cloud.clear()
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        st.sidebar.error(f"Errore salvataggio Appunti: {e}")
+        return False
+
+
+@st.cache_data(ttl=60)
+def carica_appunti_cloud():
+    sh = connetti_google_sheets()
+    if not sh:
+        return pd.DataFrame()
+    try:
+        ws = sh.worksheet("Appunti")
+        df = pd.DataFrame(ws.get_all_records()).fillna("")
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -723,7 +767,11 @@ with st.sidebar:
         st.session_state.pagina = "Ricerca Collane"
         st.rerun()
 
-    if st.button("📊 TABELLONE STATO", use_container_width=True):
+    if st.button("  APPUNTI", use_container_width=True):
+        st.session_state.pagina = "Appunti";
+        st.rerun()
+
+    if st.button(" 📊 TABELLONE STATO", use_container_width=True):
         st.session_state.pagina = "Tabellone Stato";
         st.rerun()
     st.markdown("---")
@@ -1995,3 +2043,56 @@ elif st.session_state.pagina == "Ritirate":
                                     tot_plesso += tot_tipo
                                     st.markdown(f"<div class='totale-box'>Totale tipologia: <b>{tot_tipo}</b></div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='totale-box'>Totale ritiri plesso: <b>{tot_plesso}</b></div>", unsafe_allow_html=True)
+
+# =========================================================
+# --- BLOCCO 18: APPUNTI ---
+# =========================================================
+elif st.session_state.pagina == "Appunti":
+    st.header("📝 Appunti")
+    if "appunti_reset" not in st.session_state:
+        st.session_state.appunti_reset = 0
+    suff = str(st.session_state.appunti_reset)
+
+    with st.container(border=True):
+        c1, c2, c3 = st.columns(3)
+        plesso = c1.selectbox("🏫 Plesso", [""] + elenco_plessi, key="app_ple_" + suff)
+        insegnante = c2.text_input("👩‍🏫 Insegnante", key="app_ins_" + suff)
+        materia = c3.text_input("📚 Materia", key="app_mat_" + suff)
+        c4, c5 = st.columns(2)
+        classe = c4.text_input("🏷️ Classe", key="app_cla_" + suff)
+        sezione = c5.text_input("🔡 Sez.", key="app_sez_" + suff)
+        note = st.text_area("🗒️ Note", key="app_note_" + suff, height=120)
+        b1, b2 = st.columns(2)
+        if b1.button("💾 SALVA APPUNTO", use_container_width=True, type="primary", key="app_save_" + suff):
+            if not plesso or not note.strip():
+                st.warning("Inserisci almeno Plesso e Note.")
+            else:
+                if salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
+                    st.success("Appunto salvato in Cloud.")
+                    st.session_state.appunti_reset += 1
+                    st.rerun()
+        if b2.button("🧹 PULISCI CAMPI", use_container_width=True, key="app_clear_" + suff):
+            st.session_state.appunti_reset += 1
+            st.rerun()
+
+    df_app = carica_appunti_cloud()
+    if df_app.empty:
+        st.info("Nessun appunto salvato.")
+    else:
+        with st.container(border=True):
+            f1, f2, f3 = st.columns(3)
+            f_pl = f1.multiselect("🏫 Filtra Plesso", sorted(df_app.get("Plesso", pd.Series(dtype=str)).astype(str).unique()), key="app_fpl_" + suff)
+            f_ins = f2.multiselect("👩‍🏫 Filtra Insegnante", sorted(df_app.get("Insegnante", pd.Series(dtype=str)).astype(str).unique()), key="app_fins_" + suff)
+            t_search = f3.text_input("🔎 Cerca Note", key="app_search_" + suff)
+
+        dfv = df_app.copy()
+        if f_pl and "Plesso" in dfv.columns:
+            dfv = dfv[dfv["Plesso"].astype(str).isin([str(x) for x in f_pl])]
+        if f_ins and "Insegnante" in dfv.columns:
+            dfv = dfv[dfv["Insegnante"].astype(str).isin([str(x) for x in f_ins])]
+        if t_search and "Note" in dfv.columns:
+            dfv = dfv[dfv["Note"].astype(str).str.contains(str(t_search), case=False, na=False)]
+        if "Data" in dfv.columns:
+            st.dataframe(dfv.sort_values(by=["Data"], ascending=False), use_container_width=True, hide_index=True)
+        else:
+            st.dataframe(dfv, use_container_width=True, hide_index=True)
