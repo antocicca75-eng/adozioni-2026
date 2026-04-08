@@ -468,8 +468,25 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
         except Exception:
             ws = sh.add_worksheet(title="Appunti", rows="5000", cols="20")
         values = ws.get_all_values()
-        if not values:
-            ws.append_row(["ID", "Data", "Plesso", "Insegnante", "Classe", "Sez.", "Materia", "Note", "Completato"])
+
+        def _norm(s):
+            return str(s).strip().upper().replace(".", "").replace(" ", "")
+
+        header = ["ID", "Data", "Plesso", "Insegnante", "Classe", "Sez.", "Materia", "Note", "Completato"]
+
+        header_idx = None
+        for idx, row in enumerate(values[:10] if values else []):
+            hn = [_norm(x) for x in row if str(x).strip()]
+            if "PLESSO" in hn and "NOTE" in hn:
+                header_idx = idx
+                break
+
+        if not values or header_idx is None:
+            ws.update("A1:I1", [header])
+        else:
+            current_header = [str(x).strip() for x in values[header_idx]]
+            if "ID" not in current_header or "Completato" not in current_header:
+                ws.update(f"A{header_idx+1}:I{header_idx+1}", [header])
             
         new_id = str(uuid.uuid4())[:8]
         ws.append_row([
@@ -490,6 +507,7 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
         return True
     except Exception as e:
         st.sidebar.error(f"Errore salvataggio Appunti: {e}")
+        st.error(f"Errore salvataggio Appunti: {e}")
         return False
 
 def aggiorna_appunto_cloud(appunto_id, nuovo_stato_completato):
@@ -2175,6 +2193,8 @@ elif st.session_state.pagina == "Appunti":
                         st.success("Appunto salvato in Cloud.")
                         st.session_state.appunti_reset += 1
                         st.rerun()
+                    else:
+                        st.error("Appunto NON salvato. Controlla eventuali messaggi di errore.")
             if b2.button("🧹 PULISCI CAMPI", use_container_width=True, key="app_clear_" + suff):
                 st.session_state.appunti_reset += 1
                 st.rerun()
