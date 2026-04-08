@@ -727,6 +727,22 @@ with st.sidebar:
         st.session_state.pagina = "Tabellone Stato";
         st.rerun()
     st.markdown("---")
+
+    if st.button("☁️ RIPRISTINA DB ADOZIONI DA CLOUD", use_container_width=True):
+        df_cloud = scarica_db_da_google_sheets()
+        if df_cloud.empty:
+            st.error("Nessun dato trovato sul Cloud (Adozioni_DB).")
+        else:
+            try:
+                df_cloud.to_csv(DB_FILE, index=False)
+                try:
+                    carica_csv.clear()
+                except Exception:
+                    pass
+                st.success(f"Ripristino completato: {len(df_cloud)} righe.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Errore scrittura file locale: {e}")
 # ------------------------------------------------------------------------------
 
 
