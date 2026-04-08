@@ -2105,7 +2105,7 @@ elif st.session_state.pagina == "Appunti":
         st.session_state.appunti_reset = 0
     suff = str(st.session_state.appunti_reset)
 
-    with st.expander("➕ Inserisci Appunto", expanded=True):
+    with st.expander("➕ Inserisci Appunto", expanded=False):
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
             plesso = c1.selectbox("🏫 Plesso", [""] + elenco_plessi, key="app_ple_" + suff)
