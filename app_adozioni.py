@@ -1500,7 +1500,11 @@ elif st.session_state.pagina == "ModificaLibro":
 elif st.session_state.pagina == "Registro":
     st.subheader("📑 Registro Completo")
     if os.path.exists(DB_FILE):
-        st.dataframe(carica_db_adozioni(), use_container_width=True)
+        df_reg = carica_db_adozioni().copy()
+        if "N° Alunni" in df_reg.columns:
+            n = pd.to_numeric(df_reg["N° Alunni"], errors="coerce")
+            df_reg["N° Alunni"] = n.apply(lambda x: "" if pd.isna(x) else (str(int(x)) if float(x).is_integer() else str(x)))
+        st.dataframe(df_reg, use_container_width=True)
 
 elif st.session_state.pagina == "Ricerca":
     st.subheader("🔍 Motore di Ricerca Adozioni")
@@ -1534,6 +1538,9 @@ elif st.session_state.pagina == "Ricerca":
         if f_sag != "TUTTI": df = df[df["Saggio Consegna"] == f_sag]
         if not df.empty:
             df_view = df.sort_index(ascending=False).copy()
+            if "N° Alunni" in df_view.columns:
+                n = pd.to_numeric(df_view["N° Alunni"], errors="coerce")
+                df_view["N° Alunni"] = n.apply(lambda x: "" if pd.isna(x) else (str(int(x)) if float(x).is_integer() else str(x)))
             st.dataframe(df_view, use_container_width=True)
             somma = pd.to_numeric(df["N° sezioni"], errors='coerce').sum()
             
@@ -1551,6 +1558,8 @@ elif st.session_state.pagina == "Ricerca":
                 df_export = df_view.copy()
                 if "N° sezioni" in df_export.columns:
                     df_export["N° sezioni"] = pd.to_numeric(df_export["N° sezioni"], errors="coerce").fillna(0).astype(int)
+                if "N° Alunni" in df_export.columns:
+                    df_export["N° Alunni"] = pd.to_numeric(df_export["N° Alunni"], errors="coerce").fillna(0).astype(int)
                 df_export.to_excel(out, index=False, sheet_name="Pivot Adozioni")
                 st.download_button(
                     "📥 SCARICA EXCEL",
@@ -2096,27 +2105,28 @@ elif st.session_state.pagina == "Appunti":
         st.session_state.appunti_reset = 0
     suff = str(st.session_state.appunti_reset)
 
-    with st.container(border=True):
-        c1, c2, c3 = st.columns(3)
-        plesso = c1.selectbox("🏫 Plesso", [""] + elenco_plessi, key="app_ple_" + suff)
-        insegnante = c2.text_input("👩‍🏫 Insegnante", key="app_ins_" + suff)
-        materia = c3.text_input("📚 Materia", key="app_mat_" + suff)
-        c4, c5 = st.columns(2)
-        classe = c4.text_input("🏷️ Classe", key="app_cla_" + suff)
-        sezione = c5.text_input("🔡 Sez.", key="app_sez_" + suff)
-        note = st.text_area("🗒️ Note", key="app_note_" + suff, height=120)
-        b1, b2 = st.columns(2)
-        if b1.button("💾 SALVA APPUNTO", use_container_width=True, type="primary", key="app_save_" + suff):
-            if not plesso or not note.strip():
-                st.warning("Inserisci almeno Plesso e Note.")
-            else:
-                if salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
-                    st.success("Appunto salvato in Cloud.")
-                    st.session_state.appunti_reset += 1
-                    st.rerun()
-        if b2.button("🧹 PULISCI CAMPI", use_container_width=True, key="app_clear_" + suff):
-            st.session_state.appunti_reset += 1
-            st.rerun()
+    with st.expander("➕ Inserisci Appunto", expanded=True):
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            plesso = c1.selectbox("🏫 Plesso", [""] + elenco_plessi, key="app_ple_" + suff)
+            insegnante = c2.text_input("👩‍🏫 Insegnante", key="app_ins_" + suff)
+            materia = c3.text_input("📚 Materia", key="app_mat_" + suff)
+            c4, c5 = st.columns(2)
+            classe = c4.text_input("🏷️ Classe", key="app_cla_" + suff)
+            sezione = c5.text_input("🔡 Sez.", key="app_sez_" + suff)
+            note = st.text_area("🗒️ Note", key="app_note_" + suff, height=120)
+            b1, b2 = st.columns(2)
+            if b1.button("💾 SALVA APPUNTO", use_container_width=True, type="primary", key="app_save_" + suff):
+                if not plesso or not note.strip():
+                    st.warning("Inserisci almeno Plesso e Note.")
+                else:
+                    if salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
+                        st.success("Appunto salvato in Cloud.")
+                        st.session_state.appunti_reset += 1
+                        st.rerun()
+            if b2.button("🧹 PULISCI CAMPI", use_container_width=True, key="app_clear_" + suff):
+                st.session_state.appunti_reset += 1
+                st.rerun()
 
     df_app = carica_appunti_cloud()
     if df_app.empty:
@@ -2143,6 +2153,33 @@ elif st.session_state.pagina == "Appunti":
                 dfv = dfv[dfv["Completato"].astype(str).str.upper() == "SI"]
         if "Data" in dfv.columns:
             dfv = dfv.sort_values(by=["Data"], ascending=False)
+
+        with st.container(border=True):
+            try:
+                buf = io.BytesIO()
+                engine = None
+                try:
+                    import openpyxl
+                    engine = "openpyxl"
+                except Exception:
+                    try:
+                        import xlsxwriter
+                        engine = "xlsxwriter"
+                    except Exception:
+                        engine = None
+                if engine is None:
+                    raise RuntimeError("Nessun engine Excel disponibile")
+                with pd.ExcelWriter(buf, engine=engine) as writer:
+                    dfv.to_excel(writer, index=False, sheet_name="Appunti")
+                st.download_button(
+                    "📤 ESPORTA EXCEL APPUNTI",
+                    data=buf.getvalue(),
+                    file_name=f"appunti_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            except Exception as ex:
+                st.warning(f"Export Excel non disponibile: {ex}")
 
         if "Plesso" not in dfv.columns or dfv.empty:
             st.info("Nessun appunto corrisponde ai filtri.")
