@@ -211,8 +211,9 @@ def aggiungi_ritiri(plesso, tipo, items):
 # ==============================================================================
 # BLOCCO 3: COSTANTI E SETTAGGI PAGINA
 # ==============================================================================
-DB_FILE = "dati_adozioni.csv"
-CONFIG_FILE = "anagrafiche.xlsx"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(BASE_DIR, "dati_adozioni.csv")
+CONFIG_FILE = os.path.join(BASE_DIR, "anagrafiche.xlsx")
 ID_FOGLIO = "1Ah5_pucc4b0ziNZxqo0NRpHwyUvFrUEggIugMXzlaKk"
 
 st.set_page_config(page_title="Adozioni 2026", layout="wide", page_icon="📚")
@@ -227,7 +228,7 @@ import io
 class PDF_CONSEGNA(FPDF):
     def __init__(self, logo_data=None):
         super().__init__(orientation='L', unit='mm', format='A4')
-        self.logo_path = "logo.jpg"
+        self.logo_path = os.path.join(BASE_DIR, "logo.jpg")
 
     def rounded_rect(self, x, y, w, h, r, style='', corners='1234'):
         k = self.k
@@ -398,6 +399,24 @@ def backup_su_google_sheets(df_da_salvare):
     return False
 
 
+def scarica_db_da_google_sheets():
+    sh = connetti_google_sheets()
+    if not sh:
+        return pd.DataFrame()
+    try:
+        ws = sh.worksheet("Adozioni_DB")
+        values = ws.get_all_values()
+        if not values or len(values) < 2:
+            return pd.DataFrame()
+        header = values[0]
+        rows = values[1:]
+        df = pd.DataFrame(rows, columns=header).fillna("")
+        return df
+    except Exception as e:
+        st.sidebar.error(f"Errore lettura Cloud: {e}")
+        return pd.DataFrame()
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -456,13 +475,24 @@ def carica_csv(path, mtime):
 
 
 def carica_db_adozioni():
-    if not os.path.exists(DB_FILE):
-        return pd.DataFrame()
-    try:
-        mtime = os.path.getmtime(DB_FILE)
-    except Exception:
-        mtime = 0
-    return carica_csv(DB_FILE, mtime)
+    if os.path.exists(DB_FILE):
+        try:
+            mtime = os.path.getmtime(DB_FILE)
+        except Exception:
+            mtime = 0
+        df = carica_csv(DB_FILE, mtime)
+        if not df.empty:
+            return df
+
+    df_cloud = scarica_db_da_google_sheets()
+    if not df_cloud.empty:
+        try:
+            df_cloud.to_csv(DB_FILE, index=False)
+        except Exception as e:
+            st.sidebar.error(f"Impossibile scrivere CSV locale: {e}")
+        return df_cloud
+
+    return pd.DataFrame()
 
 
 def aggiungi_libro_a_excel(t, m, e, a):
