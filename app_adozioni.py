@@ -388,7 +388,10 @@ def backup_su_google_sheets(df_da_salvare):
     sh = connetti_google_sheets()
     if sh:
         try:
-            foglio = sh.worksheet("Adozioni_DB")
+            try:
+                foglio = sh.worksheet("Adozioni_DB")
+            except Exception:
+                foglio = sh.add_worksheet(title="Adozioni_DB", rows="5000", cols="30")
             foglio.clear()
             dati = [df_da_salvare.columns.values.tolist()] + df_da_salvare.fillna("").values.tolist()
             foglio.update(dati)
@@ -404,14 +407,51 @@ def scarica_db_da_google_sheets():
     if not sh:
         return pd.DataFrame()
     try:
-        ws = sh.worksheet("Adozioni_DB")
-        values = ws.get_all_values()
-        if not values or len(values) < 2:
-            return pd.DataFrame()
-        header = values[0]
-        rows = values[1:]
-        df = pd.DataFrame(rows, columns=header).fillna("")
-        return df
+        def _looks_like_adozioni(header_row):
+            hn = [str(x).strip().upper() for x in (header_row or []) if str(x).strip()]
+            has_plesso = "PLESSO" in hn
+            has_titolo = any(("TITOLO" in h) for h in hn)
+            return has_plesso and has_titolo
+
+        def _df_from_ws(ws):
+            values = ws.get_all_values()
+            if not values or len(values) < 2:
+                return pd.DataFrame()
+            header_idx = None
+            for idx, row in enumerate(values[:10]):
+                if _looks_like_adozioni(row):
+                    header_idx = idx
+                    break
+            if header_idx is None:
+                return pd.DataFrame()
+            header = [str(x).strip() for x in values[header_idx]]
+            rows = values[header_idx + 1:]
+            df = pd.DataFrame(rows, columns=header).fillna("")
+            if not df.empty:
+                df = df.loc[~(df.astype(str).apply(lambda r: "".join(r).strip() == "", axis=1))]
+            return df
+
+        nomi_preferiti = [
+            "Adozioni_DB",
+            "Adozioni DB",
+            "Registro Adozioni",
+            "RegistroAdozioni",
+            "Adozioni",
+        ]
+
+        titoli = [w.title for w in sh.worksheets()]
+        for nome in nomi_preferiti:
+            if nome in titoli:
+                df = _df_from_ws(sh.worksheet(nome))
+                if not df.empty:
+                    return df
+
+        for ws in sh.worksheets():
+            df = _df_from_ws(ws)
+            if not df.empty:
+                return df
+
+        return pd.DataFrame()
     except Exception as e:
         st.sidebar.error(f"Errore lettura Cloud: {e}")
         return pd.DataFrame()
