@@ -458,6 +458,24 @@ def scarica_db_da_google_sheets():
         return pd.DataFrame()
 
 
+def backup_cloud_totale():
+    df = carica_db_adozioni()
+    if not df.empty:
+        backup_su_google_sheets(df)
+
+    if "db_consegne" not in st.session_state:
+        st.session_state.db_consegne = carica_config_consegne()
+    if "storico_consegne" not in st.session_state:
+        st.session_state.storico_consegne = carica_storico_cloud()
+    if "storico_ritiri" not in st.session_state:
+        st.session_state.storico_ritiri = carica_ritiri_cloud()
+
+    salva_config_consegne(st.session_state.get("db_consegne", {}))
+    salva_storico_cloud(st.session_state.get("storico_consegne", {}))
+    salva_ritiri_cloud(st.session_state.get("storico_ritiri", {}))
+    return True
+
+
 def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
     sh = connetti_google_sheets()
     if not sh:
@@ -903,6 +921,13 @@ with st.sidebar:
                 st.rerun()
             except Exception as e:
                 st.error(f"Errore scrittura file locale: {e}")
+
+    if st.button("☁️ BACKUP CLOUD (SALVA TUTTO)", use_container_width=True):
+        try:
+            backup_cloud_totale()
+            st.success("Backup Cloud completato.")
+        except Exception as e:
+            st.error(f"Backup Cloud non riuscito: {e}")
 # ------------------------------------------------------------------------------
 
 
