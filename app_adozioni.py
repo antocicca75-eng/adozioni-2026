@@ -539,6 +539,31 @@ def carica_appunti_cloud():
     try:
         ws = sh.worksheet("Appunti")
         df = pd.DataFrame(ws.get_all_records()).fillna("")
+        if not df.empty:
+            df.columns = [str(c).strip() for c in df.columns]
+            rename_map = {}
+            for c in df.columns:
+                ck = str(c).strip().upper().replace(".", "").replace(" ", "")
+                if ck == "PLESSO":
+                    rename_map[c] = "Plesso"
+                elif ck == "INSEGNANTE":
+                    rename_map[c] = "Insegnante"
+                elif ck == "CLASSE":
+                    rename_map[c] = "Classe"
+                elif ck in ["SEZ", "SEZIONE"]:
+                    rename_map[c] = "Sez."
+                elif ck == "MATERIA":
+                    rename_map[c] = "Materia"
+                elif ck == "NOTE":
+                    rename_map[c] = "Note"
+                elif ck == "DATA":
+                    rename_map[c] = "Data"
+                elif ck == "ID":
+                    rename_map[c] = "ID"
+                elif ck == "COMPLETATO":
+                    rename_map[c] = "Completato"
+            if rename_map:
+                df = df.rename(columns=rename_map)
         return df
     except Exception:
         return pd.DataFrame()
