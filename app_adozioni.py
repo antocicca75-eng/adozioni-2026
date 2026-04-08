@@ -538,32 +538,58 @@ def carica_appunti_cloud():
         return pd.DataFrame()
     try:
         ws = sh.worksheet("Appunti")
-        df = pd.DataFrame(ws.get_all_records()).fillna("")
-        if not df.empty:
-            df.columns = [str(c).strip() for c in df.columns]
-            rename_map = {}
-            for c in df.columns:
-                ck = str(c).strip().upper().replace(".", "").replace(" ", "")
-                if ck == "PLESSO":
-                    rename_map[c] = "Plesso"
-                elif ck == "INSEGNANTE":
-                    rename_map[c] = "Insegnante"
-                elif ck == "CLASSE":
-                    rename_map[c] = "Classe"
-                elif ck in ["SEZ", "SEZIONE"]:
-                    rename_map[c] = "Sez."
-                elif ck == "MATERIA":
-                    rename_map[c] = "Materia"
-                elif ck == "NOTE":
-                    rename_map[c] = "Note"
-                elif ck == "DATA":
-                    rename_map[c] = "Data"
-                elif ck == "ID":
-                    rename_map[c] = "ID"
-                elif ck == "COMPLETATO":
-                    rename_map[c] = "Completato"
-            if rename_map:
-                df = df.rename(columns=rename_map)
+        values = ws.get_all_values()
+        if not values or len(values) < 2:
+            return pd.DataFrame()
+
+        def _norm(s):
+            return str(s).strip().upper().replace(".", "").replace(" ", "")
+
+        header_idx = None
+        for idx, row in enumerate(values[:10]):
+            hn = [_norm(x) for x in row if str(x).strip()]
+            if "PLESSO" in hn and "NOTE" in hn:
+                header_idx = idx
+                break
+        if header_idx is None:
+            header_idx = 0
+
+        header = [str(x).strip() for x in values[header_idx]]
+        max_len = max([len(r) for r in values[header_idx:]] + [len(header)])
+        if len(header) < max_len:
+            header = header + [f"COL{j+1}" for j in range(len(header), max_len)]
+        rows = [r + [""] * (max_len - len(r)) for r in values[header_idx + 1:]]
+        df = pd.DataFrame(rows, columns=header).fillna("")
+        if df.empty:
+            return df
+        df = df.loc[~(df.astype(str).apply(lambda r: "".join(r).strip() == "", axis=1))]
+        if df.empty:
+            return df
+
+        df.columns = [str(c).strip() for c in df.columns]
+        rename_map = {}
+        for c in df.columns:
+            ck = _norm(c)
+            if ck == "PLESSO":
+                rename_map[c] = "Plesso"
+            elif ck == "INSEGNANTE":
+                rename_map[c] = "Insegnante"
+            elif ck == "CLASSE":
+                rename_map[c] = "Classe"
+            elif ck in ["SEZ", "SEZIONE"]:
+                rename_map[c] = "Sez."
+            elif ck == "MATERIA":
+                rename_map[c] = "Materia"
+            elif ck == "NOTE":
+                rename_map[c] = "Note"
+            elif ck == "DATA":
+                rename_map[c] = "Data"
+            elif ck == "ID":
+                rename_map[c] = "ID"
+            elif ck == "COMPLETATO":
+                rename_map[c] = "Completato"
+        if rename_map:
+            df = df.rename(columns=rename_map)
         return df
     except Exception:
         return pd.DataFrame()
