@@ -511,10 +511,10 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
             new_id,
             datetime.now().strftime("%d/%m/%Y"),
             str(plesso or ""),
-            str(insegnante or ""),
+            str(insegnante or "").strip().upper(),
             str(classe or ""),
             str(sezione or ""),
-            str(materia or ""),
+            str(materia or "").strip().upper(),
             str(note or "").upper(),
             "NO"
         ])
@@ -626,6 +626,10 @@ def carica_appunti_cloud():
                 rename_map[c] = "Completato"
         if rename_map:
             df = df.rename(columns=rename_map)
+        if "Insegnante" in df.columns:
+            df["Insegnante"] = df["Insegnante"].astype(str).str.strip().str.upper()
+        if "Materia" in df.columns:
+            df["Materia"] = df["Materia"].astype(str).str.strip().str.upper()
         return df
     except Exception:
         return pd.DataFrame()
