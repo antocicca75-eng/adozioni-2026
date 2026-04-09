@@ -1243,57 +1243,6 @@ elif st.session_state.pagina == "Storico":
         st.info("Nessuna consegna registrata.")
     else:
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
-        with st.expander("🧾 Verifica tipologie obbligatorie", expanded=False):
-            plessi_check = st.multiselect(
-                "🏫 Plessi da controllare",
-                elenco_plessi_storico,
-                default=elenco_plessi_storico,
-                key="chk_plessi_obbl",
-            )
-            mostra_completi = st.checkbox("Mostra anche plessi completi", value=False, key="chk_show_ok")
-
-            righe = []
-            for plesso in plessi_check:
-                mancanti = tipologie_mancanti_consegna(st.session_state.storico_consegne, plesso)
-                if mostra_completi or mancanti:
-                    righe.append({
-                        "Plesso": plesso,
-                        "N Mancanti": len(mancanti),
-                        "Tipologie Mancanti": ", ".join(mancanti),
-                    })
-
-            df_chk = pd.DataFrame(righe)
-            if df_chk.empty:
-                st.success("Tutte le scuole selezionate risultano complete.")
-            else:
-                df_chk = df_chk.sort_values(by=["N Mancanti", "Plesso"], ascending=[False, True])
-                st.dataframe(df_chk, use_container_width=True, hide_index=True)
-                try:
-                    buf = io.BytesIO()
-                    engine = None
-                    try:
-                        import openpyxl
-                        engine = "openpyxl"
-                    except Exception:
-                        try:
-                            import xlsxwriter
-                            engine = "xlsxwriter"
-                        except Exception:
-                            engine = None
-                    if engine is None:
-                        raise RuntimeError("Nessun engine Excel disponibile")
-                    with pd.ExcelWriter(buf, engine=engine) as writer:
-                        df_chk.to_excel(writer, index=False, sheet_name="Controllo")
-                    st.download_button(
-                        "📤 ESPORTA EXCEL CONTROLLO",
-                        data=buf.getvalue(),
-                        file_name=f"controllo_tipologie_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                    )
-                except Exception as ex:
-                    st.warning(f"Export Excel non disponibile: {ex}")
-
         scuole_selezionate = st.multiselect("🔍 Seleziona Plesso/i:", elenco_plessi_storico, key="sel_plessi_storico")
         
         if not scuole_selezionate:
@@ -1949,6 +1898,7 @@ elif st.session_state.pagina == "Tabellone Stato":
                                         ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
             solo_incompleti = st.checkbox("Solo DA RITIRARE incompleti", value=False, key="tb_incompleti")
 
+        req_sigle_vacanze = {"V1", "V2", "V3", "V4", "V5"}
         mostra = []
         for p in elenco_totale:
             if cerca_sel != "- TUTTI -" and p != cerca_sel: continue
@@ -1956,10 +1906,11 @@ elif st.session_state.pagina == "Tabellone Stato":
             ha_sigle = len(cat_attive) > 0
             e_ritirato = p in ritirati and not ha_sigle
             e_bianco = p not in consegnati and p not in ritirati
-            mancanti_obbl = tipologie_mancanti_consegna(consegnati, p) if ha_sigle else []
+            sigle_p = {mappa_sigle.get(cat, cat[:2]) for cat in cat_attive}
+            mancanti_vacanze = sorted(list(req_sigle_vacanze - sigle_p)) if ha_sigle else []
 
             if solo_incompleti and filtro_stato in ["TUTTI", "DA RITIRARE"]:
-                if not (ha_sigle and mancanti_obbl):
+                if not (ha_sigle and mancanti_vacanze):
                     continue
 
             if filtro_stato == "TUTTI":
@@ -1970,6 +1921,54 @@ elif st.session_state.pagina == "Tabellone Stato":
                 mostra.append(p)
             elif filtro_stato == "RITIRATI" and e_ritirato:
                 mostra.append(p)
+
+        if mostra:
+            righe_xls = []
+            for p in mostra:
+                cat_attive = consegnati.get(p, {}).keys()
+                sigle_p = sorted(list({mappa_sigle.get(cat, cat[:2]) for cat in cat_attive}))
+                ha_sigle = len(sigle_p) > 0
+                e_ritirato = p in ritirati and not ha_sigle
+                e_bianco = p not in consegnati and p not in ritirati
+                if e_bianco:
+                    stato = "DA INIZIARE"
+                elif e_ritirato:
+                    stato = "RITIRATI"
+                else:
+                    stato = "DA RITIRARE"
+                mancanti_v = sorted(list(req_sigle_vacanze - set(sigle_p))) if ha_sigle else sorted(list(req_sigle_vacanze))
+                righe_xls.append({
+                    "Plesso": p,
+                    "Stato": stato,
+                    "Sigle Presenti": " ".join(sigle_p),
+                    "Mancanti V1-V5": " ".join(mancanti_v),
+                })
+            df_xls = pd.DataFrame(righe_xls)
+            try:
+                buf = io.BytesIO()
+                engine = None
+                try:
+                    import openpyxl
+                    engine = "openpyxl"
+                except Exception:
+                    try:
+                        import xlsxwriter
+                        engine = "xlsxwriter"
+                    except Exception:
+                        engine = None
+                if engine is None:
+                    raise RuntimeError("Nessun engine Excel disponibile")
+                with pd.ExcelWriter(buf, engine=engine) as writer:
+                    df_xls.to_excel(writer, index=False, sheet_name="Tabellone")
+                st.download_button(
+                    "📥 SCARICA EXCEL",
+                    data=buf.getvalue(),
+                    file_name=f"tabellone_{filtro_stato.lower().replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            except Exception as ex:
+                st.warning(f"Export Excel non disponibile: {ex}")
 
         # Griglia Plessi
         if not mostra:
