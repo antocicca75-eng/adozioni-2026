@@ -1267,6 +1267,13 @@ elif st.session_state.pagina == "Storico":
         st.info("Nessuna consegna registrata.")
     else:
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
+        restore_ctx = st.session_state.pop("ritorno_storico_ctx", None)
+        if restore_ctx:
+            plesso_ctx = restore_ctx.get("plesso")
+            gruppo_ctx = restore_ctx.get("gruppo_id")
+            if plesso_ctx in elenco_plessi_storico:
+                st.session_state["sel_plessi_storico"] = [plesso_ctx]
+                st.session_state[f"open_tipo_consegnate_{plesso_ctx}"] = gruppo_ctx
         scuole_selezionate = st.multiselect("🔍 Seleziona Plesso/i:", elenco_plessi_storico, key="sel_plessi_storico")
         
         if not scuole_selezionate:
@@ -1386,6 +1393,10 @@ elif st.session_state.pagina == "Storico":
                                                     "titolo": lib.get("t", ""),
                                                     "editore": lib.get("e", ""),
                                                     "tipologia": tipo,
+                                                }
+                                                st.session_state.ritorno_storico_ctx = {
+                                                    "plesso": plesso,
+                                                    "gruppo_id": gruppo_id,
                                                 }
                                                 st.session_state.pagina = "Inserimento"
                                                 st.rerun()
@@ -1736,6 +1747,8 @@ elif st.session_state.pagina == "Inserimento":
                 st.session_state.form_id += 1
                 st.session_state.prefill_adozione = {}
                 st.success("✅ Registrazione avvenuta con successo!")
+                if st.session_state.get("ritorno_storico_ctx"):
+                    st.session_state.pagina = "Storico"
                 st.rerun()
             elif saggio == "-":
                 st.error("⚠️ Devi specificare SI/NO!")
