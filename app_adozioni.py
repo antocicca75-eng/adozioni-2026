@@ -2267,8 +2267,13 @@ elif st.session_state.pagina == "Appunti":
             dfv = dfv[dfv["Note"].astype(str).str.contains(str(t_search), case=False, na=False)]
         if f_stato == "COMPLETATI" and "Completato" in dfv.columns:
             dfv = dfv[dfv["Completato"].astype(str).str.upper() == "SI"]
-        elif f_stato != "TUTTI" and "Stato" in dfv.columns:
-            dfv = dfv[dfv["Stato"].astype(str).str.upper() == f_stato.upper()]
+        elif f_stato == "IN PREPARAZIONE":
+            if "Stato" in dfv.columns:
+                dfv = dfv[(dfv["Stato"].astype(str).str.upper() == "IN PREPARAZIONE") | (dfv["Stato"].astype(str).str.strip() == "")]
+            else:
+                dfv = dfv[dfv["Completato"].astype(str).str.upper() != "SI"]
+        elif f_stato == "PRONTA" and "Stato" in dfv.columns:
+            dfv = dfv[dfv["Stato"].astype(str).str.upper() == "PRONTA"]
         if "Data" in dfv.columns:
             dfv = dfv.sort_values(by=["Data"], ascending=False)
 
