@@ -490,7 +490,7 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
         def _norm(s):
             return str(s).strip().upper().replace(".", "").replace(" ", "")
 
-        header = ["ID", "Data", "Plesso", "Insegnante", "Classe", "Sez.", "Materia", "Note", "Completato"]
+        header = ["ID", "Data", "Plesso", "Insegnante", "Classe", "Sez.", "Materia", "Note", "Completato", "Stato"]
 
         header_idx = None
         for idx, row in enumerate(values[:10] if values else []):
@@ -500,11 +500,11 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
                 break
 
         if not values or header_idx is None:
-            ws.update("A1:I1", [header])
+            ws.update("A1:J1", [header])
         else:
             current_header = [str(x).strip() for x in values[header_idx]]
             if "ID" not in current_header or "Completato" not in current_header:
-                ws.update(f"A{header_idx+1}:I{header_idx+1}", [header])
+                ws.update(f"A{header_idx+1}:J{header_idx+1}", [header])
             
         new_id = str(uuid.uuid4())[:8]
         ws.append_row([
@@ -516,7 +516,8 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
             str(sezione or ""),
             str(materia or "").strip().upper(),
             str(note or "").upper(),
-            "NO"
+            "NO",
+            "IN PREPARAZIONE"
         ])
         try:
             carica_appunti_cloud.clear()
@@ -536,19 +537,36 @@ def aggiorna_appunto_cloud(appunto_id, nuovo_stato_completato):
         cell_list = ws.findall(appunto_id)
         if cell_list:
             riga = cell_list[0].row
-            # Cerchiamo la colonna "Completato"
             headers = ws.row_values(1)
-            try:
-                col_idx = headers.index("Completato") + 1
-            except ValueError:
-                # Se non c'è, la aggiungiamo a destra
-                col_idx = len(headers) + 1
-                ws.update_cell(1, col_idx, "Completato")
-            ws.update_cell(riga, col_idx, nuovo_stato_completato)
+            col_completato = next((i+1 for i, h in enumerate(headers) if str(h).strip() == "Completato"), None)
+            if col_completato:
+                ws.update_cell(riga, col_completato, nuovo_stato_completato)
             carica_appunti_cloud.clear()
             return True
     except Exception as e:
         st.sidebar.error(f"Errore aggiornamento Appunti: {e}")
+    return False
+
+def aggiorna_stato_appunto_cloud(appunto_id, nuovo_stato):
+    sh = connetti_google_sheets()
+    if not sh: return False
+    try:
+        ws = sh.worksheet("Appunti")
+        cell_list = ws.findall(appunto_id)
+        if cell_list:
+            riga = cell_list[0].row
+            headers = ws.row_values(1)
+            col_stato = next((i+1 for i, h in enumerate(headers) if str(h).strip() == "Stato"), None)
+            if col_stato:
+                ws.update_cell(riga, col_stato, nuovo_stato)
+            else:
+                col_stato = len(headers) + 1
+                ws.update_cell(1, col_stato, "Stato")
+                ws.update_cell(riga, col_stato, nuovo_stato)
+            carica_appunti_cloud.clear()
+            return True
+    except Exception as e:
+        st.sidebar.error(f"Errore aggiornamento Stato Appunto: {e}")
     return False
 
 def elimina_appunto_cloud(appunto_id):
@@ -624,6 +642,8 @@ def carica_appunti_cloud():
                 rename_map[c] = "ID"
             elif ck == "COMPLETATO":
                 rename_map[c] = "Completato"
+            elif ck == "STATO":
+                rename_map[c] = "Stato"
         if rename_map:
             df = df.rename(columns=rename_map)
         if "Insegnante" in df.columns:
@@ -2235,7 +2255,7 @@ elif st.session_state.pagina == "Appunti":
             f1, f2, f3, f4 = st.columns(4)
             f_pl = f1.multiselect("🏫 Filtra Plesso/i", sorted(df_app.get("Plesso", pd.Series(dtype=str)).astype(str).unique()), key="app_fpl_" + suff)
             f_ins = f2.multiselect("👩‍🏫 Filtra Insegnante", sorted(df_app.get("Insegnante", pd.Series(dtype=str)).astype(str).unique()), key="app_fins_" + suff)
-            f_stato = f3.selectbox("✅ Stato", ["TUTTI", "DA COMPLETARE", "COMPLETATI"], key="app_fstato_" + suff)
+            f_stato = f3.selectbox("✅ Stato", ["TUTTI", "IN PREPARAZIONE", "PRONTA", "COMPLETATI"], key="app_fstato_" + suff)
             t_search = f4.text_input("🔎 Cerca Note", key="app_search_" + suff)
 
         dfv = df_app.copy()
@@ -2245,11 +2265,10 @@ elif st.session_state.pagina == "Appunti":
             dfv = dfv[dfv["Insegnante"].astype(str).isin([str(x) for x in f_ins])]
         if t_search and "Note" in dfv.columns:
             dfv = dfv[dfv["Note"].astype(str).str.contains(str(t_search), case=False, na=False)]
-        if f_stato != "TUTTI" and "Completato" in dfv.columns:
-            if f_stato == "DA COMPLETARE":
-                dfv = dfv[dfv["Completato"].astype(str).str.upper() != "SI"]
-            else: # COMPLETATI
-                dfv = dfv[dfv["Completato"].astype(str).str.upper() == "SI"]
+        if f_stato != "TUTTI" and "Stato" in dfv.columns:
+            dfv = dfv[dfv["Stato"].astype(str).str.upper() == f_stato.upper()]
+        elif f_stato == "COMPLETATI" and "Completato" in dfv.columns:
+            dfv = dfv[dfv["Completato"].astype(str).str.upper() == "SI"]
         if "Data" in dfv.columns:
             dfv = dfv.sort_values(by=["Data"], ascending=False)
 
@@ -2301,27 +2320,37 @@ elif st.session_state.pagina == "Appunti":
                         r_mat = row.get("Materia", "")
                         r_note = row.get("Note", "")
                         r_comp = str(row.get("Completato", "NO")).strip().upper()
+                        r_stato = str(row.get("Stato", "IN PREPARAZIONE")).strip().upper()
 
-                        bg_color = "#d4edda" if r_comp == "SI" else "#ffffff"
+                        bg_color = "#fff3cd" if r_stato == "PRONTA" else ("#d4edda" if r_comp == "SI" else "#ffffff")
 
                         with st.container(border=True):
                             st.markdown(f"""
                             <div style="background-color: {bg_color}; padding: 10px; border-radius: 5px;">
-                                <b>{plesso_nome}</b> - {r_ins} | 🏷️ {r_cla} {r_sez} | 📚 {r_mat} <span style="float:right; color:gray;">{r_data}</span><br>
+                                <b>{plesso_nome}</b> - {r_ins} | 🏷️ {r_cla} {r_sez} | 📚 {r_mat} | <b>Stato: {r_stato}</b> <span style="float:right; color:gray;">{r_data}</span><br>
                                 <p style="margin-top: 8px;">{r_note}</p>
                             </div>
                             """, unsafe_allow_html=True)
 
-                            c_btn1, c_btn2, _ = st.columns([0.15, 0.15, 0.7])
+                            c_btn1, c_btn2, c_btn3, _ = st.columns([0.20, 0.20, 0.20, 0.40])
                             if r_comp == "SI":
-                                if c_btn1.button("❌ ANNULLA COMPL.", key=f"unc_{r_id}_{i}"):
+                                if c_btn1.button("❌ ANNULLA COMPL.", key=f"unc_{r_id}_{i}", use_container_width=True):
                                     aggiorna_appunto_cloud(r_id, "NO")
                                     st.rerun()
                             else:
-                                if c_btn1.button("✅ COMPLETA", key=f"chk_{r_id}_{i}"):
+                                if c_btn1.button("✅ COMPLETA", key=f"chk_{r_id}_{i}", use_container_width=True):
                                     aggiorna_appunto_cloud(r_id, "SI")
                                     st.rerun()
 
-                            if c_btn2.button("🗑️ ELIMINA", key=f"del_{r_id}_{i}"):
+                            if r_stato != "PRONTA":
+                                if c_btn2.button("📌 PRONTA", key=f"pront_{r_id}_{i}", use_container_width=True):
+                                    aggiorna_stato_appunto_cloud(r_id, "PRONTA")
+                                    st.rerun()
+                            else:
+                                if c_btn2.button("↩️ IN PREP.", key=f"ripr_{r_id}_{i}", use_container_width=True):
+                                    aggiorna_stato_appunto_cloud(r_id, "IN PREPARAZIONE")
+                                    st.rerun()
+
+                            if c_btn3.button("🗑️ ELIMINA", key=f"del_{r_id}_{i}", use_container_width=True):
                                 elimina_appunto_cloud(r_id)
                                 st.rerun()
