@@ -2265,15 +2265,23 @@ elif st.session_state.pagina == "Appunti":
             dfv = dfv[dfv["Insegnante"].astype(str).isin([str(x) for x in f_ins])]
         if t_search and "Note" in dfv.columns:
             dfv = dfv[dfv["Note"].astype(str).str.contains(str(t_search), case=False, na=False)]
-        if f_stato == "COMPLETATI" and "Completato" in dfv.columns:
+        if "Stato" not in dfv.columns:
+            dfv["Stato"] = ""
+        if "Completato" not in dfv.columns:
+            dfv["Completato"] = "NO"
+
+        if f_stato == "COMPLETATI":
             dfv = dfv[dfv["Completato"].astype(str).str.upper() == "SI"]
+        elif f_stato == "PRONTA":
+            dfv = dfv[
+                (dfv["Completato"].astype(str).str.upper() != "SI")
+                & (dfv["Stato"].astype(str).str.upper() == "PRONTA")
+            ]
         elif f_stato == "IN PREPARAZIONE":
-            if "Stato" in dfv.columns:
-                dfv = dfv[(dfv["Stato"].astype(str).str.upper() == "IN PREPARAZIONE") | (dfv["Stato"].astype(str).str.strip() == "")]
-            else:
-                dfv = dfv[dfv["Completato"].astype(str).str.upper() != "SI"]
-        elif f_stato == "PRONTA" and "Stato" in dfv.columns:
-            dfv = dfv[dfv["Stato"].astype(str).str.upper() == "PRONTA"]
+            dfv = dfv[
+                (dfv["Completato"].astype(str).str.upper() != "SI")
+                & (dfv["Stato"].astype(str).str.upper() != "PRONTA")
+            ]
         if "Data" in dfv.columns:
             dfv = dfv.sort_values(by=["Data"], ascending=False)
 
