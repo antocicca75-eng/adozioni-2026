@@ -584,6 +584,70 @@ def aggiorna_pronta_cloud(appunto_id, nuovo_stato_pronta):
         aggiorna_appunto_flag_cloud(appunto_id, "Completato", "NO")
     return aggiorna_appunto_flag_cloud(appunto_id, "Pronta", nuovo_stato_pronta)
 
+
+def aggiorna_appunto_dati_cloud(appunto_id, plesso, insegnante, classe, sezione, materia, note):
+    sh = connetti_google_sheets()
+    if not sh:
+        return False
+    try:
+        ws = sh.worksheet("Appunti")
+
+        def _norm(s):
+            return str(s).strip().upper().replace(".", "").replace(" ", "")
+
+        header_row = 1
+        for r in range(1, 11):
+            rv = ws.row_values(r)
+            if not rv:
+                continue
+            hn = [_norm(x) for x in rv if str(x).strip()]
+            if "PLESSO" in hn and "NOTE" in hn:
+                header_row = r
+                break
+
+        headers = [str(x).strip() for x in ws.row_values(header_row)]
+        headers_norm = [_norm(x) for x in headers]
+
+        def _col(name):
+            nn = _norm(name)
+            if nn in headers_norm:
+                return headers_norm.index(nn) + 1
+            col_idx = len(headers_norm) + 1
+            ws.update_cell(header_row, col_idx, name)
+            headers_norm.append(nn)
+            return col_idx
+
+        cols = {
+            "Plesso": _col("Plesso"),
+            "Insegnante": _col("Insegnante"),
+            "Classe": _col("Classe"),
+            "Sez.": _col("Sez."),
+            "Materia": _col("Materia"),
+            "Note": _col("Note"),
+        }
+
+        cell_list = ws.findall(appunto_id)
+        if not cell_list:
+            return False
+        riga = cell_list[0].row
+
+        ws.update_cell(riga, cols["Plesso"], str(plesso or ""))
+        ws.update_cell(riga, cols["Insegnante"], str(insegnante or ""))
+        ws.update_cell(riga, cols["Classe"], str(classe or ""))
+        ws.update_cell(riga, cols["Sez."], str(sezione or ""))
+        ws.update_cell(riga, cols["Materia"], str(materia or ""))
+        ws.update_cell(riga, cols["Note"], str(note or "").upper())
+
+        try:
+            carica_appunti_cloud.clear()
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        st.sidebar.error(f"Errore modifica Appunti: {e}")
+        return False
+
+
 def elimina_appunto_cloud(appunto_id):
     sh = connetti_google_sheets()
     if not sh: return False
@@ -2236,6 +2300,8 @@ elif st.session_state.pagina == "Appunti":
         st.session_state.appunti_insert_open = False
     if "appunti_prefill" not in st.session_state:
         st.session_state.appunti_prefill = {}
+    if "appunti_edit_id" not in st.session_state:
+        st.session_state.appunti_edit_id = None
     suff = str(st.session_state.appunti_reset)
 
     pre = st.session_state.appunti_prefill or {}
@@ -2243,7 +2309,8 @@ elif st.session_state.pagina == "Appunti":
     pre_plesso = str(pre.get("plesso", "") or "")
     pre_idx = plesso_opts.index(pre_plesso) if pre_plesso in plesso_opts else 0
 
-    with st.expander("➕ Inserisci Appunto", expanded=bool(st.session_state.appunti_insert_open)):
+    titolo_form = "✏️ Modifica Appunto" if st.session_state.appunti_edit_id else "➕ Inserisci Appunto"
+    with st.expander(titolo_form, expanded=bool(st.session_state.appunti_insert_open)):
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
             plesso = c1.selectbox("🏫 Plesso", plesso_opts, index=pre_idx, key="app_ple_" + suff)
@@ -2252,22 +2319,35 @@ elif st.session_state.pagina == "Appunti":
             c4, c5 = st.columns(2)
             classe = c4.text_input("🏷️ Classe", value=str(pre.get("classe", "") or ""), key="app_cla_" + suff)
             sezione = c5.text_input("🔡 Sez.", value=str(pre.get("sezione", "") or ""), key="app_sez_" + suff)
-            note = st.text_area("🗒️ Note", key="app_note_" + suff, height=120)
+            note = st.text_area("🗒️ Note", value=str(pre.get("note", "") or ""), key="app_note_" + suff, height=120)
             b1, b2 = st.columns(2)
             if b1.button("💾 SALVA APPUNTO", use_container_width=True, type="primary", key="app_save_" + suff):
                 if not plesso or not note.strip():
                     st.warning("Inserisci almeno Plesso e Note.")
                 else:
-                    if salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
-                        st.success("Appunto salvato in Cloud.")
-                        st.session_state.appunti_prefill = {}
-                        st.session_state.appunti_insert_open = False
-                        st.session_state.appunti_reset += 1
-                        st.rerun()
+                    if st.session_state.appunti_edit_id:
+                        ok = aggiorna_appunto_dati_cloud(st.session_state.appunti_edit_id, plesso, insegnante, classe, sezione, materia, note)
+                        if ok:
+                            st.success("Appunto aggiornato in Cloud.")
+                            st.session_state.appunti_prefill = {}
+                            st.session_state.appunti_edit_id = None
+                            st.session_state.appunti_insert_open = False
+                            st.session_state.appunti_reset += 1
+                            st.rerun()
+                        else:
+                            st.error("Appunto NON aggiornato. Controlla eventuali messaggi di errore.")
                     else:
-                        st.error("Appunto NON salvato. Controlla eventuali messaggi di errore.")
+                        if salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
+                            st.success("Appunto salvato in Cloud.")
+                            st.session_state.appunti_prefill = {}
+                            st.session_state.appunti_insert_open = False
+                            st.session_state.appunti_reset += 1
+                            st.rerun()
+                        else:
+                            st.error("Appunto NON salvato. Controlla eventuali messaggi di errore.")
             if b2.button("🧹 PULISCI CAMPI", use_container_width=True, key="app_clear_" + suff):
                 st.session_state.appunti_prefill = {}
+                st.session_state.appunti_edit_id = None
                 st.session_state.appunti_insert_open = False
                 st.session_state.appunti_reset += 1
                 st.rerun()
@@ -2367,7 +2447,7 @@ elif st.session_state.pagina == "Appunti":
                             </div>
                             """, unsafe_allow_html=True)
 
-                            c_btn1, c_btn2, c_btn3, c_btn4 = st.columns([0.15, 0.15, 0.18, 0.18])
+                            c_btn1, c_btn2, c_btn3, c_btn4, c_btn5 = st.columns([0.15, 0.15, 0.18, 0.18, 0.18])
                             if r_comp == "SI":
                                 if c_btn1.button("❌ ANNULLA COMPL.", key=f"unc_{r_id}_{i}"):
                                     aggiorna_appunto_cloud(r_id, "NO")
@@ -2386,14 +2466,16 @@ elif st.session_state.pagina == "Appunti":
                                     if c_btn4.button("🟡 PRONTA", key=f"pr1_{r_id}_{i}", use_container_width=True):
                                         aggiorna_pronta_cloud(r_id, "SI")
                                         st.rerun()
-                                if c_btn3.button("➕ NUOVO", key=f"add_{r_id}_{i}", use_container_width=True):
+                                if c_btn3.button("✏️ MODIFICA", key=f"edit_{r_id}_{i}", use_container_width=True):
                                     st.session_state.appunti_prefill = {
                                         "plesso": plesso_nome,
                                         "insegnante": r_ins,
                                         "classe": r_cla,
                                         "sezione": r_sez,
                                         "materia": r_mat,
+                                        "note": r_note,
                                     }
+                                    st.session_state.appunti_edit_id = r_id
                                     st.session_state.appunti_insert_open = True
                                     st.session_state.appunti_reset += 1
                                     st.rerun()
