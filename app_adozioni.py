@@ -2361,7 +2361,7 @@ elif st.session_state.pagina == "Appunti":
             f_pl = f1.multiselect("🏫 Filtra Plesso/i", sorted(df_app.get("Plesso", pd.Series(dtype=str)).astype(str).unique()), key="app_fpl_" + suff)
             f_ins = f2.multiselect("👩‍🏫 Filtra Insegnante", sorted(df_app.get("Insegnante", pd.Series(dtype=str)).astype(str).unique()), key="app_fins_" + suff)
             t_search = f3.text_input("🔎 Cerca Note", key="app_search_" + suff)
-            f_stato = st.selectbox("✅ Stato", ["TUTTI", "DA COMPLETARE", "PRONTI", "COMPLETATI"], key="app_fstato_" + suff)
+            f_stato = st.selectbox("✅ Stato", ["DA COMPLETARE", "PRONTI", "COMPLETATI", "TUTTI"], key="app_fstato_" + suff)
 
         dfv = df_app.copy()
         if f_pl and "Plesso" in dfv.columns:
