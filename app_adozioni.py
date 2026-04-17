@@ -2277,11 +2277,13 @@ elif st.session_state.pagina == "Appunti":
         st.info("Nessun appunto salvato.")
     else:
         with st.container(border=True):
-            f1, f2, f3, f4 = st.columns(4)
+            f1, f2, f3 = st.columns(3)
             f_pl = f1.multiselect("🏫 Filtra Plesso/i", sorted(df_app.get("Plesso", pd.Series(dtype=str)).astype(str).unique()), key="app_fpl_" + suff)
             f_ins = f2.multiselect("👩‍🏫 Filtra Insegnante", sorted(df_app.get("Insegnante", pd.Series(dtype=str)).astype(str).unique()), key="app_fins_" + suff)
-            f_stato = f3.selectbox("✅ Stato", ["TUTTI", "DA COMPLETARE", "COMPLETATI"], key="app_fstato_" + suff)
-            t_search = f4.text_input("🔎 Cerca Note", key="app_search_" + suff)
+            t_search = f3.text_input("🔎 Cerca Note", key="app_search_" + suff)
+            g1, g2 = st.columns(2)
+            f_stato = g1.selectbox("✅ Stato", ["TUTTI", "DA COMPLETARE", "COMPLETATI"], key="app_fstato_" + suff)
+            f_pronta = g2.selectbox("🟡 Pronta", ["TUTTI", "PRONTE", "NON PRONTE"], key="app_fpronta_" + suff)
 
         dfv = df_app.copy()
         if f_pl and "Plesso" in dfv.columns:
@@ -2295,6 +2297,11 @@ elif st.session_state.pagina == "Appunti":
                 dfv = dfv[dfv["Completato"].astype(str).str.upper() != "SI"]
             else: # COMPLETATI
                 dfv = dfv[dfv["Completato"].astype(str).str.upper() == "SI"]
+        if f_pronta != "TUTTI" and "Pronta" in dfv.columns:
+            if f_pronta == "PRONTE":
+                dfv = dfv[dfv["Pronta"].astype(str).str.upper() == "SI"]
+            else: # NON PRONTE
+                dfv = dfv[dfv["Pronta"].astype(str).str.upper() != "SI"]
         if "Data" in dfv.columns:
             dfv = dfv.sort_values(by=["Data"], ascending=False)
 
