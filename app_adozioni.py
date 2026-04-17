@@ -490,7 +490,7 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
         def _norm(s):
             return str(s).strip().upper().replace(".", "").replace(" ", "")
 
-        header = ["ID", "Data", "Plesso", "Insegnante", "Classe", "Sez.", "Materia", "Note", "Completato"]
+        header = ["ID", "Data", "Plesso", "Insegnante", "Classe", "Sez.", "Materia", "Note", "Pronta", "Completato"]
 
         header_idx = None
         for idx, row in enumerate(values[:10] if values else []):
@@ -500,11 +500,11 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
                 break
 
         if not values or header_idx is None:
-            ws.update("A1:I1", [header])
+            ws.update("A1:J1", [header])
         else:
             current_header = [str(x).strip() for x in values[header_idx]]
-            if "ID" not in current_header or "Completato" not in current_header:
-                ws.update(f"A{header_idx+1}:I{header_idx+1}", [header])
+            if "ID" not in current_header or "Completato" not in current_header or "Pronta" not in current_header:
+                ws.update(f"A{header_idx+1}:J{header_idx+1}", [header])
             
         new_id = str(uuid.uuid4())[:8]
         ws.append_row([
@@ -516,6 +516,7 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
             str(sezione or ""),
             str(materia or ""),
             str(note or "").upper(),
+            "NO",
             "NO"
         ])
         try:
@@ -528,28 +529,60 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
         st.error(f"Errore salvataggio Appunti: {e}")
         return False
 
-def aggiorna_appunto_cloud(appunto_id, nuovo_stato_completato):
+def aggiorna_appunto_flag_cloud(appunto_id, col_name, value):
     sh = connetti_google_sheets()
-    if not sh: return False
+    if not sh:
+        return False
     try:
         ws = sh.worksheet("Appunti")
+
+        def _norm(s):
+            return str(s).strip().upper().replace(".", "").replace(" ", "")
+
+        header_row = 1
+        for r in range(1, 11):
+            rv = ws.row_values(r)
+            if not rv:
+                continue
+            hn = [_norm(x) for x in rv if str(x).strip()]
+            if "PLESSO" in hn and "NOTE" in hn:
+                header_row = r
+                break
+
+        headers = [str(x).strip() for x in ws.row_values(header_row)]
+        headers_norm = [_norm(x) for x in headers]
+        cn = _norm(col_name)
+        if cn in headers_norm:
+            col_idx = headers_norm.index(cn) + 1
+        else:
+            col_idx = len(headers) + 1
+            ws.update_cell(header_row, col_idx, col_name)
+
         cell_list = ws.findall(appunto_id)
         if cell_list:
             riga = cell_list[0].row
-            # Cerchiamo la colonna "Completato"
-            headers = ws.row_values(1)
+            ws.update_cell(riga, col_idx, value)
             try:
-                col_idx = headers.index("Completato") + 1
-            except ValueError:
-                # Se non c'è, la aggiungiamo a destra
-                col_idx = len(headers) + 1
-                ws.update_cell(1, col_idx, "Completato")
-            ws.update_cell(riga, col_idx, nuovo_stato_completato)
-            carica_appunti_cloud.clear()
+                carica_appunti_cloud.clear()
+            except Exception:
+                pass
             return True
     except Exception as e:
         st.sidebar.error(f"Errore aggiornamento Appunti: {e}")
     return False
+
+
+def aggiorna_appunto_cloud(appunto_id, nuovo_stato_completato):
+    ok = aggiorna_appunto_flag_cloud(appunto_id, "Completato", nuovo_stato_completato)
+    if ok and str(nuovo_stato_completato).strip().upper() == "SI":
+        aggiorna_appunto_flag_cloud(appunto_id, "Pronta", "NO")
+    return ok
+
+
+def aggiorna_pronta_cloud(appunto_id, nuovo_stato_pronta):
+    if str(nuovo_stato_pronta).strip().upper() == "SI":
+        aggiorna_appunto_flag_cloud(appunto_id, "Completato", "NO")
+    return aggiorna_appunto_flag_cloud(appunto_id, "Pronta", nuovo_stato_pronta)
 
 def elimina_appunto_cloud(appunto_id):
     sh = connetti_google_sheets()
@@ -622,6 +655,8 @@ def carica_appunti_cloud():
                 rename_map[c] = "Data"
             elif ck == "ID":
                 rename_map[c] = "ID"
+            elif ck == "PRONTA":
+                rename_map[c] = "Pronta"
             elif ck == "COMPLETATO":
                 rename_map[c] = "Completato"
         if rename_map:
@@ -2197,17 +2232,26 @@ elif st.session_state.pagina == "Appunti":
     st.header("📝 Appunti")
     if "appunti_reset" not in st.session_state:
         st.session_state.appunti_reset = 0
+    if "appunti_insert_open" not in st.session_state:
+        st.session_state.appunti_insert_open = False
+    if "appunti_prefill" not in st.session_state:
+        st.session_state.appunti_prefill = {}
     suff = str(st.session_state.appunti_reset)
 
-    with st.expander("➕ Inserisci Appunto", expanded=False):
+    pre = st.session_state.appunti_prefill or {}
+    plesso_opts = [""] + elenco_plessi
+    pre_plesso = str(pre.get("plesso", "") or "")
+    pre_idx = plesso_opts.index(pre_plesso) if pre_plesso in plesso_opts else 0
+
+    with st.expander("➕ Inserisci Appunto", expanded=bool(st.session_state.appunti_insert_open)):
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
-            plesso = c1.selectbox("🏫 Plesso", [""] + elenco_plessi, key="app_ple_" + suff)
-            insegnante = c2.text_input("👩‍🏫 Insegnante", key="app_ins_" + suff)
-            materia = c3.text_input("📚 Materia", key="app_mat_" + suff)
+            plesso = c1.selectbox("🏫 Plesso", plesso_opts, index=pre_idx, key="app_ple_" + suff)
+            insegnante = c2.text_input("👩‍🏫 Insegnante", value=str(pre.get("insegnante", "") or ""), key="app_ins_" + suff)
+            materia = c3.text_input("📚 Materia", value=str(pre.get("materia", "") or ""), key="app_mat_" + suff)
             c4, c5 = st.columns(2)
-            classe = c4.text_input("🏷️ Classe", key="app_cla_" + suff)
-            sezione = c5.text_input("🔡 Sez.", key="app_sez_" + suff)
+            classe = c4.text_input("🏷️ Classe", value=str(pre.get("classe", "") or ""), key="app_cla_" + suff)
+            sezione = c5.text_input("🔡 Sez.", value=str(pre.get("sezione", "") or ""), key="app_sez_" + suff)
             note = st.text_area("🗒️ Note", key="app_note_" + suff, height=120)
             b1, b2 = st.columns(2)
             if b1.button("💾 SALVA APPUNTO", use_container_width=True, type="primary", key="app_save_" + suff):
@@ -2216,11 +2260,15 @@ elif st.session_state.pagina == "Appunti":
                 else:
                     if salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
                         st.success("Appunto salvato in Cloud.")
+                        st.session_state.appunti_prefill = {}
+                        st.session_state.appunti_insert_open = False
                         st.session_state.appunti_reset += 1
                         st.rerun()
                     else:
                         st.error("Appunto NON salvato. Controlla eventuali messaggi di errore.")
             if b2.button("🧹 PULISCI CAMPI", use_container_width=True, key="app_clear_" + suff):
+                st.session_state.appunti_prefill = {}
+                st.session_state.appunti_insert_open = False
                 st.session_state.appunti_reset += 1
                 st.rerun()
 
@@ -2298,8 +2346,14 @@ elif st.session_state.pagina == "Appunti":
                         r_mat = row.get("Materia", "")
                         r_note = row.get("Note", "")
                         r_comp = str(row.get("Completato", "NO")).strip().upper()
+                        r_pronta = str(row.get("Pronta", "NO")).strip().upper()
 
-                        bg_color = "#d4edda" if r_comp == "SI" else "#ffffff"
+                        if r_comp == "SI":
+                            bg_color = "#d4edda"
+                        elif r_pronta == "SI":
+                            bg_color = "#fff3cd"
+                        else:
+                            bg_color = "#ffffff"
 
                         with st.container(border=True):
                             st.markdown(f"""
@@ -2309,7 +2363,7 @@ elif st.session_state.pagina == "Appunti":
                             </div>
                             """, unsafe_allow_html=True)
 
-                            c_btn1, c_btn2, _ = st.columns([0.15, 0.15, 0.7])
+                            c_btn1, c_btn2, c_btn3, c_btn4 = st.columns([0.15, 0.15, 0.18, 0.18])
                             if r_comp == "SI":
                                 if c_btn1.button("❌ ANNULLA COMPL.", key=f"unc_{r_id}_{i}"):
                                     aggiorna_appunto_cloud(r_id, "NO")
@@ -2317,6 +2371,27 @@ elif st.session_state.pagina == "Appunti":
                             else:
                                 if c_btn1.button("✅ COMPLETA", key=f"chk_{r_id}_{i}"):
                                     aggiorna_appunto_cloud(r_id, "SI")
+                                    st.rerun()
+
+                            if r_comp != "SI":
+                                if r_pronta == "SI":
+                                    if c_btn4.button("⚪ NON PRONTA", key=f"pr0_{r_id}_{i}", use_container_width=True):
+                                        aggiorna_pronta_cloud(r_id, "NO")
+                                        st.rerun()
+                                else:
+                                    if c_btn4.button("🟡 PRONTA", key=f"pr1_{r_id}_{i}", use_container_width=True):
+                                        aggiorna_pronta_cloud(r_id, "SI")
+                                        st.rerun()
+                                if c_btn3.button("➕ NUOVO", key=f"add_{r_id}_{i}", use_container_width=True):
+                                    st.session_state.appunti_prefill = {
+                                        "plesso": plesso_nome,
+                                        "insegnante": r_ins,
+                                        "classe": r_cla,
+                                        "sezione": r_sez,
+                                        "materia": r_mat,
+                                    }
+                                    st.session_state.appunti_insert_open = True
+                                    st.session_state.appunti_reset += 1
                                     st.rerun()
 
                             if c_btn2.button("🗑️ ELIMINA", key=f"del_{r_id}_{i}"):
