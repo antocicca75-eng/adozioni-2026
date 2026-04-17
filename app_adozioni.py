@@ -2412,6 +2412,8 @@ elif st.session_state.pagina == "Appunti":
         if "Plesso" not in dfv.columns or dfv.empty:
             st.info("Nessun appunto corrisponde ai filtri.")
         else:
+            if "open_appunti_plesso" not in st.session_state:
+                st.session_state.open_appunti_plesso = None
             for plesso_nome in sorted(dfv["Plesso"].astype(str).fillna("").unique().tolist()):
                 dfp = dfv[dfv["Plesso"].astype(str) == plesso_nome].copy()
                 if dfp.empty:
@@ -2420,7 +2422,14 @@ elif st.session_state.pagina == "Appunti":
                 n_comp = 0
                 if "Completato" in dfp.columns:
                     n_comp = int((dfp["Completato"].astype(str).str.upper() == "SI").sum())
-                with st.expander(f"🏫 {plesso_nome}  ({n_comp}/{n_tot} completati)", expanded=False):
+
+                is_open = st.session_state.get("open_appunti_plesso") == plesso_nome
+                freccia = "🔽" if is_open else "▶️"
+                if st.button(f"{freccia} 🏫 {plesso_nome}  ({n_comp}/{n_tot} completati)", key=f"open_app_pl_{plesso_nome}", use_container_width=True):
+                    st.session_state.open_appunti_plesso = None if is_open else plesso_nome
+                    st.rerun()
+
+                if is_open:
                     for i, row in dfp.iterrows():
                         r_id = row.get("ID", "")
                         r_data = row.get("Data", "")
