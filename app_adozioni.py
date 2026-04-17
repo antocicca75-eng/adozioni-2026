@@ -2197,26 +2197,17 @@ elif st.session_state.pagina == "Appunti":
     st.header("📝 Appunti")
     if "appunti_reset" not in st.session_state:
         st.session_state.appunti_reset = 0
-    if "appunti_insert_open" not in st.session_state:
-        st.session_state.appunti_insert_open = False
-    if "appunti_prefill" not in st.session_state:
-        st.session_state.appunti_prefill = {}
     suff = str(st.session_state.appunti_reset)
 
-    pre = st.session_state.appunti_prefill or {}
-    plesso_opts = [""] + elenco_plessi
-    pre_plesso = str(pre.get("plesso", "") or "")
-    pre_idx = plesso_opts.index(pre_plesso) if pre_plesso in plesso_opts else 0
-
-    with st.expander("➕ Inserisci Appunto", expanded=bool(st.session_state.appunti_insert_open)):
+    with st.expander("➕ Inserisci Appunto", expanded=False):
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
-            plesso = c1.selectbox("🏫 Plesso", plesso_opts, index=pre_idx, key="app_ple_" + suff)
-            insegnante = c2.text_input("👩‍🏫 Insegnante", value=str(pre.get("insegnante", "") or ""), key="app_ins_" + suff)
-            materia = c3.text_input("📚 Materia", value=str(pre.get("materia", "") or ""), key="app_mat_" + suff)
+            plesso = c1.selectbox("🏫 Plesso", [""] + elenco_plessi, key="app_ple_" + suff)
+            insegnante = c2.text_input("👩‍🏫 Insegnante", key="app_ins_" + suff)
+            materia = c3.text_input("📚 Materia", key="app_mat_" + suff)
             c4, c5 = st.columns(2)
-            classe = c4.text_input("🏷️ Classe", value=str(pre.get("classe", "") or ""), key="app_cla_" + suff)
-            sezione = c5.text_input("🔡 Sez.", value=str(pre.get("sezione", "") or ""), key="app_sez_" + suff)
+            classe = c4.text_input("🏷️ Classe", key="app_cla_" + suff)
+            sezione = c5.text_input("🔡 Sez.", key="app_sez_" + suff)
             note = st.text_area("🗒️ Note", key="app_note_" + suff, height=120)
             b1, b2 = st.columns(2)
             if b1.button("💾 SALVA APPUNTO", use_container_width=True, type="primary", key="app_save_" + suff):
@@ -2225,15 +2216,11 @@ elif st.session_state.pagina == "Appunti":
                 else:
                     if salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
                         st.success("Appunto salvato in Cloud.")
-                        st.session_state.appunti_prefill = {}
-                        st.session_state.appunti_insert_open = False
                         st.session_state.appunti_reset += 1
                         st.rerun()
                     else:
                         st.error("Appunto NON salvato. Controlla eventuali messaggi di errore.")
             if b2.button("🧹 PULISCI CAMPI", use_container_width=True, key="app_clear_" + suff):
-                st.session_state.appunti_prefill = {}
-                st.session_state.appunti_insert_open = False
                 st.session_state.appunti_reset += 1
                 st.rerun()
 
@@ -2322,7 +2309,7 @@ elif st.session_state.pagina == "Appunti":
                             </div>
                             """, unsafe_allow_html=True)
 
-                            c_btn1, c_btn2, c_btn3, _ = st.columns([0.15, 0.15, 0.22, 0.48])
+                            c_btn1, c_btn2, _ = st.columns([0.15, 0.15, 0.7])
                             if r_comp == "SI":
                                 if c_btn1.button("❌ ANNULLA COMPL.", key=f"unc_{r_id}_{i}"):
                                     aggiorna_appunto_cloud(r_id, "NO")
@@ -2330,19 +2317,6 @@ elif st.session_state.pagina == "Appunti":
                             else:
                                 if c_btn1.button("✅ COMPLETA", key=f"chk_{r_id}_{i}"):
                                     aggiorna_appunto_cloud(r_id, "SI")
-                                    st.rerun()
-
-                            if r_comp != "SI":
-                                if c_btn3.button("➕ NUOVO", key=f"add_{r_id}_{i}", use_container_width=True):
-                                    st.session_state.appunti_prefill = {
-                                        "plesso": plesso_nome,
-                                        "insegnante": r_ins,
-                                        "classe": r_cla,
-                                        "sezione": r_sez,
-                                        "materia": r_mat,
-                                    }
-                                    st.session_state.appunti_insert_open = True
-                                    st.session_state.appunti_reset += 1
                                     st.rerun()
 
                             if c_btn2.button("🗑️ ELIMINA", key=f"del_{r_id}_{i}"):
