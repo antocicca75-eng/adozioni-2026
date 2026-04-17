@@ -490,7 +490,7 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
         def _norm(s):
             return str(s).strip().upper().replace(".", "").replace(" ", "")
 
-        header = ["ID", "Data", "Plesso", "Insegnante", "Classe", "Sez.", "Materia", "Note", "Completato", "Stato"]
+        header = ["ID", "Data", "Plesso", "Insegnante", "Classe", "Sez.", "Materia", "Note", "Completato"]
 
         header_idx = None
         for idx, row in enumerate(values[:10] if values else []):
@@ -500,24 +500,23 @@ def salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
                 break
 
         if not values or header_idx is None:
-            ws.update("A1:J1", [header])
+            ws.update("A1:I1", [header])
         else:
             current_header = [str(x).strip() for x in values[header_idx]]
             if "ID" not in current_header or "Completato" not in current_header:
-                ws.update(f"A{header_idx+1}:J{header_idx+1}", [header])
+                ws.update(f"A{header_idx+1}:I{header_idx+1}", [header])
             
         new_id = str(uuid.uuid4())[:8]
         ws.append_row([
             new_id,
             datetime.now().strftime("%d/%m/%Y"),
             str(plesso or ""),
-            str(insegnante or "").strip().upper(),
+            str(insegnante or ""),
             str(classe or ""),
             str(sezione or ""),
-            str(materia or "").strip().upper(),
+            str(materia or ""),
             str(note or "").upper(),
-            "NO",
-            "IN PREPARAZIONE"
+            "NO"
         ])
         try:
             carica_appunti_cloud.clear()
@@ -537,36 +536,19 @@ def aggiorna_appunto_cloud(appunto_id, nuovo_stato_completato):
         cell_list = ws.findall(appunto_id)
         if cell_list:
             riga = cell_list[0].row
+            # Cerchiamo la colonna "Completato"
             headers = ws.row_values(1)
-            col_completato = next((i+1 for i, h in enumerate(headers) if str(h).strip() == "Completato"), None)
-            if col_completato:
-                ws.update_cell(riga, col_completato, nuovo_stato_completato)
+            try:
+                col_idx = headers.index("Completato") + 1
+            except ValueError:
+                # Se non c'è, la aggiungiamo a destra
+                col_idx = len(headers) + 1
+                ws.update_cell(1, col_idx, "Completato")
+            ws.update_cell(riga, col_idx, nuovo_stato_completato)
             carica_appunti_cloud.clear()
             return True
     except Exception as e:
         st.sidebar.error(f"Errore aggiornamento Appunti: {e}")
-    return False
-
-def aggiorna_stato_appunto_cloud(appunto_id, nuovo_stato):
-    sh = connetti_google_sheets()
-    if not sh: return False
-    try:
-        ws = sh.worksheet("Appunti")
-        cell_list = ws.findall(appunto_id)
-        if cell_list:
-            riga = cell_list[0].row
-            headers = ws.row_values(1)
-            col_stato = next((i+1 for i, h in enumerate(headers) if str(h).strip() == "Stato"), None)
-            if col_stato:
-                ws.update_cell(riga, col_stato, nuovo_stato)
-            else:
-                col_stato = len(headers) + 1
-                ws.update_cell(1, col_stato, "Stato")
-                ws.update_cell(riga, col_stato, nuovo_stato)
-            carica_appunti_cloud.clear()
-            return True
-    except Exception as e:
-        st.sidebar.error(f"Errore aggiornamento Stato Appunto: {e}")
     return False
 
 def elimina_appunto_cloud(appunto_id):
@@ -642,14 +624,8 @@ def carica_appunti_cloud():
                 rename_map[c] = "ID"
             elif ck == "COMPLETATO":
                 rename_map[c] = "Completato"
-            elif ck == "STATO":
-                rename_map[c] = "Stato"
         if rename_map:
             df = df.rename(columns=rename_map)
-        if "Insegnante" in df.columns:
-            df["Insegnante"] = df["Insegnante"].astype(str).str.strip().str.upper()
-        if "Materia" in df.columns:
-            df["Materia"] = df["Materia"].astype(str).str.strip().str.upper()
         return df
     except Exception:
         return pd.DataFrame()
@@ -1267,13 +1243,57 @@ elif st.session_state.pagina == "Storico":
         st.info("Nessuna consegna registrata.")
     else:
         elenco_plessi_storico = sorted(list(st.session_state.storico_consegne.keys()))
-        restore_ctx = st.session_state.pop("ritorno_storico_ctx", None)
-        if restore_ctx:
-            plesso_ctx = restore_ctx.get("plesso")
-            gruppo_ctx = restore_ctx.get("gruppo_id")
-            if plesso_ctx in elenco_plessi_storico:
-                st.session_state["sel_plessi_storico"] = [plesso_ctx]
-                st.session_state[f"open_tipo_consegnate_{plesso_ctx}"] = gruppo_ctx
+        with st.expander("🧾 Verifica tipologie obbligatorie", expanded=False):
+            plessi_check = st.multiselect(
+                "🏫 Plessi da controllare",
+                elenco_plessi_storico,
+                default=elenco_plessi_storico,
+                key="chk_plessi_obbl",
+            )
+            mostra_completi = st.checkbox("Mostra anche plessi completi", value=False, key="chk_show_ok")
+
+            righe = []
+            for plesso in plessi_check:
+                mancanti = tipologie_mancanti_consegna(st.session_state.storico_consegne, plesso)
+                if mostra_completi or mancanti:
+                    righe.append({
+                        "Plesso": plesso,
+                        "N Mancanti": len(mancanti),
+                        "Tipologie Mancanti": ", ".join(mancanti),
+                    })
+
+            df_chk = pd.DataFrame(righe)
+            if df_chk.empty:
+                st.success("Tutte le scuole selezionate risultano complete.")
+            else:
+                df_chk = df_chk.sort_values(by=["N Mancanti", "Plesso"], ascending=[False, True])
+                st.dataframe(df_chk, use_container_width=True, hide_index=True)
+                try:
+                    buf = io.BytesIO()
+                    engine = None
+                    try:
+                        import openpyxl
+                        engine = "openpyxl"
+                    except Exception:
+                        try:
+                            import xlsxwriter
+                            engine = "xlsxwriter"
+                        except Exception:
+                            engine = None
+                    if engine is None:
+                        raise RuntimeError("Nessun engine Excel disponibile")
+                    with pd.ExcelWriter(buf, engine=engine) as writer:
+                        df_chk.to_excel(writer, index=False, sheet_name="Controllo")
+                    st.download_button(
+                        "📤 ESPORTA EXCEL CONTROLLO",
+                        data=buf.getvalue(),
+                        file_name=f"controllo_tipologie_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
+                except Exception as ex:
+                    st.warning(f"Export Excel non disponibile: {ex}")
+
         scuole_selezionate = st.multiselect("🔍 Seleziona Plesso/i:", elenco_plessi_storico, key="sel_plessi_storico")
         
         if not scuole_selezionate:
@@ -1393,10 +1413,6 @@ elif st.session_state.pagina == "Storico":
                                                     "titolo": lib.get("t", ""),
                                                     "editore": lib.get("e", ""),
                                                     "tipologia": tipo,
-                                                }
-                                                st.session_state.ritorno_storico_ctx = {
-                                                    "plesso": plesso,
-                                                    "gruppo_id": gruppo_id,
                                                 }
                                                 st.session_state.pagina = "Inserimento"
                                                 st.rerun()
@@ -1747,8 +1763,6 @@ elif st.session_state.pagina == "Inserimento":
                 st.session_state.form_id += 1
                 st.session_state.prefill_adozione = {}
                 st.success("✅ Registrazione avvenuta con successo!")
-                if st.session_state.get("ritorno_storico_ctx"):
-                    st.session_state.pagina = "Storico"
                 st.rerun()
             elif saggio == "-":
                 st.error("⚠️ Devi specificare SI/NO!")
@@ -1935,7 +1949,6 @@ elif st.session_state.pagina == "Tabellone Stato":
                                         ["TUTTI", "DA INIZIARE", "DA RITIRARE", "RITIRATI"])
             solo_incompleti = st.checkbox("Solo DA RITIRARE incompleti", value=False, key="tb_incompleti")
 
-        req_sigle_vacanze = {"V1", "V2", "V3", "V4", "V5"}
         mostra = []
         for p in elenco_totale:
             if cerca_sel != "- TUTTI -" and p != cerca_sel: continue
@@ -1943,11 +1956,10 @@ elif st.session_state.pagina == "Tabellone Stato":
             ha_sigle = len(cat_attive) > 0
             e_ritirato = p in ritirati and not ha_sigle
             e_bianco = p not in consegnati and p not in ritirati
-            sigle_p = {mappa_sigle.get(cat, cat[:2]) for cat in cat_attive}
-            mancanti_vacanze = sorted(list(req_sigle_vacanze - sigle_p)) if ha_sigle else []
+            mancanti_obbl = tipologie_mancanti_consegna(consegnati, p) if ha_sigle else []
 
             if solo_incompleti and filtro_stato in ["TUTTI", "DA RITIRARE"]:
-                if not (ha_sigle and mancanti_vacanze):
+                if not (ha_sigle and mancanti_obbl):
                     continue
 
             if filtro_stato == "TUTTI":
@@ -1958,54 +1970,6 @@ elif st.session_state.pagina == "Tabellone Stato":
                 mostra.append(p)
             elif filtro_stato == "RITIRATI" and e_ritirato:
                 mostra.append(p)
-
-        if mostra:
-            righe_xls = []
-            for p in mostra:
-                cat_attive = consegnati.get(p, {}).keys()
-                sigle_p = sorted(list({mappa_sigle.get(cat, cat[:2]) for cat in cat_attive}))
-                ha_sigle = len(sigle_p) > 0
-                e_ritirato = p in ritirati and not ha_sigle
-                e_bianco = p not in consegnati and p not in ritirati
-                if e_bianco:
-                    stato = "DA INIZIARE"
-                elif e_ritirato:
-                    stato = "RITIRATI"
-                else:
-                    stato = "DA RITIRARE"
-                mancanti_v = sorted(list(req_sigle_vacanze - set(sigle_p))) if ha_sigle else sorted(list(req_sigle_vacanze))
-                righe_xls.append({
-                    "Plesso": p,
-                    "Stato": stato,
-                    "Sigle Presenti": " ".join(sigle_p),
-                    "Mancanti V1-V5": " ".join(mancanti_v),
-                })
-            df_xls = pd.DataFrame(righe_xls)
-            try:
-                buf = io.BytesIO()
-                engine = None
-                try:
-                    import openpyxl
-                    engine = "openpyxl"
-                except Exception:
-                    try:
-                        import xlsxwriter
-                        engine = "xlsxwriter"
-                    except Exception:
-                        engine = None
-                if engine is None:
-                    raise RuntimeError("Nessun engine Excel disponibile")
-                with pd.ExcelWriter(buf, engine=engine) as writer:
-                    df_xls.to_excel(writer, index=False, sheet_name="Tabellone")
-                st.download_button(
-                    "📥 SCARICA EXCEL",
-                    data=buf.getvalue(),
-                    file_name=f"tabellone_{filtro_stato.lower().replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                )
-            except Exception as ex:
-                st.warning(f"Export Excel non disponibile: {ex}")
 
         # Griglia Plessi
         if not mostra:
@@ -2233,17 +2197,26 @@ elif st.session_state.pagina == "Appunti":
     st.header("📝 Appunti")
     if "appunti_reset" not in st.session_state:
         st.session_state.appunti_reset = 0
+    if "appunti_insert_open" not in st.session_state:
+        st.session_state.appunti_insert_open = False
+    if "appunti_prefill" not in st.session_state:
+        st.session_state.appunti_prefill = {}
     suff = str(st.session_state.appunti_reset)
 
-    with st.expander("➕ Inserisci Appunto", expanded=False):
+    pre = st.session_state.appunti_prefill or {}
+    plesso_opts = [""] + elenco_plessi
+    pre_plesso = str(pre.get("plesso", "") or "")
+    pre_idx = plesso_opts.index(pre_plesso) if pre_plesso in plesso_opts else 0
+
+    with st.expander("➕ Inserisci Appunto", expanded=bool(st.session_state.appunti_insert_open)):
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
-            plesso = c1.selectbox("🏫 Plesso", [""] + elenco_plessi, key="app_ple_" + suff)
-            insegnante = c2.text_input("👩‍🏫 Insegnante", key="app_ins_" + suff)
-            materia = c3.text_input("📚 Materia", key="app_mat_" + suff)
+            plesso = c1.selectbox("🏫 Plesso", plesso_opts, index=pre_idx, key="app_ple_" + suff)
+            insegnante = c2.text_input("👩‍🏫 Insegnante", value=str(pre.get("insegnante", "") or ""), key="app_ins_" + suff)
+            materia = c3.text_input("📚 Materia", value=str(pre.get("materia", "") or ""), key="app_mat_" + suff)
             c4, c5 = st.columns(2)
-            classe = c4.text_input("🏷️ Classe", key="app_cla_" + suff)
-            sezione = c5.text_input("🔡 Sez.", key="app_sez_" + suff)
+            classe = c4.text_input("🏷️ Classe", value=str(pre.get("classe", "") or ""), key="app_cla_" + suff)
+            sezione = c5.text_input("🔡 Sez.", value=str(pre.get("sezione", "") or ""), key="app_sez_" + suff)
             note = st.text_area("🗒️ Note", key="app_note_" + suff, height=120)
             b1, b2 = st.columns(2)
             if b1.button("💾 SALVA APPUNTO", use_container_width=True, type="primary", key="app_save_" + suff):
@@ -2252,11 +2225,15 @@ elif st.session_state.pagina == "Appunti":
                 else:
                     if salva_appunto_cloud(plesso, insegnante, classe, sezione, materia, note):
                         st.success("Appunto salvato in Cloud.")
+                        st.session_state.appunti_prefill = {}
+                        st.session_state.appunti_insert_open = False
                         st.session_state.appunti_reset += 1
                         st.rerun()
                     else:
                         st.error("Appunto NON salvato. Controlla eventuali messaggi di errore.")
             if b2.button("🧹 PULISCI CAMPI", use_container_width=True, key="app_clear_" + suff):
+                st.session_state.appunti_prefill = {}
+                st.session_state.appunti_insert_open = False
                 st.session_state.appunti_reset += 1
                 st.rerun()
 
@@ -2268,7 +2245,7 @@ elif st.session_state.pagina == "Appunti":
             f1, f2, f3, f4 = st.columns(4)
             f_pl = f1.multiselect("🏫 Filtra Plesso/i", sorted(df_app.get("Plesso", pd.Series(dtype=str)).astype(str).unique()), key="app_fpl_" + suff)
             f_ins = f2.multiselect("👩‍🏫 Filtra Insegnante", sorted(df_app.get("Insegnante", pd.Series(dtype=str)).astype(str).unique()), key="app_fins_" + suff)
-            f_stato = f3.selectbox("✅ Stato", ["TUTTI", "IN PREPARAZIONE", "PRONTA", "COMPLETATI"], key="app_fstato_" + suff)
+            f_stato = f3.selectbox("✅ Stato", ["TUTTI", "DA COMPLETARE", "COMPLETATI"], key="app_fstato_" + suff)
             t_search = f4.text_input("🔎 Cerca Note", key="app_search_" + suff)
 
         dfv = df_app.copy()
@@ -2278,23 +2255,11 @@ elif st.session_state.pagina == "Appunti":
             dfv = dfv[dfv["Insegnante"].astype(str).isin([str(x) for x in f_ins])]
         if t_search and "Note" in dfv.columns:
             dfv = dfv[dfv["Note"].astype(str).str.contains(str(t_search), case=False, na=False)]
-        if "Stato" not in dfv.columns:
-            dfv["Stato"] = ""
-        if "Completato" not in dfv.columns:
-            dfv["Completato"] = "NO"
-
-        if f_stato == "COMPLETATI":
-            dfv = dfv[dfv["Completato"].astype(str).str.upper() == "SI"]
-        elif f_stato == "PRONTA":
-            dfv = dfv[
-                (dfv["Completato"].astype(str).str.upper() != "SI")
-                & (dfv["Stato"].astype(str).str.upper() == "PRONTA")
-            ]
-        elif f_stato == "IN PREPARAZIONE":
-            dfv = dfv[
-                (dfv["Completato"].astype(str).str.upper() != "SI")
-                & (dfv["Stato"].astype(str).str.upper() != "PRONTA")
-            ]
+        if f_stato != "TUTTI" and "Completato" in dfv.columns:
+            if f_stato == "DA COMPLETARE":
+                dfv = dfv[dfv["Completato"].astype(str).str.upper() != "SI"]
+            else: # COMPLETATI
+                dfv = dfv[dfv["Completato"].astype(str).str.upper() == "SI"]
         if "Data" in dfv.columns:
             dfv = dfv.sort_values(by=["Data"], ascending=False)
 
@@ -2346,37 +2311,40 @@ elif st.session_state.pagina == "Appunti":
                         r_mat = row.get("Materia", "")
                         r_note = row.get("Note", "")
                         r_comp = str(row.get("Completato", "NO")).strip().upper()
-                        r_stato = str(row.get("Stato", "IN PREPARAZIONE")).strip().upper()
 
-                        bg_color = "#fff3cd" if r_stato == "PRONTA" else ("#d4edda" if r_comp == "SI" else "#ffffff")
+                        bg_color = "#d4edda" if r_comp == "SI" else "#ffffff"
 
                         with st.container(border=True):
                             st.markdown(f"""
                             <div style="background-color: {bg_color}; padding: 10px; border-radius: 5px;">
-                                <b>{plesso_nome}</b> - {r_ins} | 🏷️ {r_cla} {r_sez} | 📚 {r_mat} | <b>Stato: {r_stato}</b> <span style="float:right; color:gray;">{r_data}</span><br>
+                                <b>{plesso_nome}</b> - {r_ins} | 🏷️ {r_cla} {r_sez} | 📚 {r_mat} <span style="float:right; color:gray;">{r_data}</span><br>
                                 <p style="margin-top: 8px;">{r_note}</p>
                             </div>
                             """, unsafe_allow_html=True)
 
-                            c_btn1, c_btn2, c_btn3, _ = st.columns([0.20, 0.20, 0.20, 0.40])
+                            c_btn1, c_btn2, c_btn3, _ = st.columns([0.15, 0.15, 0.22, 0.48])
                             if r_comp == "SI":
-                                if c_btn1.button("❌ ANNULLA COMPL.", key=f"unc_{r_id}_{i}", use_container_width=True):
+                                if c_btn1.button("❌ ANNULLA COMPL.", key=f"unc_{r_id}_{i}"):
                                     aggiorna_appunto_cloud(r_id, "NO")
                                     st.rerun()
                             else:
-                                if c_btn1.button("✅ COMPLETA", key=f"chk_{r_id}_{i}", use_container_width=True):
+                                if c_btn1.button("✅ COMPLETA", key=f"chk_{r_id}_{i}"):
                                     aggiorna_appunto_cloud(r_id, "SI")
                                     st.rerun()
 
-                            if r_stato != "PRONTA":
-                                if c_btn2.button("📌 PRONTA", key=f"pront_{r_id}_{i}", use_container_width=True):
-                                    aggiorna_stato_appunto_cloud(r_id, "PRONTA")
-                                    st.rerun()
-                            else:
-                                if c_btn2.button("↩️ IN PREP.", key=f"ripr_{r_id}_{i}", use_container_width=True):
-                                    aggiorna_stato_appunto_cloud(r_id, "IN PREPARAZIONE")
+                            if r_comp != "SI":
+                                if c_btn3.button("➕ NUOVO", key=f"add_{r_id}_{i}", use_container_width=True):
+                                    st.session_state.appunti_prefill = {
+                                        "plesso": plesso_nome,
+                                        "insegnante": r_ins,
+                                        "classe": r_cla,
+                                        "sezione": r_sez,
+                                        "materia": r_mat,
+                                    }
+                                    st.session_state.appunti_insert_open = True
+                                    st.session_state.appunti_reset += 1
                                     st.rerun()
 
-                            if c_btn3.button("🗑️ ELIMINA", key=f"del_{r_id}_{i}", use_container_width=True):
+                            if c_btn2.button("🗑️ ELIMINA", key=f"del_{r_id}_{i}"):
                                 elimina_appunto_cloud(r_id)
                                 st.rerun()
