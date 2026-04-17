@@ -2412,6 +2412,26 @@ elif st.session_state.pagina == "Appunti":
         if "Plesso" not in dfv.columns or dfv.empty:
             st.info("Nessun appunto corrisponde ai filtri.")
         else:
+            st.markdown("""
+                <style>
+                div[data-testid="stButton"] > button {
+                    display: flex !important;
+                    justify-content: flex-start !important;
+                    text-align: left !important;
+                    padding-left: 15px !important;
+                }
+                div[data-testid="stButton"] > button > div {
+                    width: 100% !important;
+                    display: flex !important;
+                    justify-content: flex-start !important;
+                }
+                div[data-testid="stButton"] > button > div > p {
+                    width: 100% !important;
+                    text-align: left !important;
+                    margin: 0 !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
             if "open_appunti_plesso" not in st.session_state:
                 st.session_state.open_appunti_plesso = None
             for plesso_nome in sorted(dfv["Plesso"].astype(str).fillna("").unique().tolist()):
