@@ -420,9 +420,9 @@ def df_to_pdf_bytes(df, titolo="", orientamento="L"):
         if pdf.get_string_width(s) <= w_mm - 1:
             return s
         base = s
-        while base and pdf.get_string_width(base + "…") > w_mm - 1:
+        while base and pdf.get_string_width(base + "...") > w_mm - 1:
             base = base[:-1]
-        return (base + "…") if base else ""
+        return (base + "...") if base else ""
 
     pdf.set_font("Arial", "B", 8)
     pdf.set_fill_color(235, 235, 235)
