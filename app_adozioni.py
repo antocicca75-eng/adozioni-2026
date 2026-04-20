@@ -1507,6 +1507,17 @@ elif st.session_state.pagina == "Storico":
 
                                         with col_adott:
                                             if st.button("🌟 ADOTTATO", key=f"adott_{plesso}_{tipo}_{sez_g}_{i}"):
+                                                gruppo_id = f"{tipo}||{sez_g}"
+                                                open_tipo_key = f"open_tipo_consegnate_{plesso}"
+                                                sel_plessi = st.session_state.get("sel_plessi_storico")
+                                                if not sel_plessi:
+                                                    sel_plessi = [plesso]
+                                                st.session_state.return_ctx = {
+                                                    "pagina": "Storico",
+                                                    "sel_plessi_storico": list(sel_plessi),
+                                                    "open_tipo_key": open_tipo_key,
+                                                    "open_tipo_val": gruppo_id,
+                                                }
                                                 st.session_state.adozione_da_storico = {
                                                     "plesso": plesso,
                                                     "titolo": lib.get("t", ""),
@@ -1805,7 +1816,13 @@ elif st.session_state.pagina == "Inserimento":
                 st.rerun()
             if b2.button("⬅️ ANNULLA", use_container_width=True, key=f"imp_no_{st.session_state.form_id}"):
                 st.session_state.adozione_da_storico = None
-                st.session_state.pagina = "Storico"
+                ctx = st.session_state.get("return_ctx") or {}
+                st.session_state.pagina = ctx.get("pagina", "Storico")
+                if ctx.get("sel_plessi_storico") is not None:
+                    st.session_state["sel_plessi_storico"] = ctx.get("sel_plessi_storico")
+                if ctx.get("open_tipo_key") and (ctx.get("open_tipo_val") is not None):
+                    st.session_state[ctx["open_tipo_key"]] = ctx.get("open_tipo_val")
+                st.session_state.return_ctx = {}
                 st.rerun()
         st.stop()
 
@@ -1862,6 +1879,14 @@ elif st.session_state.pagina == "Inserimento":
                 st.session_state.form_id += 1
                 st.session_state.prefill_adozione = {}
                 st.success("✅ Registrazione avvenuta con successo!")
+                ctx = st.session_state.get("return_ctx") or {}
+                if ctx.get("pagina"):
+                    st.session_state.pagina = ctx.get("pagina")
+                    if ctx.get("sel_plessi_storico") is not None:
+                        st.session_state["sel_plessi_storico"] = ctx.get("sel_plessi_storico")
+                    if ctx.get("open_tipo_key") and (ctx.get("open_tipo_val") is not None):
+                        st.session_state[ctx["open_tipo_key"]] = ctx.get("open_tipo_val")
+                    st.session_state.return_ctx = {}
                 st.rerun()
             elif saggio == "-":
                 st.error("⚠️ Devi specificare SI/NO!")
