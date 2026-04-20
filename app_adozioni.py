@@ -363,6 +363,82 @@ def genera_pdf_due_copie(libri, categoria, plesso, insegnante, classe, data_modu
     pdf.disegna_modulo(148.5, libri, categoria, plesso, insegnante, classe, data_modulo)
     return io.BytesIO(pdf.output(dest='S').encode('latin1'))
 
+def _pdf_safe_text(v):
+    s = "" if v is None else str(v)
+    return s.encode("latin-1", "replace").decode("latin-1")
+
+def df_to_pdf_bytes(df, titolo="", orientamento="L"):
+    if df is None:
+        df = pd.DataFrame()
+    dfp = df.copy()
+    if dfp.empty:
+        dfp = pd.DataFrame([{"Info": "Nessun dato"}])
+    dfp = dfp.fillna("").astype(str)
+
+    pdf = FPDF(orientation=orientamento, unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=12)
+    pdf.add_page()
+
+    if titolo:
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 8, _pdf_safe_text(titolo), ln=1, align="C")
+        pdf.ln(2)
+
+    cols = [str(c) for c in dfp.columns.tolist()]
+    values = dfp.values.tolist()
+
+    usable_w = pdf.w - pdf.l_margin - pdf.r_margin
+    weights = []
+    for j, c in enumerate(cols):
+        mx = len(str(c))
+        for i in range(min(len(values), 80)):
+            mx = max(mx, len(str(values[i][j])))
+        mx = min(mx, 30)
+        weights.append(max(6, mx))
+
+    min_w = 12
+    widths = []
+    w_sum = sum(weights) if weights else 1
+    for w in weights:
+        widths.append(max(min_w, usable_w * (w / w_sum)))
+
+    total = sum(widths)
+    if total > usable_w and widths:
+        scale = usable_w / total
+        widths = [max(min_w, w * scale) for w in widths]
+
+    total = sum(widths)
+    if total > usable_w and widths:
+        over = total - usable_w
+        reducible = [max(0, w - min_w) for w in widths]
+        reducible_sum = sum(reducible)
+        if reducible_sum > 0:
+            widths = [w - over * (r / reducible_sum) for w, r in zip(widths, reducible)]
+
+    def _fit_text(text, w_mm):
+        s = _pdf_safe_text(text)
+        if pdf.get_string_width(s) <= w_mm - 1:
+            return s
+        base = s
+        while base and pdf.get_string_width(base + "…") > w_mm - 1:
+            base = base[:-1]
+        return (base + "…") if base else ""
+
+    pdf.set_font("Arial", "B", 8)
+    pdf.set_fill_color(235, 235, 235)
+    row_h = 6
+    for c, w in zip(cols, widths):
+        pdf.cell(w, row_h, _fit_text(c, w), border=1, align="C", fill=True)
+    pdf.ln(row_h)
+
+    pdf.set_font("Arial", "", 7)
+    for r in values:
+        for v, w in zip(r, widths):
+            pdf.cell(w, 5.5, _fit_text(v, w), border=1)
+        pdf.ln(5.5)
+
+    return pdf.output(dest="S").encode("latin-1", "replace")
+
 # ==============================================================================
 # BLOCCO 5: CONNESSIONE GOOGLE DRIVE E BACKUP
 # ==============================================================================
@@ -1367,6 +1443,7 @@ elif st.session_state.pagina == "Storico":
             else:
                 df_chk = df_chk.sort_values(by=["N Mancanti", "Plesso"], ascending=[False, True])
                 st.dataframe(df_chk, use_container_width=True, hide_index=True)
+                cexp1, cexp2 = st.columns(2)
                 try:
                     buf = io.BytesIO()
                     engine = None
@@ -1383,7 +1460,7 @@ elif st.session_state.pagina == "Storico":
                         raise RuntimeError("Nessun engine Excel disponibile")
                     with pd.ExcelWriter(buf, engine=engine) as writer:
                         df_chk.to_excel(writer, index=False, sheet_name="Controllo")
-                    st.download_button(
+                    cexp1.download_button(
                         "📤 ESPORTA EXCEL CONTROLLO",
                         data=buf.getvalue(),
                         file_name=f"controllo_tipologie_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
@@ -1391,7 +1468,19 @@ elif st.session_state.pagina == "Storico":
                         use_container_width=True,
                     )
                 except Exception as ex:
-                    st.warning(f"Export Excel non disponibile: {ex}")
+                    cexp1.warning(f"Export Excel non disponibile: {ex}")
+
+                try:
+                    pdf_bytes = df_to_pdf_bytes(df_chk, titolo="Controllo tipologie obbligatorie")
+                    cexp2.download_button(
+                        "📄 ESPORTA PDF CONTROLLO",
+                        data=pdf_bytes,
+                        file_name=f"controllo_tipologie_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                except Exception as ex:
+                    cexp2.warning(f"Export PDF non disponibile: {ex}")
 
         scuole_selezionate = st.multiselect("🔍 Seleziona Plesso/i:", elenco_plessi_storico, key="sel_plessi_storico")
         
@@ -1698,6 +1787,44 @@ elif st.session_state.pagina == "Registro":
             n = pd.to_numeric(df_reg["N° Alunni"], errors="coerce")
             df_reg["N° Alunni"] = n.apply(lambda x: "" if pd.isna(x) else (str(int(x)) if float(x).is_integer() else str(x)))
         st.dataframe(df_reg, use_container_width=True)
+        cexp1, cexp2 = st.columns(2)
+        try:
+            buf = io.BytesIO()
+            engine = None
+            try:
+                import openpyxl
+                engine = "openpyxl"
+            except Exception:
+                try:
+                    import xlsxwriter
+                    engine = "xlsxwriter"
+                except Exception:
+                    engine = None
+            if engine is None:
+                raise RuntimeError("Nessun engine Excel disponibile")
+            with pd.ExcelWriter(buf, engine=engine) as writer:
+                df_reg.to_excel(writer, index=False, sheet_name="Registro")
+            cexp1.download_button(
+                "📤 ESPORTA EXCEL REGISTRO",
+                data=buf.getvalue(),
+                file_name=f"registro_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        except Exception as ex:
+            cexp1.warning(f"Export Excel non disponibile: {ex}")
+
+        try:
+            pdf_bytes = df_to_pdf_bytes(df_reg, titolo="Registro Adozioni")
+            cexp2.download_button(
+                "📄 ESPORTA PDF REGISTRO",
+                data=pdf_bytes,
+                file_name=f"registro_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        except Exception as ex:
+            cexp2.warning(f"Export PDF non disponibile: {ex}")
 
 elif st.session_state.pagina == "Ricerca":
     st.subheader("🔍 Motore di Ricerca Adozioni")
@@ -1754,13 +1881,25 @@ elif st.session_state.pagina == "Ricerca":
                 if "N° Alunni" in df_export.columns:
                     df_export["N° Alunni"] = pd.to_numeric(df_export["N° Alunni"], errors="coerce").fillna(0).astype(int)
                 df_export.to_excel(out, index=False, sheet_name="Pivot Adozioni")
-                st.download_button(
+                cexp1, cexp2 = st.columns(2)
+                cexp1.download_button(
                     "📥 SCARICA EXCEL",
                     data=out.getvalue(),
                     file_name=f"pivot_adozioni_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
                 )
+                try:
+                    pdf_bytes = df_to_pdf_bytes(df_export, titolo="Pivot Adozioni")
+                    cexp2.download_button(
+                        "📄 SCARICA PDF",
+                        data=pdf_bytes,
+                        file_name=f"pivot_adozioni_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                except Exception as ex_pdf:
+                    cexp2.warning(f"Scarico PDF non disponibile: {ex_pdf}")
             except Exception as ex:
                 st.error(f"⚠️ Scarico Excel non disponibile: {ex}")
 # ------------------------------------------------------------------------------
@@ -2208,13 +2347,25 @@ elif st.session_state.pagina == "Ricerca Collane":
             if "Quantità" in df_export.columns:
                 df_export["Quantità"] = pd.to_numeric(df_export["Quantità"], errors="coerce").fillna(0).astype(int)
             df_export.to_excel(out, index=False, sheet_name="Ricerca Collane")
-            st.download_button(
+            cexp1, cexp2 = st.columns(2)
+            cexp1.download_button(
                 "📥 SCARICA EXCEL",
                 data=out.getvalue(),
                 file_name=f"ricerca_collane_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
+            try:
+                pdf_bytes = df_to_pdf_bytes(df_export, titolo="Ricerca Collane")
+                cexp2.download_button(
+                    "📄 SCARICA PDF",
+                    data=pdf_bytes,
+                    file_name=f"ricerca_collane_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            except Exception as ex_pdf:
+                cexp2.warning(f"Scarico PDF non disponibile: {ex_pdf}")
         except Exception as ex:
             st.error(f"⚠️ Scarico Excel non disponibile: {ex}")
 
@@ -2284,6 +2435,44 @@ elif st.session_state.pagina == "Ritirate":
                                 if not df_tip.empty:
                                     df_tip = df_tip.sort_values(by=["Titolo", "Editore"])
                                     st.dataframe(df_tip, use_container_width=True, hide_index=True)
+                                    cexp1, cexp2 = st.columns(2)
+                                    try:
+                                        buf = io.BytesIO()
+                                        engine = None
+                                        try:
+                                            import openpyxl
+                                            engine = "openpyxl"
+                                        except Exception:
+                                            try:
+                                                import xlsxwriter
+                                                engine = "xlsxwriter"
+                                            except Exception:
+                                                engine = None
+                                        if engine is None:
+                                            raise RuntimeError("Nessun engine Excel disponibile")
+                                        with pd.ExcelWriter(buf, engine=engine) as writer:
+                                            df_tip.to_excel(writer, index=False, sheet_name="Ritirate")
+                                        cexp1.download_button(
+                                            "📤 ESPORTA EXCEL",
+                                            data=buf.getvalue(),
+                                            file_name=f"ritiri_{plesso}_{tipo}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                            use_container_width=True,
+                                        )
+                                    except Exception as ex:
+                                        cexp1.warning(f"Export Excel non disponibile: {ex}")
+
+                                    try:
+                                        pdf_bytes = df_to_pdf_bytes(df_tip, titolo=f"Ritiri - {plesso} - {tipo}")
+                                        cexp2.download_button(
+                                            "📄 ESPORTA PDF",
+                                            data=pdf_bytes,
+                                            file_name=f"ritiri_{plesso}_{tipo}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                            mime="application/pdf",
+                                            use_container_width=True,
+                                        )
+                                    except Exception as ex:
+                                        cexp2.warning(f"Export PDF non disponibile: {ex}")
                                     tot_tipo = int(df_tip["Quantità"].sum())
                                     tot_plesso += tot_tipo
                                     st.markdown(f"<div class='totale-box'>Totale tipologia: <b>{tot_tipo}</b></div>", unsafe_allow_html=True)
@@ -2399,13 +2588,25 @@ elif st.session_state.pagina == "Appunti":
                     raise RuntimeError("Nessun engine Excel disponibile")
                 with pd.ExcelWriter(buf, engine=engine) as writer:
                     dfv.to_excel(writer, index=False, sheet_name="Appunti")
-                st.download_button(
+                cexp1, cexp2 = st.columns(2)
+                cexp1.download_button(
                     "📤 ESPORTA EXCEL APPUNTI",
                     data=buf.getvalue(),
                     file_name=f"appunti_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
                 )
+                try:
+                    pdf_bytes = df_to_pdf_bytes(dfv, titolo="Appunti")
+                    cexp2.download_button(
+                        "📄 ESPORTA PDF APPUNTI",
+                        data=pdf_bytes,
+                        file_name=f"appunti_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                except Exception as ex_pdf:
+                    cexp2.warning(f"Export PDF non disponibile: {ex_pdf}")
             except Exception as ex:
                 st.warning(f"Export Excel non disponibile: {ex}")
 
