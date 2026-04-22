@@ -1862,32 +1862,89 @@ elif st.session_state.pagina == "Inserimento":
             default_n_alunni = prefill.get("n_alunni", 0)
             n_alunni = st.number_input("👨‍🎓 N° Alunni (opzionale)", min_value=0, value=default_n_alunni, key=f"alunni_{st.session_state.form_id}")
             
+        sez_norm = str(sez_lett or "").strip().upper()
+        dup_key = f"{str(plesso or '').strip().upper()}||{str(titolo_scelto or '').strip().upper()}||{sez_norm}"
+        if "dup_pending" not in st.session_state:
+            st.session_state.dup_pending = None
+        if st.session_state.dup_pending and st.session_state.dup_pending != dup_key:
+            st.session_state.dup_pending = None
+
+        def _salva_adozione():
+            info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
+            n_alunni_val = n_alunni if n_alunni > 0 else ""
+            nuova_riga = pd.DataFrame([{
+                "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "Plesso": plesso, "Materia": info.iloc[0, 1], "Titolo": titolo_scelto,
+                "Editore": info.iloc[0, 2], "Agenzia": info.iloc[0, 3], "N° sezioni": n_sez,
+                "Sezione": sez_norm, "Saggio Consegna": saggio, "N° Alunni": n_alunni_val, "Note": note
+            }])
+            df_attuale = carica_db_adozioni()
+            df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
+            df_finale.to_csv(DB_FILE, index=False)
+            backup_su_google_sheets(df_finale)
+            st.session_state.form_id += 1
+            st.session_state.prefill_adozione = {}
+            st.session_state.dup_pending = None
+            st.success("✅ Registrazione avvenuta con successo!")
+            ctx = st.session_state.get("return_ctx") or {}
+            if ctx.get("pagina"):
+                st.session_state.pagina = ctx.get("pagina")
+                if ctx.get("sel_plessi_storico") is not None:
+                    st.session_state["sel_plessi_storico"] = ctx.get("sel_plessi_storico")
+                if ctx.get("open_tipo_key") and (ctx.get("open_tipo_val") is not None):
+                    st.session_state[ctx["open_tipo_key"]] = ctx.get("open_tipo_val")
+                st.session_state.return_ctx = {}
+            st.rerun()
+
+        if st.session_state.dup_pending == dup_key and titolo_scelto and plesso and saggio != "-":
+            df_attuale = carica_db_adozioni().astype(str)
+            if not df_attuale.empty and "Plesso" in df_attuale.columns and "Titolo" in df_attuale.columns:
+                p_norm = str(plesso).strip().upper()
+                t_norm = str(titolo_scelto).strip().upper()
+                p_col = df_attuale["Plesso"].astype(str).str.strip().str.upper()
+                t_col = df_attuale["Titolo"].astype(str).str.strip().str.upper()
+                mask = (p_col == p_norm) & (t_col == t_norm)
+                if "Sezione" in df_attuale.columns:
+                    s_col = df_attuale["Sezione"].astype(str).str.strip().str.upper()
+                    if sez_norm:
+                        mask = mask & (s_col == sez_norm)
+                    else:
+                        mask = mask & (s_col == "")
+                df_dup = df_attuale.loc[mask].copy()
+            else:
+                df_dup = pd.DataFrame()
+            st.warning("⚠️ Questa adozione sembra già registrata. Vuoi registrarla comunque?")
+            if not df_dup.empty:
+                cols_show = [c for c in ["Data", "Plesso", "Titolo", "Sezione", "N° sezioni", "Saggio Consegna", "N° Alunni", "Note"] if c in df_dup.columns]
+                st.dataframe(df_dup[cols_show] if cols_show else df_dup, use_container_width=True, hide_index=True)
+            c_dup1, c_dup2 = st.columns(2)
+            if c_dup1.button("✅ REGISTRA COMUNQUE", use_container_width=True, type="primary", key=f"dup_ok_{st.session_state.form_id}"):
+                _salva_adozione()
+            if c_dup2.button("❌ ANNULLA", use_container_width=True, key=f"dup_no_{st.session_state.form_id}"):
+                st.session_state.dup_pending = None
+                st.rerun()
+
         if st.button("💾 SALVA ADOZIONE", use_container_width=True, type="primary"):
             if titolo_scelto and plesso and saggio != "-":
-                info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
-                n_alunni_val = n_alunni if n_alunni > 0 else ""
-                nuova_riga = pd.DataFrame([{
-                    "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "Plesso": plesso, "Materia": info.iloc[0, 1], "Titolo": titolo_scelto,
-                    "Editore": info.iloc[0, 2], "Agenzia": info.iloc[0, 3], "N° sezioni": n_sez,
-                    "Sezione": sez_lett.upper(), "Saggio Consegna": saggio, "N° Alunni": n_alunni_val, "Note": note
-                }])
-                df_attuale = carica_db_adozioni()
-                df_finale = pd.concat([df_attuale, nuova_riga], ignore_index=True)
-                df_finale.to_csv(DB_FILE, index=False)
-                backup_su_google_sheets(df_finale)
-                st.session_state.form_id += 1
-                st.session_state.prefill_adozione = {}
-                st.success("✅ Registrazione avvenuta con successo!")
-                ctx = st.session_state.get("return_ctx") or {}
-                if ctx.get("pagina"):
-                    st.session_state.pagina = ctx.get("pagina")
-                    if ctx.get("sel_plessi_storico") is not None:
-                        st.session_state["sel_plessi_storico"] = ctx.get("sel_plessi_storico")
-                    if ctx.get("open_tipo_key") and (ctx.get("open_tipo_val") is not None):
-                        st.session_state[ctx["open_tipo_key"]] = ctx.get("open_tipo_val")
-                    st.session_state.return_ctx = {}
-                st.rerun()
+                df_attuale = carica_db_adozioni().astype(str)
+                is_dup = False
+                if not df_attuale.empty and "Plesso" in df_attuale.columns and "Titolo" in df_attuale.columns:
+                    p_norm = str(plesso).strip().upper()
+                    t_norm = str(titolo_scelto).strip().upper()
+                    p_col = df_attuale["Plesso"].astype(str).str.strip().str.upper()
+                    t_col = df_attuale["Titolo"].astype(str).str.strip().str.upper()
+                    mask = (p_col == p_norm) & (t_col == t_norm)
+                    if "Sezione" in df_attuale.columns:
+                        s_col = df_attuale["Sezione"].astype(str).str.strip().str.upper()
+                        if sez_norm:
+                            mask = mask & (s_col == sez_norm)
+                        else:
+                            mask = mask & (s_col == "")
+                    is_dup = bool(mask.any())
+                if is_dup:
+                    st.session_state.dup_pending = dup_key
+                    st.rerun()
+                _salva_adozione()
             elif saggio == "-":
                 st.error("⚠️ Devi specificare SI/NO!")
             else:
