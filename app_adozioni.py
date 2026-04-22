@@ -1863,7 +1863,8 @@ elif st.session_state.pagina == "Inserimento":
             n_alunni = st.number_input("👨‍🎓 N° Alunni (opzionale)", min_value=0, value=default_n_alunni, key=f"alunni_{st.session_state.form_id}")
             
         sez_norm = str(sez_lett or "").strip().upper()
-        dup_key = f"{str(plesso or '').strip().upper()}||{str(titolo_scelto or '').strip().upper()}||{sez_norm}"
+        dup_sez_key = sez_norm if sez_norm else "*"
+        dup_key = f"{str(plesso or '').strip().upper()}||{str(titolo_scelto or '').strip().upper()}||{dup_sez_key}"
         if "dup_pending" not in st.session_state:
             st.session_state.dup_pending = None
         if st.session_state.dup_pending and st.session_state.dup_pending != dup_key:
@@ -1908,8 +1909,6 @@ elif st.session_state.pagina == "Inserimento":
                     s_col = df_attuale["Sezione"].astype(str).str.strip().str.upper()
                     if sez_norm:
                         mask = mask & (s_col == sez_norm)
-                    else:
-                        mask = mask & (s_col == "")
                 df_dup = df_attuale.loc[mask].copy()
             else:
                 df_dup = pd.DataFrame()
@@ -1938,8 +1937,6 @@ elif st.session_state.pagina == "Inserimento":
                         s_col = df_attuale["Sezione"].astype(str).str.strip().str.upper()
                         if sez_norm:
                             mask = mask & (s_col == sez_norm)
-                        else:
-                            mask = mask & (s_col == "")
                     is_dup = bool(mask.any())
                 if is_dup:
                     st.session_state.dup_pending = dup_key
