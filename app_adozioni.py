@@ -1872,11 +1872,12 @@ elif st.session_state.pagina == "Inserimento":
 
         def _salva_adozione():
             info = catalogo[catalogo.iloc[:, 0] == titolo_scelto]
-            n_alunni_val = n_alunni if n_alunni > 0 else ""
+            n_alunni_val = str(int(n_alunni)) if int(n_alunni or 0) > 0 else ""
+            n_sez_val = str(int(n_sez)) if int(n_sez or 0) > 0 else "1"
             nuova_riga = pd.DataFrame([{
                 "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
                 "Plesso": plesso, "Materia": info.iloc[0, 1], "Titolo": titolo_scelto,
-                "Editore": info.iloc[0, 2], "Agenzia": info.iloc[0, 3], "N° sezioni": n_sez,
+                "Editore": info.iloc[0, 2], "Agenzia": info.iloc[0, 3], "N° sezioni": n_sez_val,
                 "Sezione": sez_norm, "Saggio Consegna": saggio, "N° Alunni": n_alunni_val, "Note": note
             }])
             df_attuale = carica_db_adozioni()
@@ -2043,11 +2044,11 @@ elif st.session_state.pagina == "Modifica":
                                         df_full.at[i, 'Materia'] = info_new.iloc[0, 1]
                                         df_full.at[i, 'Editore'] = info_new.iloc[0, 2]
                                         df_full.at[i, 'Agenzia'] = info_new.iloc[0, 3]
-                                    df_full.at[i, 'N° sezioni'] = nuovo_n_sez
+                                    df_full.at[i, 'N° sezioni'] = str(int(nuovo_n_sez))
                                     df_full.at[i, 'Sezione'] = nuova_sez_lett.upper()
                                     df_full.at[i, 'Saggio Consegna'] = nuovo_saggio
                                     df_full.at[i, 'Note'] = nuove_note
-                                    df_full.at[i, 'N° Alunni'] = nuovo_n_alunni if nuovo_n_alunni > 0 else ""
+                                    df_full.at[i, 'N° Alunni'] = str(int(nuovo_n_alunni)) if int(nuovo_n_alunni or 0) > 0 else ""
 
                                     df_full.to_csv(DB_FILE, index=False)
                                     backup_su_google_sheets(df_full)
