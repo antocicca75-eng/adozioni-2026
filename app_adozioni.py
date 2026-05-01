@@ -977,6 +977,10 @@ with st.sidebar:
         st.session_state.pagina = "Registro";
         st.rerun()
 
+    if st.button("📑 EXCEL ADOZIONI", use_container_width=True):
+        st.session_state.pagina = "ExcelAdozioni";
+        st.rerun()
+
     if st.button("🔍 PIVOT ADOZIONI", use_container_width=True):
         st.session_state.pagina = "Ricerca";
         st.rerun()
@@ -1033,7 +1037,182 @@ with st.sidebar:
 # ==============================================================================
 # BLOCCO 9: PAGINA CONSEGNE (STAMPA DOPPIA E PDF)
 # ==============================================================================
-if st.session_state.pagina == "Consegne":
+if st.session_state.pagina == "ExcelAdozioni":
+    st.header("📑 Excel Adozioni")
+
+    st.info("In Streamlit non si può aprire direttamente Excel come programma sul PC di ogni client. Qui però puoi caricare un file Excel, modificarlo come tabella, filtrarlo e riscaricarlo aggiornato.")
+
+    def _excel_engine():
+        try:
+            import openpyxl
+            return "openpyxl"
+        except Exception:
+            try:
+                import xlsxwriter
+                return "xlsxwriter"
+            except Exception:
+                return None
+
+    def _set_excel_bytes(b, nome_file="adozioni.xlsx"):
+        st.session_state.excel_adozioni_bytes = b
+        st.session_state.excel_adozioni_filename = nome_file
+        st.session_state.excel_adozioni_sheets = {}
+
+    if "excel_adozioni_sheets" not in st.session_state:
+        st.session_state.excel_adozioni_sheets = {}
+
+    tab_up, tab_local = st.tabs(["📤 Carica da PC", "📁 Apri file locale (PC server)"])
+
+    with tab_up:
+        up = st.file_uploader("Carica un file Excel", type=["xlsx", "xls"], key="excel_adozioni_upload")
+        if up is not None:
+            _set_excel_bytes(up.getvalue(), getattr(up, "name", "adozioni.xlsx"))
+            st.success(f"File caricato: {getattr(up, 'name', 'adozioni.xlsx')}")
+
+    with tab_local:
+        if "excel_adozioni_path" not in st.session_state:
+            st.session_state.excel_adozioni_path = ""
+        st.session_state.excel_adozioni_path = st.text_input(
+            "Percorso file Excel sul PC che esegue l'app (server)",
+            value=st.session_state.excel_adozioni_path,
+            key="excel_adozioni_path_in",
+        )
+        if st.button("Apri file locale", use_container_width=True, key="excel_adozioni_open_local"):
+            try:
+                p = str(st.session_state.excel_adozioni_path).strip()
+                with open(p, "rb") as f:
+                    _set_excel_bytes(f.read(), os.path.basename(p) or "adozioni.xlsx")
+                st.success("File locale caricato.")
+            except Exception as e:
+                st.error(f"Impossibile aprire il file: {e}")
+
+    b = st.session_state.get("excel_adozioni_bytes")
+    if not b:
+        st.warning("Carica un file Excel per iniziare.")
+    else:
+        try:
+            xl = pd.ExcelFile(io.BytesIO(b))
+            fogli = xl.sheet_names
+        except Exception as e:
+            st.error(f"File Excel non leggibile: {e}")
+            fogli = []
+
+        if fogli:
+            foglio = st.selectbox("Seleziona foglio", fogli, key="excel_adozioni_sheet")
+
+            try:
+                df_originale = xl.parse(sheet_name=foglio)
+            except Exception as e:
+                st.error(f"Errore lettura foglio '{foglio}': {e}")
+                df_originale = pd.DataFrame()
+
+            df_base = st.session_state.excel_adozioni_sheets.get(foglio, df_originale).copy()
+
+            editor_fn = getattr(st, "data_editor", None) or getattr(st, "experimental_data_editor", None)
+            edit_mode = st.checkbox("Modifica dati", value=True, key="excel_adozioni_edit_mode")
+            if edit_mode:
+                if editor_fn is None:
+                    st.warning("La tua versione di Streamlit non supporta la modifica tabellare. Puoi comunque filtrare e scaricare.")
+                else:
+                    df_base = editor_fn(
+                        df_base,
+                        use_container_width=True,
+                        num_rows="dynamic",
+                        key=f"excel_adozioni_editor_{foglio}",
+                    )
+                    st.session_state.excel_adozioni_sheets[foglio] = df_base.copy()
+
+            with st.expander("🔎 Filtri", expanded=False):
+                col_f, col_ctrl = st.columns([0.45, 0.55])
+                colonna = col_f.selectbox(
+                    "Colonna",
+                    ["(nessuno)"] + list(df_base.columns),
+                    key=f"excel_adozioni_filter_col_{foglio}",
+                )
+
+                df_view = df_base
+                if colonna != "(nessuno)" and colonna in df_base.columns:
+                    s = df_base[colonna]
+                    if pd.api.types.is_numeric_dtype(s):
+                        vmin = float(pd.to_numeric(s, errors="coerce").min())
+                        vmax = float(pd.to_numeric(s, errors="coerce").max())
+                        if pd.isna(vmin) or pd.isna(vmax):
+                            st.info("Colonna numerica senza valori utilizzabili per un range.")
+                        else:
+                            r = col_ctrl.slider(
+                                "Intervallo",
+                                min_value=vmin,
+                                max_value=vmax,
+                                value=(vmin, vmax),
+                                key=f"excel_adozioni_filter_rng_{foglio}",
+                            )
+                            sv = pd.to_numeric(s, errors="coerce")
+                            df_view = df_base[(sv >= r[0]) & (sv <= r[1])]
+                    else:
+                        txt = col_ctrl.text_input("Contiene", value="", key=f"excel_adozioni_filter_txt_{foglio}")
+                        if txt:
+                            df_view = df_base[s.astype(str).str.contains(str(txt), case=False, na=False)]
+
+            st.subheader("Anteprima (con filtri)")
+            st.dataframe(df_view, use_container_width=True, hide_index=True)
+
+            c_dl1, c_dl2 = st.columns(2)
+            try:
+                engine = _excel_engine()
+                if engine is None:
+                    raise RuntimeError("Nessun engine Excel disponibile")
+
+                buf_sheet = io.BytesIO()
+                with pd.ExcelWriter(buf_sheet, engine=engine) as writer:
+                    df_base.to_excel(writer, index=False, sheet_name=str(foglio)[:31] or "Foglio1")
+                c_dl1.download_button(
+                    "⬇️ SCARICA FOGLIO (MODIFICATO)",
+                    data=buf_sheet.getvalue(),
+                    file_name=f"excel_adozioni_{str(foglio).strip().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+
+                buf_view = io.BytesIO()
+                with pd.ExcelWriter(buf_view, engine=engine) as writer:
+                    df_view.to_excel(writer, index=False, sheet_name=str(foglio)[:31] or "Foglio1")
+                c_dl2.download_button(
+                    "⬇️ SCARICA VISTA FILTRATA",
+                    data=buf_view.getvalue(),
+                    file_name=f"excel_adozioni_filtrato_{str(foglio).strip().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.warning(f"Download Excel non disponibile: {e}")
+
+            st.markdown("---")
+            st.subheader("Scarica workbook completo")
+            try:
+                engine = _excel_engine()
+                if engine is None:
+                    raise RuntimeError("Nessun engine Excel disponibile")
+                buf_all = io.BytesIO()
+                with pd.ExcelWriter(buf_all, engine=engine) as writer:
+                    for sh in fogli:
+                        try:
+                            df_sh = st.session_state.excel_adozioni_sheets.get(sh)
+                            if df_sh is None:
+                                df_sh = xl.parse(sheet_name=sh)
+                            df_sh.to_excel(writer, index=False, sheet_name=str(sh)[:31] or "Foglio")
+                        except Exception:
+                            continue
+                st.download_button(
+                    "📦 SCARICA WORKBOOK (TUTTI I FOGLI)",
+                    data=buf_all.getvalue(),
+                    file_name=f"excel_adozioni_completo_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.warning(f"Download workbook non disponibile: {e}")
+
+elif st.session_state.pagina == "Consegne":
     st.header("📄 Generazione Moduli Consegna")
 
     if "storico_consegne" not in st.session_state:
